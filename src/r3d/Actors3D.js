@@ -21,6 +21,8 @@
     const F = R3D.FACE;
 
     const ACTOR_Z = 0.45;
+    /** Tommy is drawn a shade larger than his collision box. See `buildTommy`. */
+    const TOMMY_SCALE = 1.12;
     const Actors3D = {};
 
     /** One merged mesh from a builder callback, with a shared material. */
@@ -42,58 +44,90 @@
      * scaled in world units where one tile is one unit — he is `C.PLAYER_H`
      * pixels tall, which is a shade over a tile and a quarter.
      */
+    /**
+     * The miner.
+     *
+     * Rebuilt with a much stronger silhouette, because the first attempt was a
+     * stack of same-sized boxes that vanished against a room full of boxes. The
+     * things doing the work here are the ones a 2D platformer character always
+     * relies on:
+     *
+     *   - **A big head and a small body.** Roughly a third of his height is
+     *     helmet. That is what makes a 20-pixel character legible at all, and
+     *     realistic proportions at this size read as a smudge.
+     *   - **A hard colour break at the waist.** Bright coat over dark trousers,
+     *     so the silhouette splits into two blocks the eye can track while he
+     *     moves rather than one column.
+     *   - **A rim of high-value trim** — the helmet, the lamp housing, the belt
+     *     buckle — all near-white, so there is something on him brighter than
+     *     anything in the room behind him.
+     */
     function buildTommy(mat, glowMat) {
         const g = new THREE.Group();
-        const skin = R3D.col('#d9a273');
-        const coat = R3D.col('#2f6f8f');
-        const coatDark = R3D.col('#24576f');
-        const trouser = R3D.col('#3a3a48');
-        const boot = R3D.col('#241d18');
-        const helmet = R3D.col('#e0a52c');
+        const skin = R3D.col('#e8b487');
+        const coat = R3D.col('#3d8ec4');
+        const coatDark = R3D.col('#2a6b99');
+        const coatLight = R3D.col('#67b4e4');
+        const trouser = R3D.col('#33384a');
+        const boot = R3D.col('#1d1a17');
+        const helmet = R3D.col('#ffc233');
+        const helmetLight = R3D.col('#ffe08a');
+        const strap = R3D.col('#8a6a3a');
 
         const body = part(function (b) {
-            b.box(0, 0.32, 0, 0.5, 0.52, 0.34, coat, F.ALL, coatDark);
-            b.box(0, 0.16, 0.18, 0.3, 0.2, 0.05, coatDark, F.FRONT);
+            b.box(0, 0.36, 0, 0.54, 0.46, 0.36, coat, F.ALL, coatLight);
+            // Shoulders, so the torso is not a plain cuboid.
+            b.box(0, 0.54, 0, 0.62, 0.14, 0.38, coatLight, F.ALL, coatLight);
+            // Belt and buckle — the hard break at the waist.
+            b.box(0, 0.16, 0, 0.58, 0.11, 0.38, strap, F.ALL);
+            b.box(0, 0.16, 0.20, 0.13, 0.13, 0.04, R3D.col('#ffe6a0'), F.FRONT);
+            b.box(0, 0.30, 0.19, 0.26, 0.14, 0.04, coatDark, F.FRONT);
         }, mat);
         g.add(body);
 
         const head = new THREE.Group();
-        head.position.y = 0.66;
+        head.position.y = 0.70;
         head.add(part(function (b) {
-            b.box(0, 0, 0, 0.34, 0.3, 0.3, skin);
-            b.box(0, 0.19, 0, 0.42, 0.16, 0.38, helmet);
-            b.box(0, 0.13, 0.2, 0.44, 0.07, 0.14, helmet);
-            b.box(-0.08, 0.02, 0.16, 0.05, 0.05, 0.02, R3D.col('#1a1a1a'), F.FRONT);
-            b.box(0.08, 0.02, 0.16, 0.05, 0.05, 0.02, R3D.col('#1a1a1a'), F.FRONT);
+            b.box(0, 0.02, 0, 0.40, 0.36, 0.34, skin);
+            // Helmet: a dome with a brim that overhangs the face.
+            b.box(0, 0.26, 0, 0.48, 0.20, 0.42, helmet, F.ALL, helmetLight);
+            b.box(0, 0.36, 0, 0.34, 0.10, 0.30, helmetLight, F.ALL, helmetLight);
+            b.box(0, 0.17, 0.24, 0.50, 0.08, 0.16, helmet, F.ALL, helmetLight);
+            // Lamp housing on the brow.
+            b.box(0, 0.24, 0.23, 0.17, 0.13, 0.10, R3D.col('#4a4a52'), F.ALL);
+            // Eyes and a moustache — enough face to have a direction.
+            b.box(-0.09, 0.04, 0.18, 0.06, 0.07, 0.02, R3D.col('#221a14'), F.FRONT);
+            b.box(0.09, 0.04, 0.18, 0.06, 0.07, 0.02, R3D.col('#221a14'), F.FRONT);
+            b.box(0, -0.08, 0.18, 0.22, 0.06, 0.02, R3D.col('#6b4a28'), F.FRONT);
         }, mat));
-        // The lamp on the helmet. It is the light source the whole game is lit
-        // by, so it also gets a visible lens rather than being invisible magic.
         head.add(part(function (b) {
-            b.box(0, 0.17, 0.22, 0.14, 0.12, 0.06, R3D.col('#fff0c0'), F.ALL);
+            b.box(0, 0.24, 0.30, 0.13, 0.10, 0.05, R3D.col('#fff6d0'), F.ALL);
         }, glowMat));
         g.add(head);
 
         const legL = new THREE.Group();
-        legL.position.set(-0.12, 0.08, 0);
+        legL.position.set(-0.14, 0.14, 0);
         legL.add(part(function (b) {
-            b.box(0, -0.16, 0, 0.18, 0.32, 0.2, trouser);
-            b.box(0, -0.34, 0.03, 0.2, 0.1, 0.26, boot);
+            b.box(0, -0.18, 0, 0.20, 0.34, 0.22, trouser);
+            b.box(0, -0.38, 0.04, 0.23, 0.12, 0.30, boot, F.ALL, R3D.col('#2e2823'));
         }, mat));
         const legR = legL.clone();
-        legR.position.x = 0.12;
+        legR.position.x = 0.14;
         g.add(legL, legR);
 
         const armL = new THREE.Group();
-        armL.position.set(-0.28, 0.52, 0);
+        armL.position.set(-0.32, 0.54, 0);
         armL.add(part(function (b) {
-            b.box(0, -0.16, 0, 0.14, 0.34, 0.16, coat);
-            b.box(0, -0.36, 0, 0.15, 0.1, 0.17, skin);
+            b.box(0, -0.16, 0, 0.15, 0.32, 0.17, coat, F.ALL, coatLight);
+            b.box(0, -0.36, 0, 0.17, 0.12, 0.19, skin);
         }, mat));
         const armR = armL.clone();
-        armR.position.x = 0.28;
+        armR.position.x = 0.32;
         g.add(armL, armR);
 
         g.userData = { head: head, legL: legL, legR: legR, armL: armL, armR: armR, body: body };
+        // Slightly larger than life. He has to win against a room of boxes.
+        g.scale.setScalar(TOMMY_SCALE);
         return g;
     }
 
@@ -111,8 +145,11 @@
 
         // Squash on landing, stretch while falling. Read from the simulation
         // rather than invented here, so it is always in step with the impact.
+        // Multiplied over the rig's base scale, not assigned — assigning it
+        // silently reset the size the rig was built at.
         const sq = player.squash;
-        g.scale.set(1 + sq * 0.3, 1 - sq * 0.28, 1 + sq * 0.15);
+        const k = TOMMY_SCALE;
+        g.scale.set(k * (1 + sq * 0.3), k * (1 - sq * 0.28), k * (1 + sq * 0.15));
 
         let swing = 0;
         if (pose === 'run') swing = Math.sin(t * 13) * Util.clamp(speed / C.MOVE_MAX, 0, 1) * 0.9;
@@ -400,11 +437,14 @@
             mesh.rotation.y = p.kind === 'ore' ? t * 1.6 + p.phase : Math.sin(t + p.phase) * 0.25;
 
             if (p.spec.glow) {
+                // Tight and bright. A wide faint halo does not read as glow at
+                // this scale — it reads as a dirty lens, and there are a dozen
+                // of them on screen at once.
                 const halo = set.pools.glowSprite.next();
                 halo.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.12);
-                const pulse = 1.5 + Math.sin(t * 3 + p.phase) * 0.2;
+                const pulse = 0.95 + Math.sin(t * 3 + p.phase) * 0.12;
                 halo.scale.set(pulse, pulse, 1);
-                tint(halo, p.kind === 'tnt' ? '#ff8a3c' : (p.kind === 'oxygen' ? '#5cc8de' : '#ffd84a'), 0.35);
+                tint(halo, p.kind === 'tnt' ? '#ff8a3c' : (p.kind === 'oxygen' ? '#5cc8de' : '#ffd84a'), 0.75);
             }
         }
 

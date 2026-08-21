@@ -113,16 +113,18 @@
              * looked empty. The backdrop is not scenery here: it is the only
              * thing telling you that you are underground rather than in space.
              */
-            back:      '#2b2118',
-            backFar:   '#3a2c1f',
+            back:      '#33261a',
+            backFar:   '#241a13',
+            /** The warm floor of the backdrop ramp — see `backdropCanvas`. */
+            backGlow:  '#5a3a20',
             fog:       '#1c150e',
             ambient:   '#4a4260',
             hemi:      '#5b5170',
             lamp:      '#ffb867',
-            crystal:   ['#6fd3ff', '#b78bff'],
-            spike:     '#8e9099',
-            water:     '#2b6fa8',
-            lava:      '#e04b3a'
+            crystal:   ['#5fd8ff', '#c48bff'],
+            spike:     '#9aa0ad',
+            water:     '#2f7cbd',
+            lava:      '#ff5a2a'
         },
         slate: {
             rock:      ['#414a55', '#4b5561', '#39424c'],
@@ -132,16 +134,17 @@
             timberTop: '#8c7458',
             ladder:    '#8794a1',
             rope:      '#a8a389',
-            back:      '#1c232c',
-            backFar:   '#2a323d',
+            back:      '#232c38',
+            backFar:   '#161c25',
+            backGlow:  '#3c4c63',
             fog:       '#141a21',
             ambient:   '#415271',
             hemi:      '#4e5f80',
             lamp:      '#9fd0ff',
-            crystal:   ['#7fe8d8', '#8fb0ff'],
-            spike:     '#9aa3ad',
-            water:     '#26597f',
-            lava:      '#d8503c'
+            crystal:   ['#6ff0dc', '#8fb8ff'],
+            spike:     '#a6b0bd',
+            water:     '#2a6494',
+            lava:      '#ff5c3c'
         },
         ember: {
             rock:      ['#573429', '#633d2e', '#4a2c22'],
@@ -151,16 +154,22 @@
             timberTop: '#9c6038',
             ladder:    '#b57748',
             rope:      '#c98f54',
-            back:      '#2d1610',
-            backFar:   '#3e1e14',
+            /**
+             * Cinderdeep is the lava-cave reference: a deep red ramp going
+             * almost black at the roof and molten at the floor, with the
+             * silhouettes reading against it rather than disappearing into it.
+             */
+            back:      '#4a1c14',
+            backFar:   '#240d0a',
+            backGlow:  '#8a3418',
             fog:       '#23100b',
-            ambient:   '#5f373a',
-            hemi:      '#733e3e',
-            lamp:      '#ff9a4d',
-            crystal:   ['#ffb066', '#ff6f5e'],
-            spike:     '#a08a80',
-            water:     '#3a5f7a',
-            lava:      '#ff6a34'
+            ambient:   '#6b3a3c',
+            hemi:      '#7d4442',
+            lamp:      '#ffa055',
+            crystal:   ['#ffbe6e', '#ff7a62'],
+            spike:     '#b09a8e',
+            water:     '#3f6a88',
+            lava:      '#ff7326'
         }
     };
 
@@ -375,6 +384,98 @@
         return cv;
     }
 
+    /**
+     * The cavern behind the playfield, baked as one image.
+     *
+     * This replaces a field of flat silhouette boxes, and the difference is the
+     * single biggest lift in the whole render. What a 2D platformer background
+     * actually does is **grade**: a smooth vertical ramp, then three or four
+     * ridge lines in receding values with haze between them, so the eye reads
+     * enormous depth behind a shallow playfield. Boxes cannot do that — every
+     * one is a hard edge at the same value, which is why the rooms looked like
+     * platforms floating in front of a black wall.
+     *
+     * Drawn wide and shallow and stretched over the room; nobody is going to
+     * study the sampling on something eight units behind the action.
+     */
+    function backdropCanvas(pal) {
+        const W = 512, H = 288;
+        const cv = document.createElement('canvas');
+        cv.width = W;
+        cv.height = H;
+        const ctx = cv.getContext('2d');
+        const rnd = TNT.Util.rng(0xB4CD40 + pal.back.length);
+
+        // The ramp. Darker at the roof, warmer toward the floor, because the
+        // light in a mine comes from what is burning down there.
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, pal.backFar);
+        sky.addColorStop(0.55, pal.back);
+        sky.addColorStop(1, pal.backGlow || pal.back);
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, W, H);
+
+        /** One ridge line of jagged rock, filled to the bottom of the canvas. */
+        const ridge = (baseY, amp, step, fill) => {
+            ctx.beginPath();
+            ctx.moveTo(0, H);
+            ctx.lineTo(0, baseY);
+            for (let x = 0; x <= W; x += step) {
+                ctx.lineTo(x, baseY - rnd.range(0, amp));
+                ctx.lineTo(x + step * 0.5, baseY - rnd.range(0, amp * 0.6));
+            }
+            ctx.lineTo(W, H);
+            ctx.closePath();
+            ctx.fillStyle = fill;
+            ctx.fill();
+        };
+
+        // Four layers, each nearer, each a shade more contrasted. The values
+        // have to separate or the layers merge into one silhouette.
+        ridge(H * 0.42, H * 0.20, 46, mixHex(pal.backFar, pal.rock[0], 0.30));
+        ridge(H * 0.56, H * 0.17, 34, mixHex(pal.backFar, pal.rock[0], 0.50));
+        ridge(H * 0.70, H * 0.14, 26, mixHex(pal.back, pal.rock[2], 0.65));
+        ridge(H * 0.84, H * 0.10, 18, mixHex(pal.back, pal.rock[2], 0.85));
+
+        // Distant lamps, deep in the workings.
+        for (let i = 0; i < 14; i++) {
+            const x = rnd.range(0, W);
+            const y = rnd.range(H * 0.45, H * 0.9);
+            const r = rnd.range(4, 11);
+            const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+            g.addColorStop(0, 'rgba(255,190,110,0.5)');
+            g.addColorStop(1, 'rgba(255,190,110,0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        }
+
+        return cv;
+    }
+
+    /** Blend two hex strings in sRGB and return a css colour. */
+    function mixHex(a, b, t) {
+        const ca = new THREE.Color(a), cb = new THREE.Color(b);
+        ca.lerp(cb, t);
+        return '#' + ca.getHexString();
+    }
+
+    /** One baked backdrop per palette, made on demand. */
+    const _backdrops = new Map();
+    R3D.backdropTexture = function (pal) {
+        let tex = _backdrops.get(pal);
+        if (tex) return tex;
+        tex = new THREE.CanvasTexture(backdropCanvas(pal));
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        // A canvas holds sRGB values. Left unflagged, Three samples it as
+        // linear and every colour comes out lifted — the backdrop rendered as
+        // pale grey wallpaper rather than a dark cavern, which then blew out
+        // every additive glow drawn over it.
+        tex.encoding = THREE.sRGBEncoding;
+        tex.needsUpdate = true;
+        _backdrops.set(pal, tex);
+        return tex;
+    };
+
     const _textures = new Map();
 
     /**
@@ -396,6 +497,7 @@
         // marks into mud at the distance the camera actually sits.
         tex.magFilter = THREE.NearestFilter;
         tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.encoding = THREE.sRGBEncoding;
         tex.needsUpdate = true;
         _textures.set(name, tex);
         return tex;

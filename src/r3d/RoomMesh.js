@@ -128,15 +128,24 @@
                 b.box(tx + run / 2, R3D.tileY(ty), ROCK_Z, run, 1, ROCK_D,
                       face, mask, lit ? topCol : undefined);
 
-                // A lit lip along the top edge, and moss on some of it. Cheap,
-                // and it is most of what stops a wall reading as a flat block.
+                /*
+                 * The capped top — the same silhouette the platforms use, and
+                 * the reason a ledge of rock reads as a surface you can stand
+                 * on rather than as the top edge of a coloured rectangle. The
+                 * cap overhangs the face in Z, so the key light catches it and
+                 * it throws its own shadow line.
+                 */
                 if (lit) {
-                    b.box(tx + run / 2, R3D.tileY(ty) + 0.46, ROCK_Z + ROCK_D / 2 - 0.02,
-                          run, 0.09, 0.06, topCol, F.FRONT | F.TOP);
+                    const capY = R3D.tileY(ty) + 0.38;
+                    b.box(tx + run / 2, capY, ROCK_Z + ROCK_D / 2 + 0.10,
+                          run, 0.24, ROCK_D * 0.3, topCol, F.SLAB, topCol);
+                    // Shadow under the overhang.
+                    b.box(tx + run / 2, capY - 0.14, ROCK_Z + ROCK_D / 2 + 0.02,
+                          run, 0.07, 0.04, R3D.mixCol(pal.rock[2], '#000000', 0.55), F.FRONT);
                     for (let i = 0; i < run; i++) {
-                        if (Util.tileHash(tx + i, ty) % 5 !== 0) continue;
-                        b.box(tx + i + 0.5, R3D.tileY(ty) + 0.42, ROCK_Z + ROCK_D / 2 + 0.01,
-                              0.8, 0.16, 0.04, mossCol, F.FRONT);
+                        if (Util.tileHash(tx + i, ty) % 4 !== 0) continue;
+                        b.box(tx + i + 0.5, capY + 0.14, ROCK_Z + ROCK_D / 2 + 0.16,
+                              0.86, 0.14, 0.06, mossCol, F.SLAB, mossCol);
                     }
                 }
 
@@ -193,16 +202,42 @@
                 switch (t) {
                     case T.PLATFORM:
                     case T.CRUMBLE: {
-                        // Boards sit at the *top* of their tile: that is the
-                        // surface the physics lands you on, and drawing them
-                        // centred puts the visual half a tile below your feet.
+                        /*
+                         * A capped profile, not a slab.
+                         *
+                         * The platform art in every good 2D platformer is the
+                         * same three parts: a bright deck, an overhanging lip
+                         * that casts the deck forward, and a darker body
+                         * hanging under it. That silhouette is what makes a
+                         * ledge read instantly as *standable* from across the
+                         * room. A single box — which is what this was — reads
+                         * as a coloured bar and nothing else.
+                         *
+                         * Boards sit at the top of their tile because that is
+                         * the surface the physics lands you on.
+                         */
                         const c = t === T.CRUMBLE ? crumbleCol : timber;
-                        b.box(x, y + 0.34, TRIM_Z, 1, 0.30, TRIM_D, c, F.SLAB, timberTop);
+                        const capTop = t === T.CRUMBLE ? R3D.mixCol(pal.timberTop, '#000000', 0.35)
+                                                       : timberTop;
+                        // Deck: proud of the body in Z and a touch wider.
+                        b.box(x, y + 0.40, TRIM_Z + 0.12, 1, 0.18, TRIM_D + 0.22,
+                              capTop, F.SLAB, capTop);
+                        // Body: narrower, darker, hanging under the deck.
+                        b.box(x, y + 0.20, TRIM_Z, 1, 0.24, TRIM_D, c, F.SLAB);
+                        // The shadow line where one meets the other.
+                        b.box(x, y + 0.29, TRIM_Z + TRIM_D / 2 + 0.12, 1, 0.05, 0.04,
+                              R3D.mixCol(pal.timber, '#000000', 0.6), F.FRONT);
+
                         if (t === T.CRUMBLE) {
-                            b.box(x, y + 0.34, TRIM_Z + TRIM_D / 2 + 0.01, 0.9, 0.06, 0.04,
-                                  R3D.col('#20160f'), F.FRONT);
+                            // Split boards, so a rotten plank is obvious before
+                            // you stand on it rather than after.
+                            b.box(x - 0.2, y + 0.40, TRIM_Z + TRIM_D / 2 + 0.14, 0.06, 0.22, 0.04,
+                                  R3D.col('#1a1109'), F.FRONT);
+                            b.box(x + 0.24, y + 0.40, TRIM_Z + TRIM_D / 2 + 0.14, 0.05, 0.22, 0.04,
+                                  R3D.col('#1a1109'), F.FRONT);
                         } else if (Util.tileHash(tx, ty) % 3 === 0) {
-                            b.box(x, y + 0.14, TRIM_Z, 0.16, 0.36, 0.24, timber, F.SLAB);
+                            // A bracket under the boards every few tiles.
+                            b.box(x, y - 0.02, TRIM_Z, 0.18, 0.30, 0.26, c, F.SLAB);
                         }
                         break;
                     }
@@ -257,10 +292,25 @@
                     }
 
                     case T.LAVA: {
-                        p.box(x, y + 0.15, TRIM_Z, 1, 0.7, TRIM_D, R3D.col('#5a1c10'), F.SLAB);
-                        g.box(x, y + 0.42, TRIM_Z + 0.3, 1, 0.24, 0.04, lavaCol, F.FRONT);
-                        if (tx % 4 === 0) {
-                            lights.push({ x: x, y: y + 0.4, colour: pal.lava, energy: 1.1, range: 11, flicker: 0.3 });
+                        /*
+                         * Three layers, brightest last: a dark crust, the molten
+                         * body, and a near-white line at the surface. Lava is
+                         * the loudest thing in these rooms and it has to be — a
+                         * single flat band read as an orange stripe, and a
+                         * player has to know instantly that this one is not a
+                         * hazard they can take a hit from.
+                         */
+                        p.box(x, y + 0.15, TRIM_Z, 1, 0.7, TRIM_D, R3D.col('#3d1108'), F.SLAB);
+                        g.box(x, y + 0.16, TRIM_Z + 0.30, 1, 0.66, 0.03,
+                              R3D.mixCol(pal.lava, '#000000', 0.45), F.FRONT);
+                        g.box(x, y + 0.40, TRIM_Z + 0.32, 1, 0.26, 0.03, lavaCol, F.FRONT);
+                        g.box(x, y + 0.47, TRIM_Z + 0.34, 1, 0.10, 0.03,
+                              R3D.col('#fff0b0'), F.FRONT);
+                        // The heat haze above it.
+                        g.box(x, y + 0.85, TRIM_Z + 0.28, 1.4, 0.9, 0.02,
+                              R3D.mixCol(pal.lava, '#000000', 0.78), F.FRONT);
+                        if (tx % 3 === 0) {
+                            lights.push({ x: x, y: y + 0.5, colour: pal.lava, energy: 1.5, range: 13, flicker: 0.35 });
                         }
                         break;
                     }
@@ -329,28 +379,18 @@
      */
     function backdrop(group, pal, rng) {
         const b = new R3D.Builder();
-        const far = R3D.col(pal.backFar);
-        const near = R3D.mixCol(pal.backFar, pal.back, 0.55);
+        b.plate(C.COLS / 2, C.ROWS / 2, R3D.BACK_Z - 0.6,
+                C.COLS + 6, C.ROWS + 4, R3D.col('#ffffff'));
 
-        b.box(C.COLS / 2, C.ROWS / 2, R3D.BACK_Z - 0.6, C.COLS + 8, C.ROWS + 8, 0.1,
-              R3D.col(pal.back), F.FRONT);
-
-        for (let layer = 0; layer < 2; layer++) {
-            const colour = layer === 0 ? far : near;
-            const z = R3D.BACK_Z - 0.4 + layer * 0.22;
-            const step = layer === 0 ? 3 : 2.2;
-            for (let x = -2; x < C.COLS + 2; x += step) {
-                const h = rng.range(3, 9) - layer * 1.2;
-                const w = step * rng.range(0.9, 1.5);
-                b.box(x, h / 2, z, w, h, 0.08, colour, F.FRONT);
-                const top = rng.range(2, 6);
-                b.box(x + rng.range(-1, 1), C.ROWS - top / 2, z, w * 0.8, top, 0.08, colour, F.FRONT);
-            }
-        }
-
-        const mesh = new THREE.Mesh(b.geometry(), R3D.flatMaterial());
+        const mesh = new THREE.Mesh(b.geometry(), new THREE.MeshBasicMaterial({
+            map: R3D.backdropTexture(pal),
+            vertexColors: true,
+            depthWrite: false
+        }));
         mesh.name = 'backdrop';
+        mesh.renderOrder = -1;
         group.add(mesh);
+        void rng;
     }
 
     /**
@@ -426,10 +466,18 @@
             if (room.get(tx, ty) !== T.EMPTY) continue;
             const colour = rng.pick(crystalCols);
             const x = R3D.tileX(tx), y = R3D.tileY(ty);
-            const s = rng.range(0.16, 0.32);
-            g.box(x, y, R3D.BACK_Z + 0.85, s, s * 2.1, s, colour, F.ALL);
-            g.box(x, y, R3D.BACK_Z + 0.9, s * 3.2, s * 4.4, 0.02,
-                  colour.clone().multiplyScalar(0.22), F.FRONT);
+            const s = rng.range(0.14, 0.26);
+            /*
+             * A crystal is a bright *core* with a tight halo, not a large faint
+             * rectangle. The first version had the halo four times the size of
+             * the gem at a fifth of the opacity, which at this scale reads as a
+             * smudge on the lens rather than as something glowing.
+             */
+            g.box(x, y, R3D.BACK_Z + 0.85, s, s * 2.2, s, colour, F.ALL);
+            g.box(x, y, R3D.BACK_Z + 0.88, s * 0.45, s * 1.5, 0.02,
+                  R3D.col('#ffffff'), F.FRONT);
+            g.box(x, y, R3D.BACK_Z + 0.9, s * 1.9, s * 2.8, 0.02,
+                  colour.clone().multiplyScalar(0.45), F.FRONT);
         }
 
         /*
