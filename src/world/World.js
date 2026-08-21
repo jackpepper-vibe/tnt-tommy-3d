@@ -141,8 +141,37 @@
      * Frames and links
      * ------------------------------------------------------------------ */
 
-    /** How far a shaft ladder reaches into the room from the seam it crosses. */
+    /**
+     * How far a shaft ladder reaches into the room before it starts looking for
+     * something to stand on. It keeps going past this until it finds a floor —
+     * see `layStub`.
+     */
     const STUB = 6;
+    /** ...but not for ever, if the shaft happens to be over a chasm. */
+    const STUB_MAX = 14;
+
+    /**
+     * Lay a shaft ladder from a seam until it lands on something.
+     *
+     * The "until it lands" part is the whole point. A fixed-length stub left a
+     * full tile of air between the ladder's foot and the deck below it, so the
+     * only way onto the shaft out of the opening room was to jump and catch it
+     * mid-air — with nothing on screen suggesting that was the idea. A ladder
+     * has to visibly reach the thing you are standing on.
+     *
+     * @param {number} dir  -1 lays upward from the floor, +1 downward from the roof
+     */
+    function layStub(room, tx, dir) {
+        const start = dir > 0 ? 0 : C.ROWS - 1;
+        for (let i = 0; i < STUB_MAX; i++) {
+            const ty = start + dir * i;
+            if (ty < 0 || ty >= C.ROWS) break;
+            room.set(tx, ty, T.LADDER);
+            // Past the minimum, stop as soon as the next tile down is standable
+            // — the ladder has arrived somewhere.
+            if (i >= STUB && Tiles.isFloor(room.get(tx, ty + dir))) break;
+        }
+    }
 
     /**
      * Cut the doorways and lay the shaft stubs.
@@ -172,16 +201,10 @@
             // A shaft mouth becomes ladder, not empty: the climb has to continue
             // across the seam or Tommy drops out of it the moment he arrives.
             if (room.exits.up) {
-                for (const tx of Paint.SHAFT_COLS) {
-                    for (let ty = 0; ty <= STUB; ty++) room.set(tx, ty, T.LADDER);
-                }
+                for (const tx of Paint.SHAFT_COLS) layStub(room, tx, 1);
             }
             if (room.exits.down) {
-                for (const tx of Paint.SHAFT_COLS) {
-                    for (let ty = C.ROWS - 1 - STUB; ty <= C.ROWS - 1; ty++) {
-                        room.set(tx, ty, T.LADDER);
-                    }
-                }
+                for (const tx of Paint.SHAFT_COLS) layStub(room, tx, -1);
             }
             room.base.set(room.live);
         }

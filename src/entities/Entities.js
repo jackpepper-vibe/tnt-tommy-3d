@@ -94,14 +94,20 @@
      * Enemies
      * ------------------------------------------------------------------ */
 
+    /**
+     * Speeds are up about a fifth on the first pass, which had patrols slower
+     * than either original's. A room 42 tiles wide with a walker crossing it at
+     * 46 px/s gives the player nine seconds of clear air between passes — long
+     * enough that the patrol stops being a thing you plan around.
+     */
     const ENEMY_SPEC = {
-        walker:   { w: 13, h: 13, speed: 46, damage: C.DMG_ENEMY },
-        crawler:  { w: 13, h: 10, speed: 27, damage: C.DMG_ENEMY },
-        dog:      { w: 15, h: 11, speed: 38, damage: C.DMG_ENEMY },
-        bat:      { w: 14, h: 10, speed: 62, damage: C.DMG_ENEMY },
-        spider:   { w: 11, h: 11, speed: 96, damage: C.DMG_ENEMY },
-        guardian: { w: 13, h: 13, speed: 34, damage: C.DMG_ENEMY },
-        orb:      { w: 11, h: 11, speed: 58, damage: C.DMG_ENEMY }
+        walker:   { w: 13, h: 13, speed: 56, damage: C.DMG_ENEMY },
+        crawler:  { w: 13, h: 10, speed: 34, damage: C.DMG_ENEMY },
+        dog:      { w: 15, h: 11, speed: 46, damage: C.DMG_ENEMY },
+        bat:      { w: 14, h: 10, speed: 74, damage: C.DMG_ENEMY },
+        spider:   { w: 11, h: 11, speed: 110, damage: C.DMG_ENEMY },
+        guardian: { w: 13, h: 13, speed: 40, damage: C.DMG_ENEMY },
+        orb:      { w: 11, h: 11, speed: 70, damage: C.DMG_ENEMY }
     };
 
     /**

@@ -291,18 +291,23 @@ check('a ladder can be remounted from above', () => {
  * level grid that made the mine feel like ladders and empty air — so this
  * asserts the *generosity*, not the danger.
  */
-check('falling is cheap and never fatal', () => {
+/**
+ * Falling is pitched at two decks free, three decks costly. Both halves matter:
+ * free short drops keep a climbing frame quick to come down, and a costly long
+ * one stops "throw yourself off the top" being strictly better than climbing.
+ */
+check('two decks fall free, three cost, none kill', () => {
     const g = C.GRAVITY;
     const impact = (rows) => Math.min(C.MAX_FALL, Math.sqrt(2 * g * rows * C.TILE));
 
-    assert(impact(8) < C.FALL_SAFE,
-        'an eight-row drop hurts (' + impact(8).toFixed(0) + ' >= ' + C.FALL_SAFE + ')');
+    assert(impact(6) < C.FALL_SAFE,
+        'a two-deck drop hurts (' + impact(6).toFixed(0) + ' >= ' + C.FALL_SAFE + ')');
+    assert(impact(9) >= C.FALL_SAFE,
+        'a three-deck drop is free (' + impact(9).toFixed(0) + ' < ' + C.FALL_SAFE + ')');
     assert(C.FALL_FATAL === undefined,
-        'a fall can kill outright; both originals let you drop the height of a room');
-    assert(C.FALL_DMG < 20,
-        'the worst landing in the game costs ' + C.FALL_DMG + ' fuse, which is a punishment not a graze');
-    return '8 rows → ' + impact(8).toFixed(0) + 'px/s free · terminal ' +
-        C.MAX_FALL + 'px/s costs ' + C.FALL_DMG;
+        'a fall can kill outright; neither original did that');
+    return '6 rows ' + impact(6).toFixed(0) + 'px/s free · 9 rows ' +
+        impact(9).toFixed(0) + 'px/s costs ' + C.FALL_DMG;
 });
 
 check('a trampoline goes higher than a jump can', () => {

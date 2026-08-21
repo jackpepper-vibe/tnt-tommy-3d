@@ -188,7 +188,6 @@
         if (this.state !== 'playing') return;
 
         this._checkDetonator(input);
-        this._updateCheckpoint(dt);
         this._checkRoomChange();
     };
 
@@ -630,6 +629,7 @@
         this._transition = { t: 0, len: 0.34, dir: dir };
         this._setState('transition');
         this.ents().seen = true;
+        this._markEntry();
         this.bus.emit(EV.ROOM_CHANGED, { room: this.room(), dir: dir });
     };
 
@@ -638,25 +638,26 @@
      * ------------------------------------------------------------------ */
 
     /**
-     * A rolling checkpoint: wherever you were last standing safely.
+     * You go back to the door you came in by.
      *
-     * Not the room entrance. With a burning fuse, sending the player back to the
-     * door costs them the walk *and* the fuse they spent on it, which compounds
-     * a mistake into a lost run. Standing still on solid ground for a third of a
-     * second is enough to bank a position.
+     * The first version banked a rolling checkpoint wherever you were last
+     * stood safely, and it was a mistake: it meant dying two tiles from the top
+     * of a room put you back two tiles from the top of the room. Neither game
+     * this is modelled on did that, and it is most of why an early build had no
+     * tension in it — every mistake cost a life and nothing else, so there was
+     * never a moment where you had something to lose.
+     *
+     * Sending you to the room entrance keeps the *progress* — sticks stay
+     * collected, medals stay earned — and takes back the *position*, which is
+     * the thing you were actually spending fuse to buy.
      */
-    Run.prototype._updateCheckpoint = function (dt) {
-        const p = this.player;
-        const safe = p.onGround && p.mode === 'walk' && !p.inWater && !this._touchesTile(this.room(), T.SPIKE);
-        if (!safe) {
-            this._checkpointDwell = 0;
-            return;
-        }
-        this._checkpointDwell += dt;
-        if (this._checkpointDwell >= C.CHECKPOINT_DWELL) {
-            this._checkpointDwell = 0;
-            this.checkpoint = { room: this.roomIndex, x: p.x, y: p.y };
-        }
+    Run.prototype._updateCheckpoint = function () {
+        /* nothing to bank: the checkpoint is set on entering a room */
+    };
+
+    /** Remember the doorway, for when it goes wrong. */
+    Run.prototype._markEntry = function () {
+        this.checkpoint = { room: this.roomIndex, x: this.player.x, y: this.player.y };
     };
 
     Run.prototype._die = function (cause) {

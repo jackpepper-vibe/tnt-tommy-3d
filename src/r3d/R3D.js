@@ -98,18 +98,26 @@
      */
     R3D.PALETTES = {
         copper: {
-            rock:      ['#3b3026', '#443729', '#342a20'],
-            rockTop:   '#6d5740',
-            moss:      '#4a5a34',
-            timber:    '#6b4a2c',
-            timberTop: '#8a6238',
-            ladder:    '#8a6a3e',
-            rope:      '#a08048',
-            back:      '#1a1510',
-            backFar:   '#241c14',
-            fog:       '#140f0a',
-            ambient:   '#3a3348',
-            hemi:      '#4a4258',
+            rock:      ['#584634', '#63503a', '#4d3d2d'],
+            rockTop:   '#8a6d4f',
+            moss:      '#5c7040',
+            timber:    '#8a5f36',
+            timberTop: '#ab7a45',
+            ladder:    '#a8834c',
+            rope:      '#bd9756',
+            /**
+             * The cavern behind the playfield.
+             *
+             * These were near-black, and the result was a room that read as
+             * platforms floating in a void — the single biggest reason the mine
+             * looked empty. The backdrop is not scenery here: it is the only
+             * thing telling you that you are underground rather than in space.
+             */
+            back:      '#2b2118',
+            backFar:   '#3a2c1f',
+            fog:       '#1c150e',
+            ambient:   '#4a4260',
+            hemi:      '#5b5170',
             lamp:      '#ffb867',
             crystal:   ['#6fd3ff', '#b78bff'],
             spike:     '#8e9099',
@@ -117,18 +125,18 @@
             lava:      '#e04b3a'
         },
         slate: {
-            rock:      ['#2c3138', '#343a42', '#262b31'],
-            rockTop:   '#59636f',
-            moss:      '#3e5548',
-            timber:    '#57493a',
-            timberTop: '#6f5c46',
-            ladder:    '#6f7c88',
-            rope:      '#8d8a72',
-            back:      '#12161b',
-            backFar:   '#1b2027',
-            fog:       '#0d1014',
-            ambient:   '#33405a',
-            hemi:      '#3e4c68',
+            rock:      ['#414a55', '#4b5561', '#39424c'],
+            rockTop:   '#77848f',
+            moss:      '#4e6b5a',
+            timber:    '#6f5c48',
+            timberTop: '#8c7458',
+            ladder:    '#8794a1',
+            rope:      '#a8a389',
+            back:      '#1c232c',
+            backFar:   '#2a323d',
+            fog:       '#141a21',
+            ambient:   '#415271',
+            hemi:      '#4e5f80',
             lamp:      '#9fd0ff',
             crystal:   ['#7fe8d8', '#8fb0ff'],
             spike:     '#9aa3ad',
@@ -136,18 +144,18 @@
             lava:      '#d8503c'
         },
         ember: {
-            rock:      ['#3a241d', '#452b21', '#2f1d17'],
-            rockTop:   '#7d4a30',
-            moss:      '#5c3a1e',
-            timber:    '#5e3823',
-            timberTop: '#7d4c2c',
-            ladder:    '#96603a',
-            rope:      '#b07a44',
-            back:      '#1c0d0a',
-            backFar:   '#2a130d',
-            fog:       '#160806',
-            ambient:   '#4a2a2c',
-            hemi:      '#5a3030',
+            rock:      ['#573429', '#633d2e', '#4a2c22'],
+            rockTop:   '#9c5c3b',
+            moss:      '#7a4d28',
+            timber:    '#7c4a2e',
+            timberTop: '#9c6038',
+            ladder:    '#b57748',
+            rope:      '#c98f54',
+            back:      '#2d1610',
+            backFar:   '#3e1e14',
+            fog:       '#23100b',
+            ambient:   '#5f373a',
+            hemi:      '#733e3e',
             lamp:      '#ff9a4d',
             crystal:   ['#ffb066', '#ff6f5e'],
             spike:     '#a08a80',
@@ -187,6 +195,7 @@
         this.pos = [];
         this.norm = [];
         this.color = [];
+        this.uv = [];
         this.index = [];
         this.count = 0;
     }
@@ -204,6 +213,15 @@
      * @param {number} [mask]    which faces to emit; defaults to all
      * @param {THREE.Color} [topColour]  lit edge, for the +Y face only
      */
+    /**
+     * UVs are in **world units, not 0..1**.
+     *
+     * A fourteen-tile run of rock gets `u` from 0 to 14, so a tiling texture
+     * repeats once per tile however long the run is. Normalised UVs would
+     * stretch one copy of the texture across the whole run and every merged
+     * wall would be visibly smeared — which is most of what made an earlier
+     * pass read as flat coloured slabs.
+     */
     Builder.prototype.box = function (cx, cy, cz, w, h, d, colour, mask, topColour) {
         const m = (mask === undefined) ? R3D.FACE.ALL : mask;
         for (let f = 0; f < FACES.length; f++) {
@@ -211,10 +229,15 @@
             const [n, corners] = FACES[f];
             const c = (f === 4 && topColour) ? topColour : colour;
             const base = this.count;
-            for (const p of corners) {
+            // Which two of the box's dimensions this face spans.
+            const su = (f === 2 || f === 3) ? d : w;
+            const sv = (f === 4 || f === 5) ? d : h;
+            for (let i = 0; i < corners.length; i++) {
+                const p = corners[i];
                 this.pos.push(cx + p[0] * w, cy + p[1] * h, cz + p[2] * d);
                 this.norm.push(n[0], n[1], n[2]);
                 this.color.push(c.r, c.g, c.b);
+                this.uv.push((i === 1 || i === 2) ? su : 0, (i >= 2) ? sv : 0);
                 this.count++;
             }
             this.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -227,10 +250,12 @@
         const base = this.count;
         const hw = w / 2, hh = h / 2;
         const pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
-        for (const p of pts) {
-            this.pos.push(cx + p[0], cy + p[1], cz);
+        const uvs = [[0, 0], [1, 0], [1, 1], [0, 1]];
+        for (let i = 0; i < pts.length; i++) {
+            this.pos.push(cx + pts[i][0], cy + pts[i][1], cz);
             this.norm.push(0, 0, 1);
             this.color.push(colour.r, colour.g, colour.b);
+            this.uv.push(uvs[i][0], uvs[i][1]);
             this.count++;
         }
         this.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -246,6 +271,7 @@
         g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
         g.setAttribute('normal', new THREE.Float32BufferAttribute(this.norm, 3));
         g.setAttribute('color', new THREE.Float32BufferAttribute(this.color, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
         g.setIndex(this.index);
         g.computeBoundingSphere();
         return g;
@@ -257,6 +283,124 @@
      * Materials
      * ------------------------------------------------------------------ */
 
+    /* ------------------------------------------------------------------ *
+     * Surface detail
+     * ------------------------------------------------------------------ */
+
+    /**
+     * One tile of hewn rock, drawn rather than loaded.
+     *
+     * Everything in this game is generated at load — there are no image files —
+     * which is a constraint worth keeping: the page works from `file://` with
+     * no network. It also means the texture can be authored against the palette
+     * instead of tinted to fit it.
+     *
+     * The look is the Godot build's: chisel marks, a few darker pits, a lit lip
+     * along the top edge. Drawn at 32px and left unfiltered, so it reads as
+     * worked stone rather than as a blurry gradient — `NearestFilter` is doing
+     * as much work here as the drawing is.
+     */
+    function rockCanvas(seedShift) {
+        const S = 32;
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = S;
+        const ctx = cv.getContext('2d');
+        const rnd = TNT.Util.rng(0x9E3779B9 + seedShift * 7919);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, S, S);
+
+        // Chisel strokes: short darker dashes on a slight diagonal.
+        for (let i = 0; i < 26; i++) {
+            const x = rnd.int(0, S), y = rnd.int(0, S);
+            const len = rnd.int(3, 9);
+            const dark = rnd.range(0.62, 0.86);
+            ctx.strokeStyle = 'rgba(0,0,0,' + (1 - dark).toFixed(3) + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + len, y + rnd.int(-2, 2));
+            ctx.stroke();
+        }
+        // Pits.
+        for (let i = 0; i < 7; i++) {
+            ctx.fillStyle = 'rgba(0,0,0,0.30)';
+            ctx.fillRect(rnd.int(0, S - 2), rnd.int(0, S - 2), rnd.int(1, 3), rnd.int(1, 3));
+        }
+        // Highlights, so the surface has a direction.
+        for (let i = 0; i < 9; i++) {
+            ctx.fillStyle = 'rgba(255,255,255,0.16)';
+            ctx.fillRect(rnd.int(0, S - 3), rnd.int(0, S - 1), rnd.int(2, 5), 1);
+        }
+        // The lit lip along the top of a block.
+        const grad = ctx.createLinearGradient(0, 0, 0, 6);
+        grad.addColorStop(0, 'rgba(255,255,255,0.34)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, S, 6);
+
+        return cv;
+    }
+
+    /** One tile of sawn timber: plank seams, grain, and end nails. */
+    function timberCanvas() {
+        const S = 32;
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = S;
+        const ctx = cv.getContext('2d');
+        const rnd = TNT.Util.rng(0x5BF03635);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, S, S);
+
+        // Grain along the length of the board.
+        for (let i = 0; i < 20; i++) {
+            const y = rnd.int(0, S);
+            ctx.strokeStyle = 'rgba(0,0,0,' + rnd.range(0.06, 0.20).toFixed(3) + ')';
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.bezierCurveTo(S / 3, y + rnd.int(-2, 2), (2 * S) / 3, y + rnd.int(-2, 2), S, y);
+            ctx.stroke();
+        }
+        // The seam between one board and the next.
+        ctx.fillStyle = 'rgba(0,0,0,0.42)';
+        ctx.fillRect(0, 0, 1, S);
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillRect(1, 0, 1, S);
+        // Nail heads.
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(4, 5, 2, 2);
+        ctx.fillRect(4, S - 7, 2, 2);
+
+        return cv;
+    }
+
+    const _textures = new Map();
+
+    /**
+     * A tiling texture by name, made once and shared.
+     * `RepeatWrapping` plus world-unit UVs is what makes one tile repeat per
+     * tile across a merged run — see `Builder.box`.
+     */
+    R3D.texture = function (name) {
+        let tex = _textures.get(name);
+        if (tex) return tex;
+
+        let cv;
+        if (name === 'timber') cv = timberCanvas();
+        else cv = rockCanvas(name === 'rock2' ? 2 : (name === 'rock1' ? 1 : 0));
+
+        tex = new THREE.CanvasTexture(cv);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        // Unfiltered on purpose: this is pixel art, and bilinear turns chisel
+        // marks into mud at the distance the camera actually sits.
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.needsUpdate = true;
+        _textures.set(name, tex);
+        return tex;
+    };
+
     /**
      * The lit material every solid thing in the mine shares.
      *
@@ -264,11 +408,17 @@
      * entirely by a handful of moving point lights, and Lambert costs a
      * fraction of what a PBR pass does for a look that, at this art direction,
      * is indistinguishable.
+     *
+     * The map multiplies the vertex colour, so one texture serves every palette
+     * and every material — rock, timber and metal differ by colour, and the
+     * texture only supplies the *detail*. That is what keeps a room at two draw
+     * calls while still having a surface.
      */
-    R3D.solidMaterial = function () {
+    R3D.solidMaterial = function (textureName) {
         return new THREE.MeshLambertMaterial({
             vertexColors: true,
-            side: THREE.FrontSide
+            side: THREE.FrontSide,
+            map: textureName ? R3D.texture(textureName) : null
         });
     };
 

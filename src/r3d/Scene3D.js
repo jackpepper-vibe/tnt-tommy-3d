@@ -126,9 +126,22 @@
      */
     Scene3D.prototype._initLights = function () {
         const pal = this.palette;
-        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.75);
-        this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#1a1410'), 0.55);
-        this.scene.add(this.ambient, this.hemi);
+        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.62);
+        this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#1a1410'), 0.45);
+
+        /**
+         * A key light, raked down from the front-left.
+         *
+         * Point lights alone light a scene but do not give it *form*: with
+         * nothing directional in it, every face of every block took the same
+         * value and the mine read as flat coloured shapes however much texture
+         * was on them. This is what makes the top of a platform brighter than
+         * its face, and a beam brighter than the wall behind it.
+         */
+        this.key = new THREE.DirectionalLight(new THREE.Color('#ffd7a8'), 0.55);
+        this.key.position.set(-0.45, 1, 0.8);
+
+        this.scene.add(this.ambient, this.hemi, this.key);
 
         this.lightPool = [];
         for (let i = 0; i < MAX_LIGHTS; i++) {
@@ -157,6 +170,7 @@
         this.palette = R3D.palette(key);
         this.ambient.color = new THREE.Color(this.palette.ambient);
         this.hemi.color = new THREE.Color(this.palette.hemi);
+        this.key.color = new THREE.Color(this.palette.lamp);
         this.renderer.setClearColor(new THREE.Color(this.palette.fog), 1);
     };
 

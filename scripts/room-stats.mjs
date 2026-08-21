@@ -35,9 +35,13 @@ CHAR[C.Tile.DETONATOR] = 'G';
 const median = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1] || 0;
 const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
 
-/** Platform rows, the gaps between them, and how much is worth picking up. */
+/** Characters that will hurt you: patrols, machinery and hazardous terrain. */
+const ENEMY_CHARS = 'BcdFSgoR';
+const HAZARD_CHARS = '^L~VKP';
+
+/** Platform rows, the gaps between them, and how dangerous the place is. */
 function measure(rooms, pickupChars) {
-    const plats = [], gaps = [], picks = [], climbs = [];
+    const plats = [], gaps = [], picks = [], climbs = [], foes = [], hazards = [];
     for (const rows of rooms) {
         const platRows = [];
         for (let y = 0; y < rows.length; y++) {
@@ -46,15 +50,19 @@ function measure(rooms, pickupChars) {
         plats.push(platRows.length);
         for (let i = 1; i < platRows.length; i++) gaps.push(platRows[i] - platRows[i - 1]);
 
-        let p = 0, cl = 0;
+        let p = 0, cl = 0, en = 0, hz = 0;
         for (const row of rows) {
             for (const ch of row) {
                 if (pickupChars.includes(ch)) p++;
                 if (ch === '|' || ch === 'J') cl++;
+                if (ENEMY_CHARS.includes(ch)) en++;
+                if (HAZARD_CHARS.includes(ch)) hz++;
             }
         }
         picks.push(p);
         climbs.push(cl);
+        foes.push(en);
+        hazards.push(hz);
     }
     return {
         rooms: rooms.length,
@@ -63,7 +71,9 @@ function measure(rooms, pickupChars) {
         platRows: avg(plats),
         gap: median(gaps),
         pickups: avg(picks),
-        climbTiles: avg(climbs)
+        climbTiles: avg(climbs),
+        enemies: avg(foes),
+        hazards: avg(hazards)
     };
 }
 
@@ -75,6 +85,8 @@ function report(name, m, note) {
     console.log(`  gap between them     ${m.gap} rows`);
     console.log(`  pickups/room         ${m.pickups.toFixed(1)}`);
     console.log(`  ladder tiles/room    ${m.climbTiles.toFixed(1)}`);
+    console.log(`  enemies/room         ${m.enemies.toFixed(1)}`);
+    console.log(`  hazard tiles/room    ${m.hazards.toFixed(1)}`);
 }
 
 /* ---- this game ---- */
@@ -88,8 +100,17 @@ for (let i = 0; i < C.MINE_COUNT; i++) {
             for (let tx = 0; tx < C.COLS; tx++) s += CHAR[room.get(tx, ty)] || '?';
             rows.push(s);
         }
+        // Spawns are records rather than grid characters in this game, so they
+        // have to be painted back in or the comparison silently reports no
+        // enemies at all — which it did, and looked like a design problem
+        // rather than a measurement one.
+        const CH = {
+            ore: 'C', tnt: 'D', food: 'M', heart: 'H', oxygen: 'O',
+            walker: 'B', crawler: 'c', dog: 'd', bat: 'F', spider: 'S',
+            guardian: 'g', orb: 'o', crusher: 'K', boulder: 'P'
+        };
         for (const sp of room.spawns) {
-            const key = { ore: 'C', tnt: 'D', food: 'M', heart: 'H', oxygen: 'O' }[sp.kind];
+            const key = CH[sp.kind];
             if (key) rows[sp.ty] = rows[sp.ty].slice(0, sp.tx) + key + rows[sp.ty].slice(sp.tx + 1);
         }
         mineRooms.push(rows);

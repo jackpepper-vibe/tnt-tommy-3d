@@ -47,23 +47,42 @@
      * @param {object} pal  a palette from `R3D.PALETTES`
      * @returns {{group: THREE.Group, lights: Array, glow: THREE.Mesh|null}}
      */
+    /**
+     * Three solid passes rather than one, split by *texture* — hewn rock, sawn
+     * timber, and the untextured odds and ends. Colour still comes from the
+     * vertex data, so the palettes are unaffected; the split exists only
+     * because a plank and a wall do not have the same surface, and one merged
+     * mesh can carry one map.
+     *
+     * Four draw calls a room instead of two. Worth it: an earlier pass had no
+     * maps at all and read as flat coloured slabs.
+     */
     RoomMesh.build = function (room, pal) {
         const group = new THREE.Group();
-        const solid = new R3D.Builder();
+        const rock = new R3D.Builder();
+        const wood = new R3D.Builder();
+        const plain = new R3D.Builder();
         const glow = new R3D.Builder();
         const lights = [];
         const rng = Util.rng(0x7A11 + room.index * 2654435761);
 
         backdrop(group, pal, rng);
-        rockRuns(room, solid, pal);
-        trim(room, solid, glow, pal, lights);
-        decor(room, solid, glow, pal, lights, rng);
+        rockRuns(room, rock, pal);
+        trim(room, wood, plain, glow, pal, lights);
+        decor(room, wood, rock, glow, pal, lights, rng);
 
-        if (!solid.isEmpty()) {
-            const mesh = new THREE.Mesh(solid.geometry(), R3D.solidMaterial());
-            mesh.name = 'terrain';
+        const add = function (builder, name, texture, order) {
+            if (builder.isEmpty()) return;
+            const mesh = new THREE.Mesh(builder.geometry(), R3D.solidMaterial(texture));
+            mesh.name = name;
+            if (order) mesh.renderOrder = order;
             group.add(mesh);
-        }
+        };
+
+        add(rock, 'rock', 'rock0');
+        add(wood, 'timber', 'timber');
+        add(plain, 'fittings', null);
+
         if (!glow.isEmpty()) {
             const mesh = new THREE.Mesh(glow.geometry(), R3D.glowMaterial(0.85));
             mesh.name = 'terrain-glow';
@@ -146,7 +165,12 @@
      * Everything else in the grid
      * ------------------------------------------------------------------ */
 
-    function trim(room, b, g, pal, lights) {
+    /**
+     * @param {R3D.Builder} b  timber — boards, ladders, ropes, props
+     * @param {R3D.Builder} p  untextured fittings — spikes, belts, machinery
+     * @param {R3D.Builder} g  the additive glow pass
+     */
+    function trim(room, b, p, g, pal, lights) {
         const timber = R3D.col(pal.timber);
         const timberTop = R3D.col(pal.timberTop);
         const ladderCol = R3D.col(pal.ladder);
@@ -210,8 +234,8 @@
                     case T.SPIKE: {
                         for (let i = 0; i < 3; i++) {
                             const sx = x - 0.3 + i * 0.3;
-                            b.box(sx, y - 0.24, TRIM_Z, 0.16, 0.5, 0.16, spikeCol, F.SLAB);
-                            b.box(sx, y + 0.06, TRIM_Z, 0.06, 0.2, 0.06,
+                            p.box(sx, y - 0.24, TRIM_Z, 0.16, 0.5, 0.16, spikeCol, F.SLAB);
+                            p.box(sx, y + 0.06, TRIM_Z, 0.06, 0.2, 0.06,
                                   R3D.col('#cfd4dc'), F.SLAB);
                         }
                         break;
@@ -219,21 +243,21 @@
 
                     case T.BELT_R:
                     case T.BELT_L: {
-                        b.box(x, y + 0.32, TRIM_Z, 1, 0.26, TRIM_D, beltCol, F.SLAB, beltTread);
-                        b.box(x, y + 0.45, TRIM_Z + TRIM_D / 2 + 0.01, 0.5, 0.06, 0.04,
+                        p.box(x, y + 0.32, TRIM_Z, 1, 0.26, TRIM_D, beltCol, F.SLAB, beltTread);
+                        p.box(x, y + 0.45, TRIM_Z + TRIM_D / 2 + 0.01, 0.5, 0.06, 0.04,
                               beltTread, F.FRONT);
                         break;
                     }
 
                     case T.VENT: {
-                        b.box(x, y - 0.4, TRIM_Z, 0.8, 0.2, TRIM_D, R3D.col('#4a4a52'), F.SLAB);
+                        p.box(x, y - 0.4, TRIM_Z, 0.8, 0.2, TRIM_D, R3D.col('#4a4a52'), F.SLAB);
                         g.box(x, y - 0.34, TRIM_Z + 0.3, 0.5, 0.06, 0.04,
                               R3D.col('#6fd3ff'), F.FRONT);
                         break;
                     }
 
                     case T.LAVA: {
-                        b.box(x, y + 0.15, TRIM_Z, 1, 0.7, TRIM_D, R3D.col('#5a1c10'), F.SLAB);
+                        p.box(x, y + 0.15, TRIM_Z, 1, 0.7, TRIM_D, R3D.col('#5a1c10'), F.SLAB);
                         g.box(x, y + 0.42, TRIM_Z + 0.3, 1, 0.24, 0.04, lavaCol, F.FRONT);
                         if (tx % 4 === 0) {
                             lights.push({ x: x, y: y + 0.4, colour: pal.lava, energy: 1.1, range: 11, flicker: 0.3 });
@@ -254,7 +278,7 @@
                         // Sprung canvas on a frame. Sits at the top of its tile
                         // like a platform, because that is the surface the
                         // physics bounces you off.
-                        b.box(x, y + 0.30, TRIM_Z, 1, 0.14, TRIM_D, R3D.col('#2f6f8f'), F.SLAB,
+                        p.box(x, y + 0.30, TRIM_Z, 1, 0.14, TRIM_D, R3D.col('#2f6f8f'), F.SLAB,
                               R3D.col('#4a9ec0'));
                         b.box(x - 0.42, y + 0.12, TRIM_Z, 0.16, 0.4, 0.4, timber, F.SLAB);
                         b.box(x + 0.42, y + 0.12, TRIM_Z, 0.16, 0.4, 0.4, timber, F.SLAB);
@@ -266,7 +290,7 @@
                     case T.TELEPORT: {
                         // A ring set into the floor. Deliberately loud — a pad
                         // you do not notice is a route you never take.
-                        b.box(x, y + 0.42, TRIM_Z, 0.9, 0.12, 0.5, R3D.col('#3a2f52'), F.SLAB);
+                        p.box(x, y + 0.42, TRIM_Z, 0.9, 0.12, 0.5, R3D.col('#3a2f52'), F.SLAB);
                         g.box(x, y + 0.44, TRIM_Z + 0.3, 0.95, 0.1, 0.04,
                               R3D.col('#b78bff'), F.FRONT);
                         g.box(x, y + 0.1, TRIM_Z + 0.28, 0.55, 0.7, 0.02,
@@ -277,8 +301,8 @@
 
                     case T.DETONATOR: {
                         b.box(x, y - 0.2, TRIM_Z, 0.7, 0.6, 0.5, R3D.col('#5a3a22'), F.SLAB);
-                        b.box(x, y + 0.16, TRIM_Z, 0.12, 0.4, 0.12, R3D.col('#8c8c94'), F.SLAB);
-                        b.box(x, y + 0.38, TRIM_Z, 0.5, 0.12, 0.2, R3D.col('#c0392b'), F.SLAB);
+                        p.box(x, y + 0.16, TRIM_Z, 0.12, 0.4, 0.12, R3D.col('#8c8c94'), F.SLAB);
+                        p.box(x, y + 0.38, TRIM_Z, 0.5, 0.12, 0.2, R3D.col('#c0392b'), F.SLAB);
                         g.box(x, y + 0.38, TRIM_Z + 0.2, 0.55, 0.16, 0.04, R3D.col('#ff6b4a'), F.FRONT);
                         lights.push({ x: x, y: y, colour: '#ff8a5c', energy: 1.3, range: 14, flicker: 0.12 });
                         break;
@@ -336,7 +360,7 @@
      * every load and a screenshot taken before a change can be compared with one
      * taken after it.
      */
-    function decor(room, b, g, pal, lights, rng) {
+    function decor(room, b, rock, g, pal, lights, rng) {
         const timber = R3D.col(pal.timber);
         const lampCol = R3D.col('#c9a15e');
         const crystalCols = pal.crystal.map(R3D.col);
@@ -390,7 +414,7 @@
             const len = rng.range(0.4, 1.1);
             const x = R3D.tileX(tx) + rng.range(-0.2, 0.2);
             const y = R3D.tileY(ty) - 0.5 - len / 2;
-            b.box(x, y, R3D.BACK_Z + 0.9, 0.26, len, 0.26, R3D.col(pal.rock[2]), F.SLAB);
+            rock.box(x, y, R3D.BACK_Z + 0.9, 0.26, len, 0.26, R3D.col(pal.rock[2]), F.SLAB);
             made++;
         }
 

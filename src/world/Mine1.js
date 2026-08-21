@@ -43,10 +43,14 @@
             cell: [0, 2],
             exits: { right: true, up: true },
             /**
-             * The opening room, and a plain climbing frame on purpose: six
-             * decks, no hazards, and a shaft up the middle. Everything a player
-             * needs to learn about vertical movement is here and none of it can
-             * hurt them.
+             * The opening room: a climbing frame with the shaft up the middle.
+             *
+             * It teaches vertical movement, but it is **not** a safe room. The
+             * first version was — six decks and nothing that could hurt you —
+             * and it set the tone for a mine with no tension in it. There is a
+             * patrol on the floor you start beside, spikes under the middle of
+             * the frame, and a spider over the shaft, so the lesson is "look
+             * before you climb" rather than "climbing is free".
              */
             build: function (g) {
                 g.deck(20, [2, 8], [13, 7], [25, 6], [33, 7]);
@@ -70,8 +74,12 @@
                 g.ore(32, 7, 2, 2);
                 g.tnt(12, 4);
 
+                g.spikes(15, 22, 4);
                 g.bat(19, 12);
                 g.crawler(31, 7);
+                g.walker(9, 19);
+                g.spider(24, 1);
+                g.dog(26, 22);
 
                 // The long climb to the roof, and the link up to the Drift.
                 g.ladder(5, 8, 13);
@@ -115,7 +123,9 @@
                 g.crawler(20, 19);
                 g.bat(27, 12);
                 g.spider(24, 1);
+                g.spider(11, 1);
                 g.dog(9, 22);
+                g.orb(28, 10);
 
                 // The only long climb: floor to the powder shelf.
                 g.ladder(12, 11, 16);
@@ -160,6 +170,9 @@
                 g.boulder(19, 1);
                 g.bat(24, 12);
                 g.crawler(33, 16);
+                g.spider(17, 1);
+                g.orb(13, 10);
+                g.guardian(31, 6);
 
                 // Down into the water, and up to the shaft.
                 g.ladder(28, 17, 22);
@@ -209,6 +222,8 @@
                 g.bat(16, 12);
                 g.crawler(31, 16);
                 g.dog(24, 22);
+                g.spider(30, 1);
+                g.guardian(12, 6);
 
                 g.ladder(9, 8, 13);
             }
@@ -252,7 +267,9 @@
                 g.walker(19, 13);
                 g.crawler(34, 7);
                 g.spider(13, 1);
+                g.spider(27, 1);
                 g.guardian(24, 9);
+                g.bat(9, 15);
 
                 g.ladder(6, 8, 13);
             }
@@ -308,6 +325,8 @@
                 g.bat(26, 12);
                 g.crawler(34, 10);
                 g.dog(24, 22);
+                g.guardian(14, 6);
+                g.orb(18, 16);
 
             }
         },
@@ -357,6 +376,8 @@
                 g.bat(27, 15);
                 g.walker(28, 19);
                 g.spider(16, 1);
+                g.dog(14, 22);
+                g.orb(31, 10);
 
                 g.ladder(35, 5, 22);
             }
@@ -403,6 +424,8 @@
                 g.orb(13, 16);
                 g.bat(17, 12);
                 g.crawler(34, 16);
+                g.spider(22, 1);
+                g.guardian(28, 6);
 
                 g.vine(6, 5, 7);
                 g.vine(28, 5, 7);
@@ -445,6 +468,9 @@
                 g.bat(24, 12);
                 g.guardian(16, 9);
                 g.walker(18, 19);
+                g.spider(11, 1);
+                g.dog(13, 22);
+                g.orb(33, 10);
 
                 g.ladder(6, 8, 13);
             }

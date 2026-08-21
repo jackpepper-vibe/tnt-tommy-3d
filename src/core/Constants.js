@@ -188,15 +188,22 @@
      * player is never in doubt, which halves the number of levels a room can
      * hold and turns the game into ladders and empty air.
      *
-     * Terminal velocity is reached at about nine and a half rows, so that is
-     * the ceiling on how hard any landing can ever be — there is no such thing
-     * as a fall that kills, only one that arrives at `MAX_FALL`.
+     * Pitched at **two decks free, three decks costly**. Since decks are three
+     * rows apart, that means hopping down a level or two is free — which is
+     * what keeps a climbing frame quick to descend — and throwing yourself down
+     * the height of a room is a real decision.
      *
-     *   8 rows → 620 px/s   free
-     *   9+ rows → 680 px/s  terminal; grazes the fuse and nothing more
+     * An earlier pass had this so loose that only terminal velocity cost
+     * anything, and dropping the full height of a room became strictly better
+     * than climbing down. A traversal option with no downside is not an option.
+     * Nothing kills outright, though; neither original did that either.
+     *
+     *   6 rows → 537 px/s   free
+     *   7 rows → 580 px/s   costs
+     *   9+ rows → 680 px/s  terminal, and the worst it gets
      */
-    C.FALL_SAFE = 660;         // below this, landing costs nothing
-    C.FALL_DMG = 14;           // energy cost of a heavier landing than that
+    C.FALL_SAFE = 560;         // below this, landing costs nothing
+    C.FALL_DMG = 18;           // energy cost of a heavier landing than that
 
     C.BELT_V = 88;             // conveyor push while standing on one
     C.VENT_SHOVE = 210;        // a steam jet scalds and shoves; it does not lift
@@ -242,18 +249,37 @@
      * bite out of it, and food is the only way to put any back.
      */
     C.ENERGY_MAX = 100;
-    C.FUSE_SECONDS = 150;      // a full fuse burns out in this long, undisturbed
-    C.FOOD_ENERGY = 34;
-    C.FOOD_RESPAWN = 75;       // s before an eaten meal returns
-    C.DANGER_BELOW = 25;       // energy at which the danger track takes over
-    C.DANGER_CLEAR = 35;       // and the energy it has to recover to before it lets go
 
-    C.DMG_ENEMY = 30;
-    C.DMG_SPIKE = 34;
-    C.DMG_VENT = 24;
-    C.DMG_CRUSH = 45;
-    C.DMG_BOULDER = 32;
-    C.DROWN_RATE = 26;         // energy per second underwater without the tank
+    /**
+     * A full fuse burns out in this long, undisturbed.
+     *
+     * Was 150, which was more generous than either game this is modelled on —
+     * Dynamite Dan drains its energy bar in about 110 seconds and the Godot
+     * build in 80. Nine rooms in 110 seconds means you cannot sightsee, cannot
+     * strip every room on the first pass, and have to decide what to leave.
+     * That pressure is the point; without it the mine is a museum.
+     */
+    C.FUSE_SECONDS = 110;
+    C.FOOD_ENERGY = 30;
+
+    /**
+     * Meals do not come back.
+     *
+     * They used to, after 75 seconds, and it quietly removed the whole
+     * mechanic: a player short of fuse could stand in a room and wait for
+     * lunch. Food is now a fixed budget for the mine, which turns every meal
+     * into a decision about *when* rather than a tap you repeat.
+     */
+    C.FOOD_RESPAWN = 0;
+    C.DANGER_BELOW = 30;       // energy at which the danger track takes over
+    C.DANGER_CLEAR = 42;       // and the energy it has to recover to before it lets go
+
+    C.DMG_ENEMY = 34;
+    C.DMG_SPIKE = 38;
+    C.DMG_VENT = 26;
+    C.DMG_CRUSH = 50;
+    C.DMG_BOULDER = 36;
+    C.DROWN_RATE = 30;         // energy per second underwater without the tank
 
     /* ------------------------------------------------------------------ *
      * Rising lava, and the run out
@@ -350,24 +376,24 @@
             id: 'copperlode',
             name: 'COPPERLODE',
             subtitle: 'Level One',
-            fuseMul: 1.0,
-            enemyMul: 1.0,
+            fuseMul: 1.0,          // 110s
+            enemyMul: 1.15,
             palette: 'copper'
         },
         {
             id: 'blackdamp',
             name: 'BLACKDAMP',
             subtitle: 'Level Two',
-            fuseMul: 0.86,
-            enemyMul: 1.18,
+            fuseMul: 0.84,         // 92s
+            enemyMul: 1.38,
             palette: 'slate'
         },
         {
             id: 'cinderdeep',
             name: 'CINDERDEEP',
             subtitle: 'Level Three',
-            fuseMul: 0.74,
-            enemyMul: 1.36,
+            fuseMul: 0.70,         // 77s, the Godot build's number
+            enemyMul: 1.62,
             palette: 'ember'
         }
     ];
