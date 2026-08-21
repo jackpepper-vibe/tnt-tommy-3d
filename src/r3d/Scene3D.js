@@ -75,7 +75,17 @@
         this.worldGroup = new THREE.Group();
         this.scene.add(this.worldGroup);
 
-        this.camera = new THREE.PerspectiveCamera(46, 1.75, 0.1, 200);
+        /**
+         * A wide lens, deliberately.
+         *
+         * At 46 degrees the camera sat thirty units back and the projection was
+         * very nearly orthographic — every block presented only its front face
+         * and the depth that *was* modelled never appeared on screen. Widening
+         * the lens brings the camera close enough for real divergence: blocks
+         * away from centre show their sides, the parallax sheets separate, and
+         * the playfield reads as a slab with thickness rather than a mural.
+         */
+        this.camera = new THREE.PerspectiveCamera(68, 1.75, 0.1, 400);
         this.scene.add(this.camera);
 
         /**

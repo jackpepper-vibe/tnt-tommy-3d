@@ -287,27 +287,55 @@
         }
     };
 
+    /**
+     * Pickups, rebuilt out of round primitives.
+     *
+     * Every one of these used to be a box, and it read as exactly that: a gold
+     * box, a red box, a blue box. Silhouette is the whole of a pickup's job —
+     * it has to be identifiable at a glance from across a room, at maybe twenty
+     * pixels — and no amount of colour rescues the wrong shape.
+     */
     const PICKUP_RIGS = {
+        /** A bundle of sticks under a strap, with a fuse out of the top. */
         tnt: function (b) {
-            b.box(0, 0, 0, 0.46, 0.62, 0.4, R3D.col('#c0392b'), F.ALL, R3D.col('#e0503c'));
-            b.box(0, 0, 0.21, 0.5, 0.16, 0.02, R3D.col('#f0e0c0'), F.FRONT);
-            b.box(0.1, 0.4, 0, 0.06, 0.22, 0.06, R3D.col('#7a6038'));
+            const red = R3D.col('#cf3b2a');
+            const redLight = R3D.col('#f0604a');
+            for (const dx of [-0.13, 0, 0.13]) {
+                b.cyl(dx, 0, 0, 0.115, 0.62, 'y', red, 10, redLight);
+            }
+            b.cyl(0, 0.06, 0, 0.24, 0.14, 'y', R3D.col('#f2e3bd'), 12);
+            b.cyl(0, -0.1, 0, 0.245, 0.09, 'y', R3D.col('#6b4a28'), 12);
+            // Fuse, curling up out of the middle stick.
+            b.cyl(0, 0.36, 0, 0.028, 0.16, 'y', R3D.col('#7a6038'), 6);
+            b.cyl(0.06, 0.45, 0, 0.028, 0.12, 'x', R3D.col('#7a6038'), 6);
         },
+        /** A struck coin, standing on its edge. */
         ore: function (b) {
-            b.box(0, 0, 0, 0.38, 0.34, 0.34, R3D.col('#d8b23a'), F.ALL, R3D.col('#f5da72'));
+            const gold = R3D.col('#e8b62c');
+            const rim = R3D.col('#fce98a');
+            b.cyl(0, 0, 0, 0.19, 0.06, 'z', gold, 14, rim);
+            // Raised rim and a face mark, so it catches the light as it spins.
+            b.cyl(0, 0, 0.031, 0.135, 0.012, 'z', R3D.col('#a87615'), 14);
+            b.cyl(0, 0, -0.031, 0.135, 0.012, 'z', R3D.col('#a87615'), 14);
         },
+        /** A tin billy-can with a lid. */
         food: function (b) {
-            b.box(0, 0, 0, 0.5, 0.3, 0.36, R3D.col('#b5763c'), F.ALL, R3D.col('#d99a56'));
-            b.box(0, 0.16, 0, 0.4, 0.12, 0.3, R3D.col('#7fb04a'));
+            b.cyl(0, -0.02, 0, 0.19, 0.3, 'y', R3D.col('#b0784a'), 12, R3D.col('#caa06a'));
+            b.cyl(0, 0.16, 0, 0.2, 0.05, 'y', R3D.col('#8fae5a'), 12);
+            b.cyl(0, 0.22, 0, 0.05, 0.08, 'y', R3D.col('#6b4a28'), 8);
         },
+        /** A helmet, since that is what a spare life is here. */
         heart: function (b) {
-            b.box(0, 0, 0, 0.44, 0.3, 0.3, R3D.col('#e04b6a'));
-            b.box(-0.12, 0.18, 0, 0.22, 0.22, 0.3, R3D.col('#e04b6a'));
-            b.box(0.12, 0.18, 0, 0.22, 0.22, 0.3, R3D.col('#e04b6a'));
+            b.cyl(0, 0.02, 0, 0.22, 0.2, 'y', R3D.col('#ffc233'), 12, R3D.col('#ffe08a'));
+            b.cyl(0, -0.08, 0, 0.3, 0.05, 'y', R3D.col('#e8a521'), 14);
+            b.box(0, 0.06, 0.2, 0.1, 0.08, 0.06, R3D.col('#fff6d0'));
         },
+        /** A pressure bottle with a valve. */
         oxygen: function (b) {
-            b.box(0, 0, 0, 0.34, 0.62, 0.34, R3D.col('#3aa6c0'), F.ALL, R3D.col('#5cc8de'));
-            b.box(0, 0.38, 0, 0.14, 0.16, 0.14, R3D.col('#b0b8c0'));
+            b.cyl(0, -0.02, 0, 0.155, 0.5, 'y', R3D.col('#3aa6c0'), 12, R3D.col('#63cfe4'));
+            b.cyl(0, 0.26, 0, 0.06, 0.12, 'y', R3D.col('#b0b8c0'), 8);
+            b.cyl(0, 0.32, 0, 0.11, 0.04, 'y', R3D.col('#d8dee4'), 10);
+            b.cyl(0, 0.06, 0, 0.165, 0.05, 'y', R3D.col('#25798f'), 12);
         }
     };
 

@@ -40,10 +40,16 @@
 
     const R3D = {};
 
-    /** Depth of the playfield slab, in world units. */
-    R3D.DEPTH = 1.15;
+    /**
+     * Depth of the playfield slab, in world units.
+     *
+     * Deepened once the lens widened. A thin slab under a near-orthographic
+     * camera showed nothing; a deep one under a wide lens is what gives the
+     * rock visible sides and the room a floor you can see the thickness of.
+     */
+    R3D.DEPTH = 2.6;
     /** Where the back wall sits. Everything gameplay-relevant is in front of it. */
-    R3D.BACK_Z = -1.5;
+    R3D.BACK_Z = -2.6;
 
     /* ------------------------------------------------------------------ *
      * Space
@@ -398,22 +404,25 @@
      * Drawn wide and shallow and stretched over the room; nobody is going to
      * study the sampling on something eight units behind the action.
      */
-    function backdropCanvas(pal) {
+    /**
+     * One backdrop layer.
+     *
+     * Layer 0 is the opaque ramp with the most distant ridges on it; layers 1
+     * and 2 are transparent sheets of nearer rock. They are separate canvases so
+     * they can be hung at **different depths** — which is the whole point. One
+     * flat plane, however well drawn, has no parallax: it slides with the camera
+     * as a unit and the eye reads it as wallpaper. Three sheets at increasing Z
+     * diverge under the perspective camera, so they shift against each other
+     * when the screen shakes and when a room flips, and the space behind the
+     * playfield becomes somewhere rather than something.
+     */
+    function backdropCanvas(pal, layer) {
         const W = 512, H = 288;
         const cv = document.createElement('canvas');
         cv.width = W;
         cv.height = H;
         const ctx = cv.getContext('2d');
-        const rnd = TNT.Util.rng(0xB4CD40 + pal.back.length);
-
-        // The ramp. Darker at the roof, warmer toward the floor, because the
-        // light in a mine comes from what is burning down there.
-        const sky = ctx.createLinearGradient(0, 0, 0, H);
-        sky.addColorStop(0, pal.backFar);
-        sky.addColorStop(0.55, pal.back);
-        sky.addColorStop(1, pal.backGlow || pal.back);
-        ctx.fillStyle = sky;
-        ctx.fillRect(0, 0, W, H);
+        const rnd = TNT.Util.rng(0xB4CD40 + layer * 7919 + pal.back.length);
 
         /** One ridge line of jagged rock, filled to the bottom of the canvas. */
         const ridge = (baseY, amp, step, fill) => {
@@ -430,25 +439,55 @@
             ctx.fill();
         };
 
-        // Four layers, each nearer, each a shade more contrasted. The values
-        // have to separate or the layers merge into one silhouette.
-        ridge(H * 0.42, H * 0.20, 46, mixHex(pal.backFar, pal.rock[0], 0.30));
-        ridge(H * 0.56, H * 0.17, 34, mixHex(pal.backFar, pal.rock[0], 0.50));
-        ridge(H * 0.70, H * 0.14, 26, mixHex(pal.back, pal.rock[2], 0.65));
-        ridge(H * 0.84, H * 0.10, 18, mixHex(pal.back, pal.rock[2], 0.85));
+        if (layer === 0) {
+            // The ramp. Darker at the roof, warmer toward the floor, because
+            // the light in a mine comes from what is burning down there.
+            const sky = ctx.createLinearGradient(0, 0, 0, H);
+            sky.addColorStop(0, pal.backFar);
+            sky.addColorStop(0.55, pal.back);
+            sky.addColorStop(1, pal.backGlow || pal.back);
+            ctx.fillStyle = sky;
+            ctx.fillRect(0, 0, W, H);
 
-        // Distant lamps, deep in the workings.
-        for (let i = 0; i < 14; i++) {
-            const x = rnd.range(0, W);
-            const y = rnd.range(H * 0.45, H * 0.9);
-            const r = rnd.range(4, 11);
-            const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-            g.addColorStop(0, 'rgba(255,190,110,0.5)');
-            g.addColorStop(1, 'rgba(255,190,110,0)');
-            ctx.fillStyle = g;
-            ctx.fillRect(x - r, y - r, r * 2, r * 2);
+            ridge(H * 0.40, H * 0.20, 52, mixHex(pal.backFar, pal.rock[0], 0.26));
+            ridge(H * 0.54, H * 0.17, 38, mixHex(pal.backFar, pal.rock[0], 0.42));
+
+            // Distant lamps, deep in the workings.
+            for (let i = 0; i < 16; i++) {
+                const x = rnd.range(0, W);
+                const y = rnd.range(H * 0.45, H * 0.92);
+                const r = rnd.range(4, 12);
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+                g.addColorStop(0, 'rgba(255,190,110,0.55)');
+                g.addColorStop(1, 'rgba(255,190,110,0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(x - r, y - r, r * 2, r * 2);
+            }
+            return cv;
         }
 
+        // Nearer sheets: rock only, over transparency, and a haze wash so each
+        // one sits in front of the last rather than merging with it.
+        ctx.clearRect(0, 0, W, H);
+        if (layer === 1) {
+            ridge(H * 0.66, H * 0.16, 30, mixHex(pal.back, pal.rock[2], 0.62));
+            ctx.globalCompositeOperation = 'source-atop';
+            const haze = ctx.createLinearGradient(0, H * 0.5, 0, H);
+            haze.addColorStop(0, 'rgba(255,255,255,0.10)');
+            haze.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = haze;
+            ctx.fillRect(0, 0, W, H);
+        } else {
+            ridge(H * 0.82, H * 0.12, 22, mixHex(pal.back, pal.rock[2], 0.88));
+            // Pit props silhouetted against the workings behind them.
+            ctx.fillStyle = mixHex(pal.back, '#000000', 0.45);
+            for (let i = 0; i < 7; i++) {
+                const x = rnd.range(10, W - 10);
+                const h = rnd.range(H * 0.16, H * 0.34);
+                ctx.fillRect(x, H - h, 5, h);
+                ctx.fillRect(x - 16, H - h, 37, 5);
+            }
+        }
         return cv;
     }
 
@@ -459,12 +498,16 @@
         return '#' + ca.getHexString();
     }
 
-    /** One baked backdrop per palette, made on demand. */
+    /** Depths the three backdrop sheets hang at, nearest last. */
+    R3D.BACKDROP_Z = [-19, -11, -5.5];
+
+    /** One baked backdrop layer per palette, made on demand. */
     const _backdrops = new Map();
-    R3D.backdropTexture = function (pal) {
-        let tex = _backdrops.get(pal);
+    R3D.backdropTexture = function (pal, layer) {
+        const key = pal.back + ':' + layer;
+        let tex = _backdrops.get(key);
         if (tex) return tex;
-        tex = new THREE.CanvasTexture(backdropCanvas(pal));
+        tex = new THREE.CanvasTexture(backdropCanvas(pal, layer));
         tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
         // A canvas holds sRGB values. Left unflagged, Three samples it as
         // linear and every colour comes out lifted — the backdrop rendered as
@@ -472,8 +515,126 @@
         // every additive glow drawn over it.
         tex.encoding = THREE.sRGBEncoding;
         tex.needsUpdate = true;
-        _backdrops.set(pal, tex);
+        _backdrops.set(key, tex);
         return tex;
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Round primitives
+     * ------------------------------------------------------------------ */
+
+    /**
+     * A capped cylinder along an axis.
+     *
+     * The builder could only make boxes, and it showed: a coin was a gold box,
+     * a lantern was a yellow box, a barrel was a brown box. No amount of
+     * texture or lighting rescues a prop whose *silhouette* is wrong — round
+     * things have to actually be round, and at eight or ten segments they cost
+     * almost nothing.
+     *
+     * @param {string} axis  'x', 'y' or 'z' — the length runs along this
+     */
+    Builder.prototype.cyl = function (cx, cy, cz, radius, length, axis, colour, seg, capColour) {
+        const n = seg || 10;
+        const half = length / 2;
+        const cap = capColour || colour;
+        const ring = [];
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            ring.push([Math.cos(a) * radius, Math.sin(a) * radius]);
+        }
+
+        // Map the two cross-section axes and the length axis into world space.
+        const at = (u, v, w) => {
+            if (axis === 'x') return [cx + w, cy + u, cz + v];
+            if (axis === 'z') return [cx + u, cy + v, cz + w];
+            return [cx + u, cy + w, cz + v];
+        };
+        const nrm = (u, v, w) => {
+            if (axis === 'x') return [w, u, v];
+            if (axis === 'z') return [u, v, w];
+            return [u, w, v];
+        };
+
+        // Side wall.
+        for (let i = 0; i < n; i++) {
+            const a = ring[i], b = ring[(i + 1) % n];
+            const base = this.count;
+            const quad = [[a, -half], [b, -half], [b, half], [a, half]];
+            for (let k = 0; k < 4; k++) {
+                const [p, w] = quad[k];
+                const pos = at(p[0], p[1], w);
+                const nn = nrm(p[0] / radius, p[1] / radius, 0);
+                this.pos.push(pos[0], pos[1], pos[2]);
+                this.norm.push(nn[0], nn[1], nn[2]);
+                this.color.push(colour.r, colour.g, colour.b);
+                this.uv.push(k === 1 || k === 2 ? 1 : 0, k >= 2 ? 1 : 0);
+                this.count++;
+            }
+            this.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        }
+
+        // Both caps, as fans.
+        for (const side of [-1, 1]) {
+            const centre = this.count;
+            const cPos = at(0, 0, half * side);
+            const cN = nrm(0, 0, side);
+            this.pos.push(cPos[0], cPos[1], cPos[2]);
+            this.norm.push(cN[0], cN[1], cN[2]);
+            this.color.push(cap.r, cap.g, cap.b);
+            this.uv.push(0.5, 0.5);
+            this.count++;
+            for (let i = 0; i < n; i++) {
+                const p = ring[i];
+                const pos = at(p[0], p[1], half * side);
+                this.pos.push(pos[0], pos[1], pos[2]);
+                this.norm.push(cN[0], cN[1], cN[2]);
+                this.color.push(cap.r, cap.g, cap.b);
+                this.uv.push(0.5 + p[0] / (radius * 2), 0.5 + p[1] / (radius * 2));
+                this.count++;
+            }
+            for (let i = 0; i < n; i++) {
+                const a = centre + 1 + i;
+                const b = centre + 1 + ((i + 1) % n);
+                if (side > 0) this.index.push(centre, a, b);
+                else this.index.push(centre, b, a);
+            }
+        }
+        return this;
+    };
+
+    /** A faceted gem: two pyramids base to base, along Y. */
+    Builder.prototype.gem = function (cx, cy, cz, radius, height, colour, seg) {
+        const n = seg || 6;
+        const ring = [];
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            ring.push([Math.cos(a) * radius, Math.sin(a) * radius]);
+        }
+        for (const tipY of [height / 2, -height / 2]) {
+            for (let i = 0; i < n; i++) {
+                const a = ring[i], b = ring[(i + 1) % n];
+                const base = this.count;
+                const tri = [[a[0], 0, a[1]], [b[0], 0, b[1]], [0, tipY, 0]];
+                // Facet normal, so the gem catches light per face.
+                const ux = tri[1][0] - tri[0][0], uy = tri[1][1] - tri[0][1], uz = tri[1][2] - tri[0][2];
+                const vx = tri[2][0] - tri[0][0], vy = tri[2][1] - tri[0][1], vz = tri[2][2] - tri[0][2];
+                let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+                const len = Math.hypot(nx, ny, nz) || 1;
+                nx /= len; ny /= len; nz /= len;
+                if (tipY < 0) { nx = -nx; ny = -ny; nz = -nz; }
+                for (let k = 0; k < 3; k++) {
+                    this.pos.push(cx + tri[k][0], cy + tri[k][1], cz + tri[k][2]);
+                    this.norm.push(nx, ny, nz);
+                    this.color.push(colour.r, colour.g, colour.b);
+                    this.uv.push(k === 1 ? 1 : 0, k === 2 ? 1 : 0);
+                    this.count++;
+                }
+                if (tipY > 0) this.index.push(base, base + 1, base + 2);
+                else this.index.push(base, base + 2, base + 1);
+            }
+        }
+        return this;
     };
 
     const _textures = new Map();

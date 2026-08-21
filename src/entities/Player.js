@@ -411,16 +411,30 @@
             }
         }
 
-        // Climbing out through a shaft mouth: hold on. `Run._checkRoomChange`
-        // fires this same step and the ladder continues in the next room, but
-        // asking the room about a row it does not have answers ROCK, which
-        // would let go of the ladder exactly at the seam and drop him back.
-        if (this.y <= 0 || this.y >= C.ROOM_H) return;
+        /*
+         * Climbing out through a shaft mouth: hold on.
+         *
+         * A room cannot answer questions about rows it does not have, and
+         * `Room.get` returns ROCK for them — so the moment a climber's feet
+         * cross row zero, `stillOn` went false and let go of the ladder. He
+         * dropped, re-grabbed, climbed, and let go again, one pixel below the
+         * seam, for ever. That is what "I can't get up the ladder into the next
+         * room" looked like from the inside, and it survived two attempts at
+         * fixing the *level* because the level was never the problem.
+         *
+         * Anything outside the room counts as still on the ladder. The climb
+         * continues, `Run._checkRoomChange` fires on the same step, and the
+         * ladder carries on in the room next door.
+         */
+        const feetRow = Math.floor((this.y - 1) / C.TILE);
+        const bodyRow = Math.floor(this.centreY() / C.TILE);
+        const outside = function (ty) { return ty < 0 || ty >= C.ROWS; };
+        if (outside(feetRow) || outside(bodyRow)) return;
 
         // Off the bottom: stand up if there is ground, otherwise let go.
-        const feetTile = room.get(this.climbCol, Math.floor((this.y - 1) / C.TILE));
+        const feetTile = room.get(this.climbCol, feetRow);
         const stillOn = Tiles.isClimbable(feetTile) ||
-            Tiles.isClimbable(room.get(this.climbCol, Math.floor(this.centreY() / C.TILE)));
+            Tiles.isClimbable(room.get(this.climbCol, bodyRow));
 
         if (!stillOn) {
             // Climbed off the top of the shaft: stand on the cap.

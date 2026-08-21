@@ -420,6 +420,44 @@ check('respawning rewinds the machinery but not the score', () => {
     return 'life spent, ore stayed collected, fuse refilled';
 });
 
+/**
+ * Climbing a shaft out of a room, which is the only way to change floor.
+ *
+ * This is here because it was broken twice and reported twice. `Room.get`
+ * answers ROCK for rows outside the room, so the instant a climber's feet
+ * crossed row zero the ladder let go, he fell, re-grabbed and climbed again —
+ * an invisible loop one pixel below the seam. Both earlier attempts went
+ * looking at the level design, because from the outside it looks exactly like
+ * a ladder that does not reach.
+ */
+check('an up-shaft carries you into the room above', () => {
+    const h = harness();
+    const run = h.run;
+    const p = run.player;
+    const col = TNT.Paint.SHAFT_COLS[0];
+
+    // Find the foot of the shaft ladder and stand on it.
+    const room = run.room();
+    assert(room.exits.up, 'the opening room has no up exit to test');
+    let foot = -1;
+    for (let ty = 0; ty < C.ROWS; ty++) {
+        if (Tiles.isClimbable(room.get(col, ty))) foot = ty;
+    }
+    assert(foot > 0, 'no shaft ladder in column ' + col);
+
+    const start = run.roomIndex;
+    p.reset(col * C.TILE + C.TILE / 2, (foot + 1) * C.TILE, true);
+    h.seconds(0.1, []);
+    h.tap('up');
+    for (let i = 0; i < 12 && run.roomIndex === start; i++) h.seconds(0.25, ['up']);
+
+    assert(run.roomIndex !== start,
+        'climbed the shaft for three seconds and never left ' + room.id);
+    assert(p.y > 0 && p.y < C.ROOM_H,
+        'arrived outside the room above at y=' + p.y.toFixed(1));
+    return room.id + ' → ' + run.room().id;
+});
+
 check('walking out of a doorway changes room', () => {
     const h = harness();
     const run = h.run;

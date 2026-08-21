@@ -377,19 +377,31 @@
      * seeded RNG, so every room has its own skyline behind it and the flip
      * between two of them reads as travel rather than as a redraw.
      */
+    /**
+     * Three sheets at increasing depth, each sized so it still covers the frame
+     * from where the camera sits. The far one has to be much bigger than the
+     * room: under a perspective camera a plane nineteen units back subtends a
+     * far smaller angle, and sizing them all alike leaves the corners empty.
+     */
     function backdrop(group, pal, rng) {
-        const b = new R3D.Builder();
-        b.plate(C.COLS / 2, C.ROWS / 2, R3D.BACK_Z - 0.6,
-                C.COLS + 6, C.ROWS + 4, R3D.col('#ffffff'));
+        for (let layer = 0; layer < 3; layer++) {
+            const z = R3D.BACKDROP_Z[layer];
+            // Scale with distance from the play plane so each sheet fills the view.
+            const spread = 1 + (Math.abs(z) - 5) * 0.055;
+            const b = new R3D.Builder();
+            b.plate(C.COLS / 2, C.ROWS / 2, z,
+                    (C.COLS + 6) * spread, (C.ROWS + 4) * spread, R3D.col('#ffffff'));
 
-        const mesh = new THREE.Mesh(b.geometry(), new THREE.MeshBasicMaterial({
-            map: R3D.backdropTexture(pal),
-            vertexColors: true,
-            depthWrite: false
-        }));
-        mesh.name = 'backdrop';
-        mesh.renderOrder = -1;
-        group.add(mesh);
+            const mesh = new THREE.Mesh(b.geometry(), new THREE.MeshBasicMaterial({
+                map: R3D.backdropTexture(pal, layer),
+                vertexColors: true,
+                transparent: layer > 0,
+                depthWrite: false
+            }));
+            mesh.name = 'backdrop' + layer;
+            mesh.renderOrder = -3 + layer;
+            group.add(mesh);
+        }
         void rng;
     }
 
@@ -420,11 +432,30 @@
             const mount = room.get(tx, ty);
             if (!isRock(room, tx, ty) && mount !== T.PLATFORM) continue;
             if (room.get(tx, ty + 1) !== T.EMPTY || room.get(tx, ty + 2) !== T.EMPTY) continue;
-            const x = R3D.tileX(tx), y = R3D.tileY(ty) - 0.9;
-            b.box(x, y + 0.5, TRIM_Z + 0.2, 0.06, 0.5, 0.06, R3D.col('#3a3a40'), F.SLAB);
-            b.box(x, y, TRIM_Z + 0.2, 0.34, 0.34, 0.34, lampCol, F.SLAB);
-            g.box(x, y, TRIM_Z + 0.42, 0.6, 0.6, 0.02, R3D.col(pal.lamp), F.FRONT);
-            lights.push({ x: x, y: y, colour: pal.lamp, energy: 1.15, range: 16, flicker: 0.18 });
+            /*
+             * A miner's lantern, not a glowing cube: a hook, a chain, a metal
+             * cap, a glass body and a bright wick inside it. The lamps are the
+             * most-repeated prop in the game — six a room, twenty-seven rooms —
+             * so a box here was a box everywhere you looked.
+             */
+            const x = R3D.tileX(tx), y = R3D.tileY(ty) - 1.0;
+            const z = TRIM_Z + 0.3;
+            const metal = R3D.col('#4a4038');
+            const brass = R3D.col('#c9a15e');
+
+            b.cyl(x, y + 0.72, z, 0.035, 0.62, 'y', metal, 6);          // chain
+            b.cyl(x, y + 0.36, z, 0.13, 0.10, 'y', brass, 10);           // cap
+            b.cyl(x, y + 0.10, z, 0.155, 0.44, 'y', R3D.col('#e0b878'), 10);  // glass
+            b.cyl(x, y - 0.16, z, 0.14, 0.09, 'y', brass, 10);           // base
+            // Guard bars, so it reads as a lamp rather than a jar.
+            for (const dx of [-0.13, 0.13]) {
+                b.cyl(x + dx, y + 0.10, z, 0.022, 0.46, 'y', metal, 4);
+            }
+            // The wick, and the halo it throws on the rock behind.
+            g.cyl(x, y + 0.08, z + 0.04, 0.07, 0.22, 'y', R3D.col('#fff3c8'), 8);
+            g.box(x, y + 0.08, z + 0.1, 0.9, 0.9, 0.02, R3D.col(pal.lamp), F.FRONT);
+
+            lights.push({ x: x, y: y + 0.1, colour: pal.lamp, energy: 1.25, range: 17, flicker: 0.2 });
             hung++;
         }
 
@@ -466,18 +497,16 @@
             if (room.get(tx, ty) !== T.EMPTY) continue;
             const colour = rng.pick(crystalCols);
             const x = R3D.tileX(tx), y = R3D.tileY(ty);
-            const s = rng.range(0.14, 0.26);
+            const s = rng.range(0.16, 0.30);
             /*
-             * A crystal is a bright *core* with a tight halo, not a large faint
-             * rectangle. The first version had the halo four times the size of
-             * the gem at a fifth of the opacity, which at this scale reads as a
-             * smudge on the lens rather than as something glowing.
+             * A faceted gem with a tight halo. Facet normals mean each face
+             * catches the lamps differently, which is what makes it read as
+             * crystal — a box lit evenly on every side is a coloured brick, and
+             * a wide faint halo round it is a smudge on the lens.
              */
-            g.box(x, y, R3D.BACK_Z + 0.85, s, s * 2.2, s, colour, F.ALL);
-            g.box(x, y, R3D.BACK_Z + 0.88, s * 0.45, s * 1.5, 0.02,
-                  R3D.col('#ffffff'), F.FRONT);
-            g.box(x, y, R3D.BACK_Z + 0.9, s * 1.9, s * 2.8, 0.02,
-                  colour.clone().multiplyScalar(0.45), F.FRONT);
+            g.gem(x, y, R3D.BACK_Z + 1.4, s, s * 2.6, colour, 6);
+            g.box(x, y, R3D.BACK_Z + 1.6, s * 1.8, s * 2.6, 0.02,
+                  colour.clone().multiplyScalar(0.4), F.FRONT);
         }
 
         /*
