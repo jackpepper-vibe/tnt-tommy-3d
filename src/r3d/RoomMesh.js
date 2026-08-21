@@ -420,16 +420,65 @@
 
         // Crystals in the back wall — the Godot build's signature, and the only
         // thing in a room that is lit by nothing and still visible.
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < 16; i++) {
             const tx = rng.int(1, C.COLS - 2);
             const ty = rng.int(1, C.ROWS - 2);
             if (room.get(tx, ty) !== T.EMPTY) continue;
             const colour = rng.pick(crystalCols);
             const x = R3D.tileX(tx), y = R3D.tileY(ty);
-            const s = rng.range(0.18, 0.34);
+            const s = rng.range(0.16, 0.32);
             g.box(x, y, R3D.BACK_Z + 0.85, s, s * 2.1, s, colour, F.ALL);
             g.box(x, y, R3D.BACK_Z + 0.9, s * 3.2, s * 4.4, 0.02,
                   colour.clone().multiplyScalar(0.22), F.FRONT);
+        }
+
+        /*
+         * Everything below fills the open air, and it is there because the
+         * rooms read as empty without it: platforms in a void, with nothing
+         * between them and the back wall. The Godot build put chains, mushrooms
+         * and hanging cable in the same gaps for the same reason. All of it is
+         * behind the play plane and none of it collides.
+         */
+
+        // Hanging chains from solid ceilings.
+        for (let attempt = 0, made = 0; attempt < 120 && made < 7; attempt++) {
+            const tx = rng.int(2, C.COLS - 3);
+            const ty = rng.int(0, C.ROWS - 12);
+            if (!isRock(room, tx, ty) || room.get(tx, ty + 1) !== T.EMPTY) continue;
+            const len = rng.range(1.2, 3.4);
+            const x = R3D.tileX(tx);
+            const top = R3D.tileY(ty) - 0.5;
+            b.box(x, top - len / 2, R3D.BACK_Z + 0.75, 0.1, len, 0.1,
+                  R3D.col('#3a3a42'), F.SLAB);
+            b.box(x, top - len, R3D.BACK_Z + 0.75, 0.26, 0.22, 0.26,
+                  R3D.col('#4a4a54'), F.SLAB);
+            made++;
+        }
+
+        // Glowing mushrooms on ledges — small, and the only cool light down at
+        // floor level, which stops the lower half of a room going to mud.
+        for (let attempt = 0, made = 0; attempt < 150 && made < 8; attempt++) {
+            const tx = rng.int(2, C.COLS - 3);
+            const ty = rng.int(3, C.ROWS - 2);
+            if (room.get(tx, ty) !== T.EMPTY) continue;
+            if (!Tiles.isFloor(room.get(tx, ty + 1))) continue;
+            const x = R3D.tileX(tx) + rng.range(-0.25, 0.25);
+            const y = R3D.tileY(ty) - 0.34;
+            const glowCol = R3D.col('#6fe0c0');
+            b.box(x, y, R3D.BACK_Z + 1.0, 0.09, 0.22, 0.09, R3D.col('#c9d8c0'), F.SLAB);
+            g.box(x, y + 0.16, R3D.BACK_Z + 1.02, 0.3, 0.16, 0.02, glowCol, F.FRONT);
+            g.box(x, y + 0.16, R3D.BACK_Z + 1.03, 0.9, 0.7, 0.02,
+                  glowCol.clone().multiplyScalar(0.16), F.FRONT);
+            made++;
+        }
+
+        // Cut timbering on the back wall: the ribs of the working, receding.
+        for (let x = 3; x < C.COLS - 3; x += rng.int(6, 10)) {
+            const h = rng.range(5, 11);
+            const y = rng.range(h / 2 + 1, C.ROWS - h / 2 - 1);
+            b.box(x, y, R3D.BACK_Z + 0.5, 0.22, h, 0.22, R3D.col(pal.timber), F.SLAB);
+            b.box(x, y + h / 2, R3D.BACK_Z + 0.5, 2.2, 0.24, 0.24,
+                  R3D.col(pal.timber), F.SLAB);
         }
     }
 

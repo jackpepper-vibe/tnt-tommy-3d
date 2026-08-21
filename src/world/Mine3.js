@@ -64,9 +64,13 @@
                 g.ore(19, 7, 2, 2);
                 g.ore(32, 7, 2, 2);
 
+                g.spikes(17, 22, 4);
                 g.bat(19, 12);
                 g.crawler(35, 10);
                 g.dog(24, 22);
+                g.spider(30, 1);
+                g.guardian(12, 6);
+                g.orb(33, 16);
 
                 g.ladder(6, 8, 13);
             }
@@ -115,8 +119,11 @@
 
                 g.walker(17, 19);
                 g.spider(24, 1);
+                g.spider(11, 1);
                 g.guardian(14, 12);
                 g.crawler(35, 10);
+                g.orb(19, 10);
+                g.bat(30, 15);
 
             }
         },
@@ -153,8 +160,12 @@
                 g.tnt(33, 7);
 
                 g.orb(14, 16);
+                g.orb(30, 10);
                 g.bat(26, 12);
                 g.guardian(18, 9);
+                g.spider(22, 1);
+                g.crawler(12, 19);
+                g.walker(34, 19);
 
                 g.ladder(6, 5, 7);
             }
@@ -204,6 +215,9 @@
                 g.bat(17, 12);
                 g.dog(19, 22);
                 g.guardian(28, 9);
+                g.spider(25, 1);
+                g.orb(16, 16);
+                g.crawler(34, 13);
 
             }
         },
@@ -248,7 +262,10 @@
                 g.orb(8, 18);
                 g.orb(31, 18);
                 g.guardian(17, 9);
+                g.guardian(26, 6);
                 g.bat(24, 12);
+                g.spider(14, 1);
+                g.spider(29, 1);
 
             }
         },
@@ -300,9 +317,13 @@
                 g.ore(24, 7, 2, 2);
                 g.tnt(6, 4);
 
+                g.spikes(15, 22, 4);
                 g.bat(15, 15);
                 g.spider(13, 1);
                 g.guardian(16, 9);
+                g.orb(11, 16);
+                g.crawler(25, 13);
+                g.dog(9, 22);
 
             }
         },
@@ -345,9 +366,13 @@
                 g.ore(18, 7, 2, 2);
                 g.ore(32, 7, 2, 2);
 
+                g.spikes(20, 22, 4);
                 g.bat(17, 6);
                 g.orb(13, 18);
                 g.crawler(34, 13);
+                g.spider(27, 1);
+                g.guardian(24, 12);
+                g.dog(8, 22);
 
                 g.vine(6, 5, 7);
                 g.vine(28, 5, 7);
@@ -397,8 +422,11 @@
 
                 g.walker(24, 19);
                 g.spider(24, 1);
+                g.spider(11, 1);
                 g.guardian(12, 9);
+                g.guardian(30, 6);
                 g.crawler(34, 16);
+                g.orb(19, 16);
             }
         },
 
@@ -437,10 +465,14 @@
                 g.ore(18, 7, 2, 2);
                 g.ore(33, 7, 1);
 
+                g.spikes(14, 22, 4);
                 g.guardian(17, 9);
+                g.guardian(27, 6);
                 g.bat(22, 15);
                 g.walker(17, 19);
                 g.spider(29, 1);
+                g.spider(12, 1);
+                g.orb(9, 16);
 
                 g.ladder(6, 8, 13);
             }

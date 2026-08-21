@@ -75,6 +75,10 @@
                 g.tnt(12, 4);
 
                 g.spikes(15, 22, 4);
+                // Rotten boards over the spikes, so the shortest way down the
+                // middle is also the one that gives way under you.
+                g.crumble(16, 20, 5);
+                g.crumble(19, 14, 5);
                 g.bat(19, 12);
                 g.crawler(31, 7);
                 g.walker(9, 19);
@@ -120,6 +124,9 @@
                 g.tnt(23, 7);
                 g.ore(10, 7, 2, 2);
 
+                g.crumble(18, 17, 5);
+                g.crumble(24, 11, 4);
+                g.boulder(26, 1);
                 g.crawler(20, 19);
                 g.bat(27, 12);
                 g.spider(24, 1);
@@ -168,6 +175,9 @@
 
                 g.boulder(11, 1);
                 g.boulder(19, 1);
+                g.boulder(31, 1);
+                g.crumble(16, 17, 5);
+                g.crumble(22, 11, 4);
                 g.bat(24, 12);
                 g.crawler(33, 16);
                 g.spider(17, 1);
@@ -219,6 +229,8 @@
                 g.ore(19, 7, 2, 2);
                 g.ore(31, 7, 2, 2);
 
+                g.crumble(15, 20, 5);
+                g.crumble(21, 14, 4);
                 g.bat(16, 12);
                 g.crawler(31, 16);
                 g.dog(24, 22);
@@ -264,6 +276,8 @@
                 g.ore(17, 7, 2, 2);
                 g.ore(30, 7, 2, 2);
 
+                g.crumble(17, 17, 5);
+                g.crumble(23, 11, 4);
                 g.walker(19, 13);
                 g.crawler(34, 7);
                 g.spider(13, 1);
@@ -322,6 +336,9 @@
                 g.ore(10, 7, 2, 2);
                 g.tnt(24, 7);
 
+                g.crumble(11, 17, 4);
+                g.crumble(26, 11, 5);
+                g.boulder(14, 1);
                 g.bat(26, 12);
                 g.crawler(34, 10);
                 g.dog(24, 22);
@@ -373,6 +390,8 @@
                 g.ore(12, 7, 2, 2);
                 g.ore(26, 7, 2, 2);
 
+                g.crumble(20, 17, 5);
+                g.crumble(15, 11, 4);
                 g.bat(27, 15);
                 g.walker(28, 19);
                 g.spider(16, 1);
@@ -421,6 +440,8 @@
                 g.ore(32, 7, 2, 2);
                 g.tnt(8, 4);
 
+                g.crumble(18, 14, 5);
+                g.crumble(11, 8, 4);
                 g.orb(13, 16);
                 g.bat(17, 12);
                 g.crawler(34, 16);
@@ -465,6 +486,9 @@
                 g.ore(18, 7, 2, 2);
                 g.ore(31, 7, 2, 2);
 
+                g.crumble(18, 17, 5);
+                g.crumble(24, 11, 4);
+                g.boulder(29, 1);
                 g.bat(24, 12);
                 g.guardian(16, 9);
                 g.walker(18, 19);
