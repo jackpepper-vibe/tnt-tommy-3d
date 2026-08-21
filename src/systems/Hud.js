@@ -32,13 +32,47 @@
             room: root.querySelector('#room-name'),
             toast: root.querySelector('#toast'),
             floats: root.querySelector('#floats'),
-            kit: root.querySelector('#kit')
+            kit: root.querySelector('#kit'),
+            medals: root.querySelector('#medal-count'),
+            medalTotal: root.querySelector('#medal-total'),
+            escape: root.querySelector('#escape'),
+            escapeTime: root.querySelector('#escape-time'),
+            minimap: root.querySelector('#minimap')
         };
         this._roomShown = 0;
         this._toastT = 0;
         this._lastLives = -1;
+        this._lastMedals = -1;
+        /** Room index → its cell in the minimap. Rebuilt when a mine starts. */
+        this._cells = [];
         this._listen();
     }
+
+    /**
+     * Lay out the minimap as the mine's 3x3 grid.
+     *
+     * The point of it is not navigation — nine rooms is memorable — it is
+     * *bookkeeping*: which rooms still owe you a nugget, and which are done.
+     * Dynamite Dan had one and it is most of why its rooms felt like places
+     * rather than corridors.
+     */
+    Hud.prototype._buildMap = function (mine) {
+        const map = this.el.minimap;
+        if (!map) return;
+        map.innerHTML = '';
+        this._cells = [];
+
+        for (let cy = 0; cy < C.MINE_ROWS; cy++) {
+            for (let cx = 0; cx < C.MINE_COLS; cx++) {
+                const room = mine.roomAt(cx, cy);
+                const cell = document.createElement('i');
+                cell.className = 'minimap__cell';
+                if (!room) cell.classList.add('is-void');
+                map.appendChild(cell);
+                if (room) this._cells[room.index] = cell;
+            }
+        }
+    };
 
     Hud.prototype._listen = function () {
         const bus = this.run.bus;
@@ -52,14 +86,28 @@
         bus.on(EV.MINE_STARTED, function (e) {
             self.el.mine.textContent = e.mine.name;
             self.el.tntTotal.textContent = e.mine.tntTotal;
+            self.el.medalTotal.textContent = e.mine.rooms.filter(function (r) {
+                return r.oreCount > 0;
+            }).length;
+            self._buildMap(e.mine);
+            self._lastMedals = -1;
+        });
+
+        bus.on(EV.ESCAPE_STARTED, function () {
+            self.el.escape.classList.add('is-shown');
+            self.toast('THE SEAM IS COMING DOWN — GET TO THE PLUNGER', 'bad');
+        });
+
+        bus.on(EV.ALL_MEDALS, function () {
+            self.toast('EVERY SEAM STRIPPED  +' + C.SCORE_ALL_MEDALS, 'good');
         });
 
         bus.on(EV.PICKUP, function (e) {
             if (e.value > 0) self.float('+' + e.value, e.x, e.y, 'gold');
         });
 
-        bus.on(EV.ROOM_CLEARED, function () {
-            self.toast('SEAM CLEARED  +' + C.SCORE_ROOM_CLEAR, 'good');
+        bus.on(EV.ROOM_CLEARED, function (e) {
+            self.toast('MEDAL — ' + e.room.name + '  +' + C.SCORE_MEDAL, 'good');
         });
 
         bus.on(EV.ALL_TNT, function () {
@@ -127,6 +175,31 @@
         }
 
         this.el.kit.classList.toggle('is-on', run.player.hasOxygen);
+
+        if (run.medals !== this._lastMedals) {
+            this._lastMedals = run.medals;
+            this.el.medals.textContent = run.medals;
+        }
+
+        // The minimap. Where you are, and which rooms still owe you a nugget.
+        for (let i = 0; i < this._cells.length; i++) {
+            const cell = this._cells[i];
+            if (!cell) continue;
+            cell.classList.toggle('is-here', i === run.roomIndex);
+            const set = run.entities[i];
+            cell.classList.toggle('is-medalled', !!(set && set.medal));
+            cell.classList.toggle('is-visited', !!(set && set.seen));
+        }
+
+        // The run out. A hard countdown replacing the fuse as the thing that
+        // will kill you, so it gets the loudest element on the screen.
+        if (run.escape > 0) {
+            this.el.escape.classList.add('is-shown');
+            this.el.escape.classList.toggle('is-critical', run.escape <= C.ESCAPE_WARN);
+            this.el.escapeTime.textContent = Util.formatTime(run.escape);
+        } else {
+            this.el.escape.classList.remove('is-shown', 'is-critical');
+        }
 
         if (this._roomShown > 0) {
             this._roomShown -= dt;

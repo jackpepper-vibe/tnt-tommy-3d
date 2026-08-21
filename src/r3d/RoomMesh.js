@@ -250,6 +250,31 @@
                         break;
                     }
 
+                    case T.TRAMPOLINE: {
+                        // Sprung canvas on a frame. Sits at the top of its tile
+                        // like a platform, because that is the surface the
+                        // physics bounces you off.
+                        b.box(x, y + 0.30, TRIM_Z, 1, 0.14, TRIM_D, R3D.col('#2f6f8f'), F.SLAB,
+                              R3D.col('#4a9ec0'));
+                        b.box(x - 0.42, y + 0.12, TRIM_Z, 0.16, 0.4, 0.4, timber, F.SLAB);
+                        b.box(x + 0.42, y + 0.12, TRIM_Z, 0.16, 0.4, 0.4, timber, F.SLAB);
+                        g.box(x, y + 0.38, TRIM_Z + TRIM_D / 2 + 0.01, 0.9, 0.06, 0.04,
+                              R3D.col('#7fd4f0'), F.FRONT);
+                        break;
+                    }
+
+                    case T.TELEPORT: {
+                        // A ring set into the floor. Deliberately loud — a pad
+                        // you do not notice is a route you never take.
+                        b.box(x, y + 0.42, TRIM_Z, 0.9, 0.12, 0.5, R3D.col('#3a2f52'), F.SLAB);
+                        g.box(x, y + 0.44, TRIM_Z + 0.3, 0.95, 0.1, 0.04,
+                              R3D.col('#b78bff'), F.FRONT);
+                        g.box(x, y + 0.1, TRIM_Z + 0.28, 0.55, 0.7, 0.02,
+                              R3D.col('#6f4fd0'), F.FRONT);
+                        lights.push({ x: x, y: y + 0.3, colour: '#b78bff', energy: 0.8, range: 9, flicker: 0.25 });
+                        break;
+                    }
+
                     case T.DETONATOR: {
                         b.box(x, y - 0.2, TRIM_Z, 0.7, 0.6, 0.5, R3D.col('#5a3a22'), F.SLAB);
                         b.box(x, y + 0.16, TRIM_Z, 0.12, 0.4, 0.12, R3D.col('#8c8c94'), F.SLAB);

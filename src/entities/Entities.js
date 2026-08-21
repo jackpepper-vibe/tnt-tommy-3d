@@ -95,10 +95,13 @@
      * ------------------------------------------------------------------ */
 
     const ENEMY_SPEC = {
-        walker:  { w: 13, h: 13, speed: 46, damage: C.DMG_ENEMY },
-        crawler: { w: 13, h: 10, speed: 27, damage: C.DMG_ENEMY },
-        bat:     { w: 14, h: 10, speed: 62, damage: C.DMG_ENEMY },
-        orb:     { w: 11, h: 11, speed: 58, damage: C.DMG_ENEMY }
+        walker:   { w: 13, h: 13, speed: 46, damage: C.DMG_ENEMY },
+        crawler:  { w: 13, h: 10, speed: 27, damage: C.DMG_ENEMY },
+        dog:      { w: 15, h: 11, speed: 38, damage: C.DMG_ENEMY },
+        bat:      { w: 14, h: 10, speed: 62, damage: C.DMG_ENEMY },
+        spider:   { w: 11, h: 11, speed: 96, damage: C.DMG_ENEMY },
+        guardian: { w: 13, h: 13, speed: 34, damage: C.DMG_ENEMY },
+        orb:      { w: 11, h: 11, speed: 58, damage: C.DMG_ENEMY }
     };
 
     /**
@@ -141,6 +144,167 @@
 
     Ground.prototype.box = function () {
         return box(this.x, this.y - this.spec.h / 2, this.spec.w, this.spec.h);
+    };
+
+    /**
+     * A guard dog. Patrols like a walker until Tommy is on its level and in
+     * front of it, then charges.
+     *
+     * The tell is deliberate and long — it stops and braces for `ROUSE` before
+     * it moves. A charger with no wind-up is unfair on a three-row grid, where
+     * the counter is usually "get above it", and getting above something takes
+     * a jump you have to start before it commits.
+     */
+    const DOG_ROUSE = 0.45;
+    const DOG_SIGHT = 130;
+    const DOG_CHARGE = 2.6;
+
+    function Dog(tx, ty, room, speedMul) {
+        Ground.call(this, 'dog', tx, ty, room, speedMul);
+        this.kind = 'dog';
+        this.state = 'patrol';
+        this.timer = 0;
+    }
+    Dog.prototype = Object.create(Ground.prototype);
+    Dog.prototype.constructor = Dog;
+
+    Dog.prototype.update = function (dt, player) {
+        if (this.dead) return;
+        this.t += dt;
+
+        const sees = player && player.active &&
+            Math.abs(player.y - this.y) < C.TILE * 1.5 &&
+            Math.abs(player.x - this.x) < DOG_SIGHT &&
+            Util.sign(player.x - this.x) === this.dir;
+
+        if (this.state === 'patrol') {
+            if (sees) { this.state = 'rouse'; this.timer = DOG_ROUSE; }
+        } else if (this.state === 'rouse') {
+            this.timer -= dt;
+            if (this.timer <= 0) { this.state = 'charge'; this.timer = DOG_CHARGE; }
+            return;                              // braced, not moving
+        } else {
+            this.timer -= dt;
+            if (this.timer <= 0) this.state = 'patrol';
+        }
+
+        const speed = this.state === 'charge' ? this.speed * 3.1 : this.speed;
+        this.x += this.dir * speed * dt;
+        if (this.x <= this.minX) { this.x = this.minX; this.dir = 1; this.state = 'patrol'; }
+        if (this.x >= this.maxX) { this.x = this.maxX; this.dir = -1; this.state = 'patrol'; }
+    };
+
+    /**
+     * A cave spider. Sits in the ceiling until Tommy is under it, drops on a
+     * thread, then reels back up.
+     *
+     * The one hazard in the game that comes from above, which is why it is
+     * worth having: on a climbing frame the player's attention is on the ledge
+     * they are aiming at, and this is the only thing that punishes never
+     * looking up. `thread` is read by the renderer to draw the silk.
+     */
+    const SPIDER_WAIT = 1.1;
+    const SPIDER_HANG = 0.7;
+    const SPIDER_TRIGGER = C.TILE * 1.6;
+
+    function Spider(tx, ty, room, speedMul) {
+        const spec = ENEMY_SPEC.spider;
+        this.kind = 'spider';
+        this.spec = spec;
+        this.speed = spec.speed * speedMul;
+        this.dead = false;
+        this.dir = 1;
+        this.t = 0;
+        this.x = tileCentre(tx);
+        this.homeY = ty * C.TILE + C.TILE / 2;
+        this.y = this.homeY;
+        this.state = 'wait';
+        this.timer = SPIDER_WAIT;
+
+        // How far it can drop before it hits something.
+        let y = ty;
+        while (y + 1 < C.ROWS && !Tiles.isFloor(room.get(tx, y + 1)) &&
+               !Tiles.isSolid(room.get(tx, y + 1))) y++;
+        this.lowY = y * C.TILE + C.TILE / 2;
+        this.thread = 0;
+    }
+
+    Spider.prototype.update = function (dt, player) {
+        if (this.dead) return;
+        this.t += dt;
+
+        switch (this.state) {
+            case 'wait': {
+                const under = player && player.active &&
+                    Math.abs(player.x - this.x) < SPIDER_TRIGGER &&
+                    player.y > this.y;
+                this.timer -= dt;
+                if (under && this.timer <= 0) { this.state = 'drop'; }
+                break;
+            }
+            case 'drop':
+                this.y = Math.min(this.lowY, this.y + this.speed * dt);
+                if (this.y >= this.lowY) { this.state = 'hang'; this.timer = SPIDER_HANG; }
+                break;
+            case 'hang':
+                this.timer -= dt;
+                if (this.timer <= 0) this.state = 'climb';
+                break;
+            default:
+                this.y = Math.max(this.homeY, this.y - this.speed * 0.6 * dt);
+                if (this.y <= this.homeY) { this.state = 'wait'; this.timer = SPIDER_WAIT; }
+                break;
+        }
+        this.thread = this.y - this.homeY;
+    };
+
+    Spider.prototype.box = function () {
+        return box(this.x, this.y, this.spec.w, this.spec.h);
+    };
+
+    /**
+     * A guardian. Drifts toward Tommy through anything — rock included.
+     *
+     * Slow enough to outrun and impossible to hide from, which makes it a
+     * pressure source rather than an obstacle: it is the reason not to stand
+     * still working out a route. Ignoring walls is the point, not a shortcut;
+     * a pathfinding version would simply get stuck in the geometry and stop
+     * mattering.
+     */
+    function Guardian(tx, ty, room, speedMul) {
+        const spec = ENEMY_SPEC.guardian;
+        this.kind = 'guardian';
+        this.spec = spec;
+        this.speed = spec.speed * speedMul;
+        this.dead = false;
+        this.dir = 1;
+        this.t = 0;
+        this.homeX = tileCentre(tx);
+        this.homeY = tileCentre(ty);
+        this.x = this.homeX;
+        this.y = this.homeY;
+        void room;
+    }
+
+    Guardian.prototype.update = function (dt, player) {
+        if (this.dead) return;
+        this.t += dt;
+        if (!player || !player.active) return;
+
+        const tx = player.x;
+        const ty = player.centreY();
+        const dx = tx - this.x;
+        const dy = ty - this.y;
+        const d = Math.hypot(dx, dy) || 1;
+        this.x += (dx / d) * this.speed * dt;
+        this.y += (dy / d) * this.speed * dt;
+        this.dir = dx >= 0 ? 1 : -1;
+        // A slight bob, so it reads as hovering rather than sliding.
+        this.y += Math.sin(this.t * 2.2) * 6 * dt;
+    };
+
+    Guardian.prototype.box = function () {
+        return box(this.x, this.y, this.spec.w, this.spec.h);
     };
 
     /** Horizontal flier, weaving. */
@@ -404,6 +568,75 @@
     };
 
     /* ------------------------------------------------------------------ *
+     * Rising lava
+     * ------------------------------------------------------------------ */
+
+    /**
+     * A flood room: the molten level climbs while you are in it.
+     *
+     * It rises **only while the room is occupied**, and drains once you leave.
+     * A flood that kept rising in your absence would mean coming back to a room
+     * you can no longer enter, with nothing having told you that was happening —
+     * which in a game where you revisit rooms to fetch the last stick is a run
+     * lost to something the player could not have known.
+     *
+     * The surface is a pixel height above the floor, not a tile, so it can
+     * creep. `Run` reads `surfaceY` to decide what is submerged.
+     */
+    function Flood(baseRow, ceilRow) {
+        this.kind = 'flood';
+        this.baseY = (baseRow + 1) * C.TILE;
+        this.topY = ceilRow * C.TILE;
+        this.level = 0;                      // px above the base
+        this.active = false;
+    }
+
+    Flood.prototype.update = function (dt, occupied) {
+        this.active = occupied;
+        const max = this.baseY - this.topY;
+        if (occupied) this.level = Math.min(max, this.level + C.FLOOD_RISE * dt);
+        else this.level = Math.max(0, this.level - C.FLOOD_DRAIN * dt);
+    };
+
+    /** Screen-space y of the molten surface. */
+    Flood.prototype.surfaceY = function () {
+        return this.baseY - this.level;
+    };
+
+    Flood.prototype.reset = function () {
+        this.level = 0;
+        this.active = false;
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Warp pads
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Paired warp pads. Stand on one, press Down.
+     *
+     * Pairing is by reading order within the room — first pad with second,
+     * third with fourth — which is unambiguous, needs no letters in the grid,
+     * and makes an odd pad a build error rather than a pad that silently does
+     * nothing.
+     */
+    function Warp(tx, ty) {
+        this.kind = 'warp';
+        this.tx = tx;
+        this.ty = ty;
+        this.x = tileCentre(tx);
+        this.y = ty * C.TILE + C.TILE;
+        this.partner = null;
+        this.lock = 0;
+        this.t = 0;
+    }
+
+    Warp.prototype.update = function (dt) {
+        this.t += dt;
+        if (this.lock > 0) this.lock -= dt;
+    };
+
+    /* ------------------------------------------------------------------ *
      * Span derivation
      * ------------------------------------------------------------------ */
 
@@ -455,8 +688,12 @@
         /** Tile index → {state, timer}. Only occupied planks are in here. */
         this.crumbles = new Map();
         this.detonator = null;
-        /** Set once every nugget in the room has been taken; the bonus is once. */
-        this.oreCleared = false;
+        this.warps = [];
+        this.flood = null;
+        /** Set once every nugget in the room has been taken; the medal is once. */
+        this.medal = false;
+        /** Whether the player has ever been here. Drawn on the minimap. */
+        this.seen = false;
 
         const mul = mine.enemyMul;
         const liftMarks = { h: [], v: [] };
@@ -471,8 +708,17 @@
                 case 'walker': case 'crawler':
                     this.enemies.push(new Ground(s.kind, s.tx, s.ty, room, mul));
                     break;
+                case 'dog':
+                    this.enemies.push(new Dog(s.tx, s.ty, room, mul));
+                    break;
                 case 'bat':
                     this.enemies.push(new Bat(s.tx, s.ty, room, mul));
+                    break;
+                case 'spider':
+                    this.enemies.push(new Spider(s.tx, s.ty, room, mul));
+                    break;
+                case 'guardian':
+                    this.enemies.push(new Guardian(s.tx, s.ty, room, mul));
                     break;
                 case 'orb':
                     this.enemies.push(new Orb(s.tx, s.ty, room, mul));
@@ -494,17 +740,45 @@
             }
         }
 
-        // Vents are terrain rather than actors — they are a hole in the floor —
-        // so they are found by scanning rather than by spawn record.
+        // Vents, warp pads and the plunger are terrain rather than actors, so
+        // they are found by scanning rather than by spawn record.
+        let lavaLow = -1, lavaHigh = C.ROWS;
         for (let ty = 0; ty < C.ROWS; ty++) {
             for (let tx = 0; tx < C.COLS; tx++) {
                 const t = room.get(tx, ty);
-                if (t === T.VENT) this.vents.push(new Vent(tx, ty));
-                else if (t === T.DETONATOR) this.detonator = { x: tileCentre(tx), y: ty * C.TILE + C.TILE };
+                if (t === T.VENT) {
+                    this.vents.push(new Vent(tx, ty));
+                } else if (t === T.TELEPORT) {
+                    this.warps.push(new Warp(tx, ty));
+                } else if (t === T.DETONATOR) {
+                    this.detonator = { x: tileCentre(tx), y: ty * C.TILE + C.TILE };
+                } else if (t === T.LAVA) {
+                    lavaLow = Math.max(lavaLow, ty);
+                    lavaHigh = Math.min(lavaHigh, ty);
+                }
             }
         }
 
+        pairWarps(this, room);
         pairLifts(this, liftMarks, room);
+
+        // A room marked as flooding gets a rising surface over its lava bed.
+        if (room.flooding && lavaLow >= 0) {
+            this.flood = new Flood(lavaLow, Math.max(1, lavaHigh - C.FLOOD_CEILING));
+        }
+    }
+
+    /** Pads pair in reading order; an odd one out is a typo, not a feature. */
+    function pairWarps(set, room) {
+        if (set.warps.length === 0) return;
+        if (set.warps.length % 2 !== 0) {
+            throw new Error(room.id + ': ' + set.warps.length +
+                ' warp pads; they pair in reading order, so there must be an even number');
+        }
+        for (let i = 0; i < set.warps.length; i += 2) {
+            set.warps[i].partner = set.warps[i + 1];
+            set.warps[i + 1].partner = set.warps[i];
+        }
     }
 
     /**
@@ -545,9 +819,20 @@
         }
     }
 
-    RoomEntities.prototype.update = function (dt, bus) {
+    /**
+     * @param {number} dt
+     * @param {TNT.EventBus} bus
+     * @param {TNT.Player} [player]  passed only for the room Tommy is actually
+     *   in. The dog, the spider and the guardian all react to him; every other
+     *   entity ignores the argument, and rooms he is not in are ticked without
+     *   it so nothing off-screen chases a player who is not there.
+     * @param {boolean} [occupied]
+     */
+    RoomEntities.prototype.update = function (dt, bus, player, occupied) {
         for (const p of this.pickups) p.update(dt);
-        for (const e of this.enemies) e.update(dt);
+        for (const e of this.enemies) e.update(dt, player);
+        for (const w of this.warps) w.update(dt);
+        if (this.flood) this.flood.update(dt, !!occupied);
         for (const c of this.crushers) {
             const wasSlam = c.state === 'slam';
             c.update(dt);
@@ -627,8 +912,13 @@
             e.t = 0;
             e.dir = 1;
             if (e.kind === 'orb') e.y = e.minY;
+            else if (e.kind === 'spider') { e.y = e.homeY; e.state = 'wait'; e.timer = SPIDER_WAIT; e.thread = 0; }
+            else if (e.kind === 'guardian') { e.x = e.homeX; e.y = e.homeY; }
+            else if (e.kind === 'dog') { e.x = e.minX; e.state = 'patrol'; e.timer = 0; }
             else e.x = e.minX;
         }
+        for (const w of this.warps) w.lock = 0;
+        if (this.flood) this.flood.reset();
         for (const c of this.crushers) { c.phase = 0; c.state = 'idle'; c.y = c.topY; }
         for (const b of this.boulders) { b.falling = false; b.phase = 0; b.y = b.homeY; b.vy = 0; }
         for (const v of this.vents) { v.phase = 0; v.state = 'idle'; v.height = 0; }
@@ -656,6 +946,11 @@
         Crusher: Crusher,
         Boulder: Boulder,
         Vent: Vent,
+        Flood: Flood,
+        Warp: Warp,
+        Spider: Spider,
+        Guardian: Guardian,
+        Dog: Dog,
         PICKUP_SPEC: PICKUP_SPEC,
         ENEMY_SPEC: ENEMY_SPEC,
 

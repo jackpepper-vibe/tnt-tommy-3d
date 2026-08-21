@@ -184,6 +184,41 @@
                 b.box(x, -0.24, -0.18, 0.08, 0.3, 0.08, R3D.col('#2a2030'));
             }
         },
+        dog: function (b) {
+            // Long and low, and pointed — the silhouette has to say "this one
+            // moves toward you" before it does.
+            b.box(0, 0, 0, 0.8, 0.4, 0.42, R3D.col('#5a3b2a'), F.ALL, R3D.col('#7a5238'));
+            b.box(0.42, 0.1, 0, 0.34, 0.3, 0.34, R3D.col('#6a4632'));
+            b.box(0.62, 0.04, 0, 0.16, 0.16, 0.2, R3D.col('#2a1c14'));
+            b.box(0.34, 0.3, 0.1, 0.1, 0.18, 0.06, R3D.col('#3d2a1e'));
+            b.box(0.34, 0.3, -0.1, 0.1, 0.18, 0.06, R3D.col('#3d2a1e'));
+            b.box(-0.44, 0.14, 0, 0.24, 0.1, 0.1, R3D.col('#4a3122'));
+            for (const x of [-0.26, 0.22]) {
+                b.box(x, -0.28, 0.16, 0.11, 0.24, 0.11, R3D.col('#3d2a1e'));
+                b.box(x, -0.28, -0.16, 0.11, 0.24, 0.11, R3D.col('#3d2a1e'));
+            }
+        },
+        spider: function (b) {
+            b.box(0, 0, 0, 0.4, 0.34, 0.4, R3D.col('#241c2e'), F.ALL, R3D.col('#3a2c4a'));
+            b.box(0.06, 0.06, 0.2, 0.08, 0.08, 0.04, R3D.col('#ff5c4d'), F.FRONT);
+            b.box(-0.06, 0.06, 0.2, 0.08, 0.08, 0.04, R3D.col('#ff5c4d'), F.FRONT);
+            for (let i = 0; i < 4; i++) {
+                const a = -0.34 + i * 0.22;
+                b.box(a, 0.1, 0.26, 0.05, 0.34, 0.05, R3D.col('#1a1422'));
+                b.box(a, 0.1, -0.26, 0.05, 0.34, 0.05, R3D.col('#1a1422'));
+            }
+        },
+        guardian: function (b) {
+            // A floating lantern-thing. No legs on purpose: it goes through
+            // walls, and anything with legs reads as something that should not.
+            b.box(0, 0, 0, 0.44, 0.44, 0.44, R3D.col('#2c3a52'), F.ALL, R3D.col('#44587a'));
+            b.box(0, 0.3, 0, 0.2, 0.16, 0.2, R3D.col('#5a7098'));
+            b.box(0, 0, 0.24, 0.22, 0.22, 0.04, R3D.col('#9fd0ff'), F.FRONT);
+        },
+        thread: function (b) {
+            // One unit of spider silk, scaled to length by the sync pass.
+            b.box(0, -0.5, 0, 0.045, 1, 0.045, R3D.col('#8f8fa8'));
+        },
         bat: function (b) {
             b.box(0, 0, 0, 0.34, 0.34, 0.32, R3D.col('#42324a'));
             b.box(-0.46, 0.06, 0, 0.6, 0.16, 0.22, R3D.col('#2e2436'));
@@ -309,6 +344,9 @@
             const mat = (kind === 'orb') ? glow : solid;
             set.pools[kind] = new Pool(set.group, RIGS[kind], mat, 6);
         }
+        set.pools.warp = new Pool(set.group, function (b) {
+            b.plate(0, 0, 0, 1, 1, R3D.col('#ffffff'));
+        }, R3D.haloMaterial('#b78bff', 0.55), 6);
         for (const kind in PICKUP_RIGS) {
             set.pools['pickup_' + kind] = new Pool(set.group, PICKUP_RIGS[kind], solid, 8);
         }
@@ -320,6 +358,17 @@
         set.pools.jet = new Pool(set.group, function (b) {
             b.box(0, 0.5, 0, 0.7, 1, 0.5, R3D.col('#cfefff'));
         }, glow, 4);
+
+        // A rising flood, as one unit-square slab scaled to the room. Two
+        // pieces: the body, which is dark and opaque enough to read as depth,
+        // and a bright surface line at the top, which is the bit the player is
+        // actually watching.
+        set.pools.floodBody = new Pool(set.group, function (b) {
+            b.plate(0, 0.5, 0, 1, 1, R3D.col('#6a1c10'));
+        }, R3D.flatMaterial(), 2);
+        set.pools.floodLine = new Pool(set.group, function (b) {
+            b.plate(0, 0, 0, 1, 1, R3D.col('#ffffff'));
+        }, R3D.haloMaterial('#ff7a3c', 0.85), 2);
 
         return set;
     };
@@ -368,6 +417,29 @@
             mesh.rotation.y = e.dir >= 0 ? 0 : Math.PI;
             if (e.kind === 'bat') {
                 mesh.rotation.z = Math.sin(t * 12) * 0.35;
+            } else if (e.kind === 'spider') {
+                // The silk, drawn from the ceiling anchor down to the body. It
+                // is what makes a spider read as *dropping* rather than as a
+                // thing that appeared: without it the drop looks like a bug.
+                if (e.thread > 1) {
+                    const silk = set.pools.thread.next();
+                    const top = R3D.wy(e.homeY);
+                    const len = e.thread / C.TILE;
+                    silk.position.set(R3D.wx(e.x), top, ACTOR_Z - 0.05);
+                    silk.scale.set(1, len, 1);
+                }
+                mesh.rotation.y = 0;
+                mesh.scale.setScalar(e.state === 'hang' ? 1.1 : 1);
+            } else if (e.kind === 'guardian') {
+                mesh.rotation.y = t * 0.7;
+                const halo = set.pools.glowSprite.next();
+                halo.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.1);
+                halo.scale.set(2.4, 2.4, 1);
+                tint(halo, '#7fb0ff', 0.3);
+            } else if (e.kind === 'dog') {
+                // Braced before a charge: dips, and holds.
+                mesh.position.y -= e.state === 'rouse' ? 0.06 : 0;
+                if (e.state === 'charge') mesh.position.y += Math.abs(Math.sin(t * 18)) * 0.08;
             } else if (e.kind === 'orb') {
                 const s = 1 + Math.sin(t * 7) * 0.12;
                 mesh.scale.set(s, s, s);
@@ -404,6 +476,26 @@
             const mesh = set.pools.lift.next();
             mesh.position.set(R3D.wx(l.x) + C.LIFT_W / 2, R3D.wy(l.y) - 0.17, ACTOR_Z - 0.15);
         }
+
+        // Warp pads pulse, and pulse *together* — a pair that breathes in step
+        // is how the player works out which two are joined without being told.
+        for (const w of ents.warps) {
+            const halo = set.pools.warp.next();
+            const s = 1.4 + Math.sin(t * 2.6) * 0.25;
+            halo.position.set(R3D.wx(w.x), R3D.wy(w.y) + 0.3, ACTOR_Z - 0.1);
+            halo.scale.set(s, s * 0.7, 1);
+        }
+        if (ents.flood && ents.flood.level > 0.5) {
+            const surface = R3D.wy(ents.flood.surfaceY());
+            const body = set.pools.floodBody.next();
+            body.position.set(C.COLS / 2, 0, ACTOR_Z - 0.2);
+            body.scale.set(C.COLS, Math.max(0.01, surface), 1);
+
+            const line = set.pools.floodLine.next();
+            line.position.set(C.COLS / 2, surface, ACTOR_Z - 0.15);
+            line.scale.set(C.COLS, 0.9 + Math.sin(t * 3.4) * 0.15, 1);
+        }
+
         for (const bomb of run.bombs) {
             if (bomb.room !== run.roomIndex) continue;
             const mesh = set.pools.bomb.next();

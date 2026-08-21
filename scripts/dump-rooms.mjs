@@ -35,10 +35,13 @@ CHAR[C.Tile.VENT] = 'V';
 CHAR[C.Tile.LAVA] = 'L';
 CHAR[C.Tile.WATER] = 'W';
 CHAR[C.Tile.DETONATOR] = 'G';
+CHAR[C.Tile.TRAMPOLINE] = 'T';
+CHAR[C.Tile.TELEPORT] = 'Q';
 
 const ACTOR = {
     spawn: '@', tnt: 'D', ore: 'C', food: 'M', heart: 'H', oxygen: 'O',
-    walker: 'B', bat: 'F', crawler: 'S', orb: 'o',
+    walker: 'B', crawler: 'c', dog: 'd', bat: 'F', spider: 'S',
+    guardian: 'g', orb: 'o',
     crusher: 'K', boulder: 'P', liftH: 'h', liftV: 'v'
 };
 

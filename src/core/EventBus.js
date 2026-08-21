@@ -55,12 +55,18 @@
      */
     EventBus.EVENTS = {
         PICKUP: 'pickup',                 // {kind, x, y, value}
-        ROOM_CLEARED: 'room-cleared',     // {room}
+        ROOM_CLEARED: 'room-cleared',     // {room, medals}
+        ALL_MEDALS: 'all-medals',         // {mine}
+        ESCAPE_STARTED: 'escape-started', // {seconds}
+        ESCAPE_TICK: 'escape-tick',       // {left}
         ROOM_CHANGED: 'room-changed',     // {room, dir}
         MINE_STARTED: 'mine-started',     // {mine, index}
         PLAYER_HURT: 'player-hurt',       // {x, y, cause, amount}
         PLAYER_DIED: 'player-died',       // {x, y, cause}
         PLAYER_LANDED: 'player-landed',   // {x, y, speed, hard}
+        PLAYER_JUMPED: 'player-jumped',   // {x, y}
+        BOUNCE: 'bounce',                 // {x, y}
+        TELEPORT: 'teleport',             // {fromX, fromY, toX, toY}
         PLAYER_MOUNT: 'player-mount',     // {x, y, kind}
         PLAYER_RESPAWN: 'player-respawn', // {x, y}
         BLAST_PLANTED: 'blast-planted',   // {x, y}

@@ -25,7 +25,7 @@
 (function (TNT) {
     'use strict';
 
-    const { C, Tiles, Paint, Remix } = TNT;
+    const { C, Tiles, Paint } = TNT;
     const T = C.Tile;
 
     /* ------------------------------------------------------------------ *
@@ -38,8 +38,12 @@
         this.name = def.name;
         this.cell = def.cell;
         this.exits = def.exits;
+        /** Flood rooms: the lava bed rises while you are standing in it. */
+        this.flooding = !!def.flooding;
+        /** Shown once, on arrival, under the room name. */
+        this.blurb = def.blurb || '';
 
-        const parsed = Tiles.parse(def.grid, def.id);
+        const parsed = Tiles.parse(Paint.render(def.build), def.id);
         this.base = parsed.tiles;
         this.live = new Uint8Array(parsed.tiles);
         this.spawns = parsed.spawns;
@@ -97,7 +101,9 @@
         this.fuseMul = meta.fuseMul;
         this.enemyMul = meta.enemyMul;
 
-        this.rooms = Remix.buildMine(index).map(function (def, i) {
+        const defs = TNT.Rooms.MINES[index];
+        if (!defs) throw new Error('no room set authored for mine ' + index);
+        this.rooms = defs.map(function (def, i) {
             return new Room(def, i);
         });
 
@@ -135,12 +141,24 @@
      * Frames and links
      * ------------------------------------------------------------------ */
 
+    /** How far a shaft ladder reaches into the room from the seam it crosses. */
+    const STUB = 6;
+
     /**
-     * Cut the doorways and shaft mouths.
+     * Cut the doorways and lay the shaft stubs.
      *
      * Done here rather than in the room builders on purpose: two neighbours can
-     * then never disagree about where the opening is, and adding a link to a
-     * room is a one-word change rather than an edit to two grids.
+     * never disagree about where an opening is, and adding a link to a room is
+     * a one-word change to its `exits` rather than an edit to two grids.
+     *
+     * **The stubs are short.** A vertical link used to be a ladder running the
+     * full height of the room, and that single decision was most of what made
+     * the mine feel like a ladder farm: forty-six tiles of ladder per room
+     * against Dynamite Dan's thirteen, measured. It is also redundant — with
+     * decks three rows apart the player can jump the whole height anyway, so a
+     * full-height ladder is a lift running beside a staircase. Six rows at each
+     * end is enough to carry the seam and no more; `scripts/room-stats.mjs`
+     * watches the number.
      */
     function cutFrames(mine) {
         for (const room of mine.rooms) {
@@ -150,13 +168,20 @@
             if (room.exits.right) {
                 for (const ty of Paint.DOOR_ROWS) room.set(C.COLS - 1, ty, T.EMPTY);
             }
+
             // A shaft mouth becomes ladder, not empty: the climb has to continue
             // across the seam or Tommy drops out of it the moment he arrives.
             if (room.exits.up) {
-                for (const tx of Paint.SHAFT_COLS) room.set(tx, 0, T.LADDER);
+                for (const tx of Paint.SHAFT_COLS) {
+                    for (let ty = 0; ty <= STUB; ty++) room.set(tx, ty, T.LADDER);
+                }
             }
             if (room.exits.down) {
-                for (const tx of Paint.SHAFT_COLS) room.set(tx, C.ROWS - 1, T.LADDER);
+                for (const tx of Paint.SHAFT_COLS) {
+                    for (let ty = C.ROWS - 1 - STUB; ty <= C.ROWS - 1; ty++) {
+                        room.set(tx, ty, T.LADDER);
+                    }
+                }
             }
             room.base.set(room.live);
         }

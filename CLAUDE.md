@@ -14,24 +14,51 @@ Neither original is a reference for *movement*, because this one has no jump.
 
 ## The one rule everything else follows
 
-**Tommy cannot jump.** Height is only ever gained by a ladder, a hanging rope,
-or a lift. Nothing gives him upward velocity he did not climb for — not a
-trampoline, not a steam vent, not a conveyor, not knockback. Every one of the
-twenty-seven rooms is authored on that assumption, so a change that quietly
-reintroduces a hop does not make the game easier, it invalidates the level
-design of the entire project at once.
+**A jump clears three rows. Four needs a ladder.**
 
-Three things carry the weight the jump used to:
+Every one of the twenty-seven rooms is authored on a three-row deck grid, which
+is exactly `C.JUMP_APEX`: fifty-six pixels, clearing a three-row gap with eight
+to spare and missing a four-row one by twenty-four. Six decks fit in a room and
+each is a hop from the one below. Ladders, hanging ropes, lifts and trampolines
+are for everything taller than that, which is what keeps them load-bearing
+rather than decorative.
 
-- **Falling is a move.** Walking off a ledge is how you get down, so a drop has
-  to be aimable — air control is nearly as strong as ground control.
-- **The level grid is load-bearing.** Standing surfaces sit five rows apart, and
-  `C.FALL_SAFE` is derived from exactly that height. Author a ledge off the grid
-  and you have made a drop the player must judge by eye.
-- **Ladder columns are slides, not holes.** A ladder must punch through the deck
-  it serves to stay continuous, so every ladder is also a gap — and the shaft
-  linking two rooms is a gap in the *floor*. `C.SLIDE_V` caps your speed inside
-  one, which is what stops all of them being lethal traps.
+Change `JUMP_V` or `GRAVITY` and the traversal of the whole game moves at once,
+silently — rooms stay perfectly plausible in a screenshot while becoming trivial
+or impossible. `scripts/smoke.mjs` asserts the apex for that reason, and
+`scripts/validate-world.mjs` re-walks all 27 rooms under it.
+
+Three supporting rules:
+
+- **Falling is cheap and never fatal.** Eight rows is free, terminal velocity
+  grazes the fuse for fourteen, nothing kills. Both originals were the same, and
+  it is what lets a dense climbing frame be fun to come back down.
+- **The forgiveness mechanics are not polish.** Coyote time, jump buffering and
+  variable height are all present, and a three-row grid over spike beds is
+  miserable without them.
+- **Ladder columns are slides, not holes.** A ladder punches through the deck it
+  serves to stay climbable, so every ladder is also a gap — and a shaft link is a
+  gap in the *floor*. `C.SLIDE_V` caps your speed inside one.
+
+### What this replaced, and why it is written down
+
+The first build of this game had **no jump at all**, at the brief's request, and
+it failed for a reason worth keeping on the record because it is not obvious
+from playing it — it is only obvious from measuring it:
+
+| | no-jump build | dynamite-dan | now |
+|---|---|---|---|
+| platform rows per room | 3.0 | 5.7 | 5.9 |
+| gap between them | 5 rows | 3 rows | 3 rows |
+| ladder tiles per room | 65.4 | 13.6 | 21.3 |
+| hand-authored rooms | 9 of 27 | 27 of 27 | 27 of 27 |
+
+Without a jump every change of level has to be a ladder, and forgiving fall
+damage has to be tight so the player is never in doubt about a drop — which
+forces a five-row grid, which halves the levels a room can hold. The result was
+five times the ladder and half the structure: a ladder farm, not a mine. Run
+`node scripts/room-stats.mjs` before and after any change to the level grid; it
+prints these numbers against `../dynamite-dan` on demand.
 
 ## Shape of the code
 
@@ -56,20 +83,27 @@ verified by screenshot instead.
 
 ## Rooms
 
-Nine rooms are authored by hand in `src/world/Rooms.js`, as **feature calls**
-rather than character grids — `g.shelf(3, 10, 18, 23, 4)`, not forty-two
-characters you have to count. Both were tried; strings let you see the room but
-every edit is a counting exercise and one dropped dot shifts half a level
-sideways. `node scripts/dump-rooms.mjs 1 cageShaft` prints any room back as
-ASCII when you do want to look at it.
+All twenty-seven rooms are authored by hand, nine to a file in
+`src/world/Mine1.js`, `Mine2.js` and `Mine3.js`. Each mine has its own room
+names, its own link graph and its own character: Copperlode teaches, Blackdamp
+adds warp pads and a flooding seam, Cinderdeep replaces spikes with lava and
+runs the tightest fuse.
 
-The other eighteen are derived by `src/world/Remix.js`: Blackdamp mirrors the
-mine's layout, Cinderdeep flips it vertically, and both escalate hazards. Only
-hazards that **cannot disconnect a room** are applied — rotten boards, slower
-climbs, more patrols, less fuse. Scattered terrain hazards are banned outright,
-and that is not squeamishness: a lone spike in a corridor cannot be stepped over
-when there is no jump, and Cinderdeep converts spikes to lava, so a dozen of
-them sealed all nine rooms of a mine that still looked perfectly normal.
+Rooms are **feature calls** rather than character grids — `g.deck(20, [2, 8],
+[13, 7], [25, 6])`, not forty-two characters you have to count. Both were tried;
+strings let you see the room but every edit is a counting exercise and one
+dropped dot shifts half a level sideways. `node scripts/dump-rooms.mjs 1
+cageShaft` prints any room back as ASCII when you do want to look at it.
+
+An earlier build derived eighteen of the rooms by mirroring the other nine. It
+was rejected on sight, correctly: it is the opposite of the detail this game is
+supposed to have, and the back two thirds felt like the first third reflected.
+Do not reintroduce it.
+
+`Paint` refuses to bury an actor under terrain — a `put` onto anything but open
+air or water throws, and so does a `shaft()` that would cover one. Both fired
+repeatedly during authoring, and every one was a nugget or a stick that would
+have silently vanished from the game.
 
 ## Things that will bite you
 
@@ -120,21 +154,26 @@ gets slower and then dies, a long way from the cause.
 Three passes, and none of them is optional before pushing.
 
 ```
-node scripts/smoke.mjs           16 checks on the rules, headless, no browser
+node scripts/smoke.mjs           19 checks on the rules, headless, no browser
 node scripts/validate-world.mjs  reachability across all 27 rooms
-node scripts/shot.mjs            11 screenshots
+node scripts/check-rooms.mjs     build every room, report all faults at once
+node scripts/room-stats.mjs      density, against ../dynamite-dan
+node scripts/shot.mjs            16 screenshots
 node scripts/dump-rooms.mjs 2    print a mine as ASCII
 ```
 
 `validate-world.mjs` is the one that earns its keep. It walks every mine the way
 the player has to, under the real constants, and proves every stick, tank and
-plunger reachable. It is deliberately **conservative** — every move it allows is
-one the physics definitely permits, and it leaves out several the physics does
-allow, notably steering a fall sideways. So "reachable" is a guarantee and
-"unreachable" is a prompt to go and look. Modelling air steering generously
-makes the pass silently useless, because it clears rooms that are genuinely
-broken. It has already caught Cinderdeep being entirely unplayable and every
-shaft mouth in the game being a lethal trap.
+plunger reachable. It is deliberately **conservative** — the jump is credited
+with only two columns of sideways reach where the real arc carries over five —
+so "reachable" is a guarantee and "unreachable" is a prompt to go and look.
+Modelling the arc generously makes the pass silently useless, because it clears
+rooms that are genuinely broken.
+
+It has already caught: a whole mine being unplayable, every shaft mouth in the
+game being a lethal trap, and — after the jump went back in — every room beyond
+the first band looking unreachable because the search could not mount a shaft
+stub from the deck below it.
 
 `window.TNT.game` is the test hook — `pause()`, `resume()`, `step(n)`,
 `begin(mine)`, `room(id)`, `put(tx, ty)`, `hold([...])`, `bare()`, `crt(on)`.

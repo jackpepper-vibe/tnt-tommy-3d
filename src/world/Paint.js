@@ -22,11 +22,20 @@
  *
  * THE LEVEL GRID
  * --------------
- * Standing surfaces sit on `LEVELS`, five rows apart. That spacing is the same
- * number `C.FALL_SAFE` is derived from, which is what makes every ledge in the
- * game safe to step off and every shaft dangerous to fall down. Author a ledge
- * off the grid and you have made a drop the player has to measure by eye — in a
- * game with no jump button, that is a bad ledge.
+ * Standing surfaces sit on `LEVELS`, **three rows apart**, which is exactly what
+ * a jump clears (`C.JUMP_APEX`). Six levels fit over the floor, and every one is
+ * reachable from the one below without a ladder.
+ *
+ * That number is the whole difference between this game and an earlier version
+ * of it that had no jump and a five-row grid. Five rows halves the levels a room
+ * can hold and demands a ladder at every single one — which measurably produced
+ * rooms averaging three platform rows and sixty-five tiles of ladder, against
+ * Dynamite Dan's five-point-seven and thirteen. `scripts/room-stats.mjs` prints
+ * both, so that drift stays visible rather than a matter of opinion.
+ *
+ * Ladders are for the *fourth* row and beyond: long shafts, room links, and
+ * deliberate climbs. A ladder spanning three rows is a ladder doing a jump's
+ * job, and probably should not be there.
  */
 (function (TNT) {
     'use strict';
@@ -36,8 +45,15 @@
     /** Bedrock. The walkable surface of a room is the top of this row. */
     const FLOOR_ROW = C.ROWS - 1;              // 23
 
-    /** Standing surfaces, floor first. Five rows apart — see the header. */
-    const LEVELS = [FLOOR_ROW, 18, 13, 8, 3];
+    /**
+     * Platform rows, in ascending height. Three rows apart — see the header.
+     *
+     * Standing on the floor puts Tommy's feet at row `FLOOR_ROW`; standing on
+     * the platform at row 20 puts them three rows higher, and so on up. Six
+     * levels over a floor, which is what makes a room a climbing frame rather
+     * than a corridor with shelves.
+     */
+    const LEVELS = [20, 17, 14, 11, 8, 5];
 
     /** Where `World` cuts side doorways. Three tiles of headroom over the floor. */
     const DOOR_ROWS = [FLOOR_ROW - 3, FLOOR_ROW - 2, FLOOR_ROW - 1];   // 20, 21, 22
@@ -178,6 +194,28 @@
         return this.fill(x, y, w, h || 1, 'W');
     };
 
+    /**
+     * A trampoline. Reaches roughly seven rows — more than double a jump — so
+     * it is the tool for a ledge that would otherwise need a ladder, in a place
+     * where a ladder would be tedious.
+     *
+     * Mind what is above one. The launch is not cuttable, so a ceiling of
+     * spikes over a trampoline is a trap the player cannot decline once they
+     * have stepped on it.
+     */
+    Grid.prototype.tramp = function (x, y, w) {
+        return this.fill(x, y, w || 1, 1, 'T');
+    };
+
+    /**
+     * A warp pad, entered with Down. Pads pair up **within a room, in reading
+     * order** — first with second, third with fourth. An odd number of pads in
+     * a room is a fault and `Entities` will say so rather than guess.
+     */
+    Grid.prototype.warp = function (x, y) {
+        return this.set(x, y, 'Q');
+    };
+
     Grid.prototype.detonator = function (x, y) {
         return this.set(x, y, 'G');
     };
@@ -216,16 +254,32 @@
     Grid.prototype.heart = function (x, y) { return this.put('H', x, y); };
     Grid.prototype.oxygen = function (x, y) { return this.put('O', x, y); };
 
-    /** A run of ore nuggets along a surface. */
+    /**
+     * A run of ore nuggets along a surface.
+     *
+     * Steps *around* the shaft columns rather than throwing on them, and the
+     * distinction from a single placement is deliberate. "Nuggets along this
+     * deck" is a statement about the deck, and the shaft is a hole in it — the
+     * author does not care which side of the hole each nugget lands. A `tnt` or
+     * a `guardian` in a shaft column is the opposite: a specific placement, in
+     * a place it cannot be, and that still throws.
+     */
     Grid.prototype.ore = function (x, y, n, step) {
         const gap = step || 2;
-        for (let i = 0; i < (n || 1); i++) this.put('C', x + i * gap, y);
+        for (let i = 0; i < (n || 1); i++) {
+            const cx = x + i * gap;
+            if (SHAFT_COLS.indexOf(cx) >= 0) continue;
+            this.put('C', cx, y);
+        }
         return this;
     };
 
     Grid.prototype.walker = function (x, y) { return this.put('B', x, y); };
+    Grid.prototype.crawler = function (x, y) { return this.put('c', x, y); };
+    Grid.prototype.dog = function (x, y) { return this.put('d', x, y); };
     Grid.prototype.bat = function (x, y) { return this.put('F', x, y); };
-    Grid.prototype.crawler = function (x, y) { return this.put('S', x, y); };
+    Grid.prototype.spider = function (x, y) { return this.put('S', x, y); };
+    Grid.prototype.guardian = function (x, y) { return this.put('g', x, y); };
     Grid.prototype.orb = function (x, y) { return this.put('o', x, y); };
     Grid.prototype.crusher = function (x, y) { return this.put('K', x, y); };
     Grid.prototype.boulder = function (x, y) { return this.put('P', x, y); };
@@ -261,14 +315,45 @@
      * ------------------------------------------------------------------ */
 
     /**
-     * A shelf: a platform with a ladder down to the surface below it.
-     * The overwhelmingly common structure, so it is one call.
+     * A whole level in one call: several platform runs sharing a row.
      *
-     * @param {number} x      left edge of the platform
-     * @param {number} w      platform width
-     * @param {number} row    the platform's row (should be one of `LEVELS`)
-     * @param {number} below  the surface row the ladder reaches down to
-     * @param {number} [ladderAt]  column for the ladder; defaults to the left end
+     * `g.deck(20, [3, 9], [15, 6], [26, 11])` lays three runs across row 20.
+     * This is the workhorse of a dense room — six of these and the room already
+     * has more structure than the entire no-jump build managed — and it exists
+     * because writing `plat` six times per level made authors economise on
+     * levels, which is exactly the wrong thing to economise on.
+     *
+     * @param {number} row  one of `LEVELS`
+     * @param {...Array<number>} runs  `[x, width]` pairs
+     */
+    Grid.prototype.deck = function (row) {
+        for (let i = 1; i < arguments.length; i++) {
+            const run = arguments[i];
+            if (!run) continue;
+            this.plat(run[0], row, run[1]);
+        }
+        return this;
+    };
+
+    /**
+     * A staircase of one-tile ledges climbing away from `x`.
+     * @param {number} dir  +1 climbs to the right, -1 to the left
+     */
+    Grid.prototype.steps = function (x, row, count, dir, width) {
+        const d = dir >= 0 ? 1 : -1;
+        const w = width || 3;
+        for (let i = 0; i < count; i++) {
+            this.plat(x + d * i * (w + 1), row - i * 3, w);
+        }
+        return this;
+    };
+
+    /**
+     * A platform with a ladder running down from it to the surface below.
+     *
+     * Rarer than it used to be, and it should be: with a three-row grid the
+     * level below is a jump away, so a ladder here is a deliberate statement
+     * that this climb is longer than a jump. Pass the surface row it reaches.
      */
     Grid.prototype.shelf = function (x, w, row, below, ladderAt) {
         this.plat(x, row, w);
@@ -277,14 +362,31 @@
         return this;
     };
 
+    /** Characters that represent an actor rather than terrain. */
+    const ACTOR_CHARS = '@DCMHOBcdFSgoKPhv';
+
     /**
      * The ladder that carries a vertical room link. Runs the full height of the
      * room in the shaft columns; `World` opens the frame at the ends.
+     *
+     * Painted last in most rooms, so it overwrites whatever it crosses — which
+     * is right for terrain and badly wrong for an actor. A crusher authored in
+     * a shaft column simply vanished, and the room looked fine. Terrain it
+     * covers is the author's business; an actor it covers is a mistake.
      */
     Grid.prototype.shaft = function (fromRow, toRow) {
         const y0 = (fromRow === undefined) ? 1 : fromRow;
         const y1 = (toRow === undefined) ? FLOOR_ROW - 1 : toRow;
-        for (const cx of SHAFT_COLS) this.fill(cx, y0, 1, y1 - y0 + 1, '|');
+        for (const cx of SHAFT_COLS) {
+            for (let y = y0; y <= y1; y++) {
+                const there = this.get(cx, y);
+                if (ACTOR_CHARS.indexOf(there) >= 0) {
+                    throw new Error('the shaft at column ' + cx + ' would bury actor "' +
+                        there + '" at (' + cx + ',' + y + ')');
+                }
+                this.set(cx, y, '|');
+            }
+        }
         return this;
     };
 

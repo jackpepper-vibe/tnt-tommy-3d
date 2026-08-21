@@ -3,39 +3,41 @@
  *
  * THE RULE
  * --------
- * There is no jump. Height is only ever gained by climbing a ladder, climbing a
- * hanging rope, or riding a lift. Nothing — not a trampoline, not a steam vent,
- * not a conveyor, not a slope — gives Tommy upward velocity he did not climb
- * for. Everything below follows from that one constraint, and any change that
- * quietly reintroduces a hop breaks the level design of all twenty-seven rooms
- * at once, because every room is authored on the assumption that a ledge without
- * a ladder is unreachable.
+ * **A jump clears three rows. Four needs a ladder.**
  *
- * WHAT THE CONSTRAINT COSTS, AND HOW IT IS PAID
- * ---------------------------------------------
- * Take away the jump and a platformer loses its main verb, so three others have
- * to carry more weight than they normally would:
+ * Rooms are authored on a three-row grid, so hopping from any standing surface
+ * to the next is always on, and anything above that is a ladder, a hanging
+ * rope, a lift or a trampoline. `C.JUMP_APEX` clears three rows with eight
+ * pixels to spare and misses four by twenty-four — a margin wide enough that
+ * the player never has to measure a ledge by eye, and `scripts/smoke.mjs`
+ * asserts it, because moving `JUMP_V` or `GRAVITY` silently changes the
+ * traversal of all twenty-seven rooms at once.
  *
- *   - **Falling is a move, not a mistake.** Walking off a ledge is how you get
- *     down, so it has to be *aimed*. Air control is close to ground control
- *     (`C.AIR_ACC`, `C.AIR_MAX`) where a jumping game would keep it tight, and
- *     the level grid guarantees a one-storey drop never hurts.
- *   - **Ladders need generous mouths.** With no hop to correct a near miss, a
- *     ladder you slide past is a ladder you cannot use. Mounting snaps Tommy to
- *     the centre line (`C.MOUNT_SNAP`) rather than requiring him to be on it,
- *     and stepping off an edge leaves a short grace window (`C.LEDGE_GRACE`).
- *   - **Ropes are boarded sideways.** You reach a rope by climbing to its row
- *     and stepping onto it, never by jumping to it. That is the only way onto
- *     one, which is why `Rooms.js` insists every rope crosses a ladder.
+ * GAME FEEL
+ * ---------
+ * All three of the standard forgiveness mechanics are here, and both games this
+ * replaces had all three. They are not polish — without them a three-row grid
+ * over spike beds is miserable:
+ *
+ *   - **Coyote time.** A jump still fires for `C.COYOTE_TIME` after walking off
+ *     a ledge, so running off the end of a plank and pressing jump does what it
+ *     looked like it should.
+ *   - **Jump buffering.** A press up to `C.JUMP_BUFFER` before landing is held
+ *     and fires on touchdown, so chaining hops down a climbing frame does not
+ *     demand frame-perfect timing.
+ *   - **Variable height.** Releasing early multiplies gravity by
+ *     `C.CUT_GRAV_MUL`, so a tap is a small hop and a hold is the full three
+ *     rows. This is what makes one jump button serve a room with ledges at
+ *     one, two and three rows.
  *
  * SHAPE
  * -----
- * `mode` is a small state machine: `walk` (which covers falling), `climb`,
- * `rope`, `swim`. Each has its own integrator, and the transitions between them
- * are the interesting part of the file. Position is the feet: `x` centred, `y`
- * at the sole. Collision is axis-separated and resolves a single tile per step,
- * which is sound because the step is 1/120 s and nothing moves a whole tile in
- * that time (`C.MAX_FALL` is 640 px/s, or 5.3 px per step).
+ * `mode` is a small state machine: `walk` (which covers jumping and falling),
+ * `climb`, `rope`, `swim`. Each has its own integrator, and the transitions
+ * between them are the interesting part of the file. Position is the feet: `x`
+ * centred, `y` at the sole. Collision is axis-separated and resolves a single
+ * tile per step, which is sound because the step is 1/120 s and nothing moves a
+ * whole tile in that time (`C.MAX_FALL` is 680 px/s, or 5.7 px per step).
  */
 (function (TNT) {
     'use strict';
@@ -60,8 +62,16 @@
 
         this.hasOxygen = false;
         this.invuln = 0;
-        this.coyote = 0;
         this.animT = 0;
+        /** Seconds of grace left to jump after leaving the ground. */
+        this.coyote = 0;
+        /** Seconds a jump press stays live waiting for a landing. */
+        this.buffer = 0;
+        /** True from leaving the ground until the arc is cut or the apex passes. */
+        this.rising = false;
+        /** Set while a bounce is in flight, so it is not cut short by releasing. */
+        this.boosted = false;
+        this.teleportLock = 0;
         /** Set while Down is held so a one-way platform lets you through. */
         this.dropping = 0;
         /** Peak downward speed since leaving the ground, for fall damage. */
@@ -149,6 +159,24 @@
      * Walking and falling
      * ------------------------------------------------------------------ */
 
+    /**
+     * Should this frame's input be read as a jump?
+     *
+     * Up counts, but only when there is no ladder to climb. Players reach for
+     * Up to jump; refusing them makes the ladder rule feel like a trap rather
+     * than a rule. Checking for a ladder first means the two never fight — if
+     * there is something to climb, Up climbs it.
+     */
+    Player.prototype._wantsJump = function (room, input) {
+        if (input.justPressed('jump')) return true;
+        if (!input.justPressed('up')) return false;
+        return this._climbColumnNear(room, this.centreY()) < 0;
+    };
+
+    Player.prototype._holdingJump = function (input) {
+        return input.isDown('jump') || input.isDown('up');
+    };
+
     Player.prototype._walk = function (dt, room, input, ents) {
         if (this.inWater && this.hasOxygen) {
             this.mode = 'swim';
@@ -164,9 +192,6 @@
                 ? Util.approach(this.vx, target, C.MOVE_ACC * dt)
                 : Util.approach(this.vx, 0, C.MOVE_FRICTION * dt);
         } else {
-            // Air control is wide open on purpose — a drop is how you travel
-            // downward here, and a drop you cannot steer is a drop you cannot
-            // plan. See the header.
             if (ax !== 0) {
                 this.vx = Util.approach(this.vx, ax * C.AIR_MAX, C.AIR_ACC * dt);
             } else {
@@ -180,11 +205,44 @@
             if (belt !== 0) this.x += belt * C.BELT_V * dt;
         }
 
-        this.vy = Math.min(this.vy + C.GRAVITY * dt, C.MAX_FALL);
+        /* ---- the jump ---- */
+
+        this.coyote = grounded ? C.COYOTE_TIME : Math.max(0, this.coyote - dt);
+        this.buffer = this._wantsJump(room, input) ? C.JUMP_BUFFER : Math.max(0, this.buffer - dt);
+
+        if (this.buffer > 0 && this.coyote > 0) {
+            this.vy = -C.JUMP_V;
+            this.buffer = 0;
+            this.coyote = 0;
+            this.rising = true;
+            this.boosted = false;
+            this.onGround = false;
+            this.ridingLift = null;
+            this.squash = -0.5;                 // stretch, not squash
+            this.bus.emit(TNT.EV.PLAYER_JUMPED, { x: this.x, y: this.y });
+        }
+
+        /* ---- gravity, with the two multipliers that shape the arc ---- */
+
+        let g = C.GRAVITY;
+        if (this.vy < 0) {
+            // Cutting the jump short is the variable-height mechanic. A bounce
+            // is exempt: a trampoline is the level's decision about how high
+            // you go, not the player's, and letting go mid-flight should not
+            // strand you under the ledge it was aimed at.
+            if (this.rising && !this.boosted && !this._holdingJump(input)) {
+                g *= C.CUT_GRAV_MUL;
+            }
+        } else {
+            this.rising = false;
+            this.boosted = false;
+            g *= C.FALL_GRAV_MUL;
+        }
+        this.vy = Math.min(this.vy + g * dt, C.MAX_FALL);
 
         // Sliding down a ladder shaft rather than falling down it. See
         // `C.SLIDE_V` — this is what stops every ladder hole in the game from
-        // being a lethal trap.
+        // being a trap.
         this.sliding = false;
         if (this.vy > 0 && Tiles.isClimbable(room.at(this.x, this.centreY()))) {
             this.vy = Math.min(this.vy, C.SLIDE_V);
@@ -193,8 +251,6 @@
         }
 
         if (!grounded) this.fallSpeed = Math.max(this.fallSpeed, this.vy);
-
-        this.coyote = grounded ? C.LEDGE_GRACE : Math.max(0, this.coyote - dt);
 
         // A one-way platform is let go of, not fallen through by accident.
         if (input.justPressed('down') && grounded && this._oneWayBelow(room)) {
@@ -216,6 +272,20 @@
             this.vx *= 0.86;
             this.vy = Math.min(this.vy, 90);
         }
+    };
+
+    /** Launch off a trampoline. Higher than a jump, and not cuttable. */
+    Player.prototype.bounce = function (speed) {
+        this.mode = 'walk';
+        this.vy = -(speed || C.TRAMP_V);
+        this.onGround = false;
+        this.ridingLift = null;
+        this.rising = true;
+        this.boosted = true;
+        this.buffer = 0;
+        this.fallSpeed = 0;
+        this.squash = -0.8;
+        this.bus.emit(TNT.EV.BOUNCE, { x: this.x, y: this.y });
     };
 
     /* ------------------------------------------------------------------ *
@@ -290,6 +360,27 @@
     };
 
     Player.prototype._climb = function (dt, room, input) {
+        // Jumping off a ladder, sideways in the direction you are holding.
+        //
+        // This is what turns a set of ladders into a climbing frame rather than
+        // a set of lifts. Without it every ladder is a dead end you must climb
+        // all the way back down, and rooms with two parallel shafts become
+        // twice the walking for no reason.
+        if (input.justPressed('jump')) {
+            const ax = input.axisX();
+            this.mode = 'walk';
+            this.vy = -C.JUMP_V * 0.86;
+            this.vx = ax * C.DISMOUNT_V;
+            this.rising = true;
+            this.boosted = false;
+            this.onGround = false;
+            this.coyote = 0;
+            this.buffer = 0;
+            this.fallSpeed = 0;
+            this.bus.emit(TNT.EV.PLAYER_JUMPED, { x: this.x, y: this.y });
+            return;
+        }
+
         const centre = this.climbCol * C.TILE + C.TILE / 2;
         // Pull to the centre line rather than snap: a hard snap reads as the
         // character being yanked, and at this speed it is invisible anyway.
@@ -385,6 +476,23 @@
     };
 
     Player.prototype._rope = function (dt, room, input) {
+        // Drop off with Down, or launch off with Jump. A rope you can only fall
+        // from is a rope that ends every route it is part of.
+        if (input.justPressed('jump')) {
+            const dir = input.axisX();
+            this.mode = 'walk';
+            this.vy = -C.JUMP_V * 0.8;
+            this.vx = dir * C.DISMOUNT_V;
+            this.rising = true;
+            this.boosted = false;
+            this.onGround = false;
+            this.coyote = 0;
+            this.buffer = 0;
+            this.fallSpeed = 0;
+            this.bus.emit(TNT.EV.PLAYER_JUMPED, { x: this.x, y: this.y });
+            return;
+        }
+
         const ax = input.axisX();
         this.vx = ax * C.ROPE_V;
         this.x += this.vx * dt;
@@ -576,6 +684,15 @@
     Player.prototype._land = function (room, ents, tx, ty) {
         const t = room.get(tx, ty);
         if (t === T.CRUMBLE && ents) ents.touchCrumble(tx, ty);
+
+        // A trampoline never lets you settle on it. Checked before `_settle` so
+        // the landing does not also count as a heavy one — a bounce off a long
+        // drop is the reward for the drop, not a reason to take fuse damage.
+        if (t === T.TRAMPOLINE) {
+            this.fallSpeed = 0;
+            this.bounce(C.TRAMP_V);
+            return;
+        }
         this._settle();
     };
 
@@ -619,18 +736,21 @@
     /**
      * Knock Tommy back from a hazard.
      *
-     * Upward knockback is capped hard. A hit that lobs him a couple of tiles
-     * into the air is the one place the no-jump rule could leak, and worse, it
-     * would occasionally be *useful* — being hit on purpose to reach a ledge is
-     * exactly the kind of thing players find and designers never intended.
+     * The upward component stays well under a jump. A hit that lobbed him three
+     * rows would occasionally be *useful* — taking a hit on purpose to reach a
+     * ledge is exactly the sort of thing players find and designers never meant
+     * — and it would make the three-row rule negotiable.
      */
     Player.prototype.knock = function (dirX) {
         this.mode = 'walk';
-        this.vx = dirX * 150;
-        this.vy = -90;
+        this.vx = dirX * 165;
+        this.vy = -150;
+        this.rising = false;
+        this.boosted = false;
         this.onGround = false;
         this.ridingLift = null;
         this.fallSpeed = 0;
+        this.buffer = 0;
         this.invuln = C.HURT_INVULN;
     };
 

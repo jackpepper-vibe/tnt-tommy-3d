@@ -13,12 +13,20 @@
 (function (TNT) {
     'use strict';
 
+    /**
+     * Jump gets the big key, because it is pressed a hundred times a room and
+     * planting a stick is pressed a handful of times a mine. `up` is also read
+     * as a jump when Tommy is not on a ladder — see `Player._walk`. That is how
+     * the Godot build worked and it is worth keeping: players reach for Up to
+     * jump, and refusing them only makes the ladder rule feel like a trap.
+     */
     const BINDINGS = {
         left: ['ArrowLeft', 'KeyA'],
         right: ['ArrowRight', 'KeyD'],
         up: ['ArrowUp', 'KeyW'],
         down: ['ArrowDown', 'KeyS'],
-        plant: ['Space', 'KeyZ', 'KeyJ'],
+        jump: ['Space', 'KeyZ'],
+        plant: ['KeyX', 'ShiftLeft', 'ShiftRight'],
         confirm: ['Enter', 'Space', 'NumpadEnter'],
         pause: ['Escape', 'KeyP'],
         crt: ['KeyK'],

@@ -18,14 +18,21 @@
  * A breadth-first search over `(room, tx, ty, stance)`, using the same
  * constants the real player does. It is deliberately **conservative**: every
  * move it allows is one the physics definitely permits, and several the physics
- * does permit are left out — notably steering a fall sideways, which real
- * players do constantly. So the bias is one-directional and useful:
+ * does permit are left out. So the bias is one-directional and useful:
  *
  *   - "reachable" is a guarantee
  *   - "unreachable" is a prompt to go and look, not a proof
  *
- * The alternative bias — modelling air steering generously — makes the pass
+ * The alternative bias — modelling the jump arc generously — makes the pass
  * silently useless, because it would clear rooms that are genuinely broken.
+ *
+ * WHAT IS MODELLED CONSERVATIVELY
+ * -------------------------------
+ * The jump reaches `JUMP_ROWS` up, derived from `C.JUMP_APEX`, and only
+ * `JUMP_REACH` columns sideways. The real arc carries much further — a full
+ * hop is over five tiles of ground — but a landing spot the search is not sure
+ * about is one it should not claim. Falls are unlimited, because nothing in
+ * this game dies of one; only where they *land* matters.
  */
 import { loadSim } from './lib/load.mjs';
 
@@ -36,8 +43,15 @@ const T = C.Tile;
 /** Stances the search tracks. Ground includes standing on a one-way plank. */
 const GROUND = 0, CLIMB = 1, ROPE = 2;
 
-/** How far a fall may go before it kills, in tiles. Derived, not guessed. */
-const FATAL_TILES = Math.ceil((C.FALL_FATAL * C.FALL_FATAL) / (2 * C.GRAVITY * C.TILE));
+/** Rows a jump clears, derived from the apex rather than assumed. */
+const JUMP_ROWS = Math.floor(C.JUMP_APEX / C.TILE);
+/** Rows a trampoline clears. */
+const TRAMP_ROWS = Math.floor(C.TRAMP_APEX / C.TILE);
+/**
+ * Columns a jump is *credited* with covering. The real arc reaches over five,
+ * but claiming that would have the pass approving ledges it cannot be sure of.
+ */
+const JUMP_REACH = 2;
 
 let problems = 0;
 let warnings = 0;
@@ -77,6 +91,29 @@ function climbable(room, tx, ty) {
 
 function isRope(room, tx, ty) {
     return room.get(tx, ty) === T.ROPE;
+}
+
+/**
+ * The pad paired with this one, if any.
+ *
+ * Pairing is by reading order, exactly as `Entities.pairWarps` does it. Two
+ * implementations of the same rule is a smell, but the alternative is the
+ * validator importing the entity layer, and this pass is supposed to be able to
+ * check a room without instantiating one.
+ */
+function warpPartners(room, tx, ty) {
+    const pads = [];
+    for (let y = 0; y < C.ROWS; y++) {
+        for (let x = 0; x < C.COLS; x++) {
+            if (room.get(x, y) === T.TELEPORT) pads.push([x, y]);
+        }
+    }
+    if (pads.length % 2 !== 0) return [];
+    for (let i = 0; i < pads.length; i += 2) {
+        if (pads[i][0] === tx && pads[i][1] === ty) return [pads[i + 1]];
+        if (pads[i + 1][0] === tx && pads[i + 1][1] === ty) return [pads[i]];
+    }
+    return [];
 }
 
 /* ------------------------------------------------------------------ *
@@ -163,19 +200,52 @@ function explore(mine) {
     const drop = (roomIdx, tx, ty) => {
         const room = mine.rooms[roomIdx];
         let y = ty;
-        let travelled = 0;
         while (y + 1 < C.ROWS) {
             if (!open(room, tx, y + 1)) break;
             if (Tiles.isFloor(room.get(tx, y + 1))) break;
             y++;
-            travelled = climbable(room, tx, y) ? 0 : travelled + 1;
-            if (travelled > FATAL_TILES) return -1;
         }
         if (y + 1 >= C.ROWS) return -1;               // out through the floor
         if (!footing(room, tx, y)) return -1;
         const landed = room.get(tx, y);
         if (landed === T.LAVA || landed === T.SPIKE) return -1;
         return y;
+    };
+
+    /**
+     * Everywhere a hop from `(tx, ty)` can put you.
+     *
+     * Straight up first, then sideways at each height, and the column has to be
+     * clear the whole way — a ledge under a ceiling is not reachable however
+     * close it is. Landing on a hazard does not count as arriving.
+     */
+    const hops = (roomIdx, tx, ty, height) => {
+        const room = mine.rooms[roomIdx];
+        const out = [];
+
+        for (let h = 1; h <= height; h++) {
+            if (!open(room, tx, ty - h)) break;            // head hits something
+            for (let dx = -JUMP_REACH; dx <= JUMP_REACH; dx++) {
+                const nx = tx + dx;
+                const ny = ty - h;
+                if (!open(room, nx, ny)) continue;
+                // The horizontal leg has to be clear too.
+                let clear = true;
+                for (let s = 1; s <= Math.abs(dx); s++) {
+                    if (!open(room, tx + Math.sign(dx) * s, ny)) { clear = false; break; }
+                }
+                if (!clear) continue;
+
+                const here = room.get(nx, ny);
+                if (here === T.SPIKE) continue;
+                if (footing(room, nx, ny)) out.push([nx, ny]);
+                else {
+                    const land = drop(roomIdx, nx, ny);
+                    if (land >= 0) out.push([nx, land]);
+                }
+            }
+        }
+        return out;
     };
 
     const start = mine.rooms[mine.spawnRoom];
@@ -202,12 +272,20 @@ function explore(mine) {
         if (isRope(room, tx, ty) && stance !== GROUND) push(roomIdx, tx, ty, ROPE);
 
         if (stance === GROUND) {
-            // A ladder in the *next* column over is close enough to grab —
-            // `Player._climbColumnNear` searches one either side. Rooms rely on
-            // this: the shaft ladder is often reachable only from the lip of
-            // the floor beside it.
-            for (const dx of [-1, 1]) {
-                if (climbable(room, tx + dx, ty)) push(roomIdx, tx + dx, ty, CLIMB);
+            /*
+             * Mounting a ladder from the ground.
+             *
+             * Three cells count, and the one above matters most: `World` lays
+             * the shaft links as short stubs near the seam, so the bottom rung
+             * of an up-shaft usually sits one row *above* the deck you are
+             * standing on. `Player._climbColumnNear` finds it because it tests
+             * the whole body, not just the feet. Checking only the current row
+             * here made every room beyond the first band look unreachable.
+             */
+            for (const dx of [-1, 0, 1]) {
+                for (const dy of [0, -1]) {
+                    if (climbable(room, tx + dx, ty + dy)) push(roomIdx, tx + dx, ty + dy, CLIMB);
+                }
             }
         }
 
@@ -235,6 +313,21 @@ function explore(mine) {
                 } else {
                     const land = drop(roomIdx, nx, ty);
                     if (land >= 0) push(roomIdx, nx, land, GROUND);
+                }
+            }
+
+            // Jumping — the main verb, and the reason the decks are three rows
+            // apart. A trampoline underfoot launches more than twice as far.
+            const height = room.get(tx, ty + 1) === T.TRAMPOLINE ? TRAMP_ROWS : JUMP_ROWS;
+            for (const [nx, ny] of hops(roomIdx, tx, ty, height)) {
+                push(roomIdx, nx, ny, GROUND);
+            }
+
+            // Warp pads pair within the room; standing on one and pressing Down
+            // is a move like any other.
+            if (room.get(tx, ty) === T.TELEPORT) {
+                for (const [px, py] of warpPartners(room, tx, ty)) {
+                    push(roomIdx, px, py, GROUND);
                 }
             }
         }
@@ -379,7 +472,8 @@ function validate(mine) {
  * ------------------------------------------------------------------ */
 
 console.log('\nTNT Tommy — reachability');
-console.log(`no jump · fatal fall at ${FATAL_TILES} tiles · falls modelled straight down\n`);
+console.log(`jump ${JUMP_ROWS} rows · trampoline ${TRAMP_ROWS} · ` +
+            `credited with ${JUMP_REACH} columns of reach · falls never fatal\n`);
 
 for (let i = 0; i < C.MINE_COUNT; i++) {
     validate(new World.Mine(i));

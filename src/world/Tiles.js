@@ -45,12 +45,24 @@
         'V': T.VENT,
         'L': T.LAVA,
         'W': T.WATER,
-        'G': T.DETONATOR
+        'G': T.DETONATOR,
+        'T': T.TRAMPOLINE,
+        'Q': T.TELEPORT
     };
 
     /**
      * Actor characters → spawn kind. The grid cell underneath becomes `EMPTY`,
      * except for the two that need something to stand on, noted below.
+     */
+    /**
+     * Actor characters → spawn kind.
+     *
+     * Six patrol behaviours rather than four, because a mine full of things
+     * that all move the same way is a mine with one hazard in it repeated. Each
+     * of these asks a different question of the player: the walker is about
+     * timing, the dog about distance, the spider about looking up, the guardian
+     * about geometry it ignores, the orb about a column you have to cross, the
+     * bat about a gap you have to cross under it.
      */
     const ACTORS = {
         '@': 'spawn',       // Tommy's start; exactly one per mine
@@ -59,14 +71,17 @@
         'M': 'food',
         'H': 'heart',
         'O': 'oxygen',
-        'B': 'walker',      // patrols a floor, turns at edges and walls
+        'B': 'walker',      // brisk floor patrol, turns at edges and walls
+        'c': 'crawler',     // slow, and reverses on its own schedule
+        'd': 'dog',         // floor patrol that charges when it sees you level
         'F': 'bat',         // sine-weaves along a horizontal span
-        'S': 'crawler',     // hugs surfaces, slower, ignores ledges
+        'S': 'spider',      // drops from the ceiling on a thread, then retracts
+        'g': 'guardian',    // hovers, drifts toward you, walls mean nothing
         'o': 'orb',         // fire orb, bobs along a vertical span
         'K': 'crusher',     // ceiling piston; slams C.CRUSH_TILES down
         'P': 'boulder',     // ceiling dropper
-        'h': 'liftH',       // horizontal lift; span read from the open run
-        'v': 'liftV'        // vertical lift; span read from the open shaft
+        'h': 'liftH',       // horizontal lift; a pair marks the ends of its run
+        'v': 'liftV'        // vertical lift; likewise
     };
 
     Tiles.TERRAIN_CHARS = TERRAIN;
@@ -82,7 +97,8 @@
 
     /** Stand on it from above, pass through it from below. */
     Tiles.isOneWay = function (t) {
-        return t === T.PLATFORM || t === T.CRUMBLE || t === T.BELT_R || t === T.BELT_L;
+        return t === T.PLATFORM || t === T.CRUMBLE || t === T.BELT_R ||
+               t === T.BELT_L || t === T.TRAMPOLINE;
     };
 
     /** Anything Tommy's feet can rest on. */
@@ -108,6 +124,14 @@
 
     Tiles.beltDir = function (t) {
         return t === T.BELT_R ? 1 : (t === T.BELT_L ? -1 : 0);
+    };
+
+    Tiles.isTrampoline = function (t) {
+        return t === T.TRAMPOLINE;
+    };
+
+    Tiles.isTeleport = function (t) {
+        return t === T.TELEPORT;
     };
 
     /** Tiles that never block movement, so the reachability walk can pass them. */

@@ -33,7 +33,7 @@ const SHOTS = {
         eval: ['bare', 'TNT.game.step(90)']
     },
     powder: {
-        desc: 'Powder Store — the spike bed, the rope over it, the conveyor deck',
+        desc: 'Powder Store — the spike bed and the drop-through decks',
         wait: 2600,
         eval: ['bare', 'TNT.game.room("powderStore")', 'TNT.game.step(120)']
     },
@@ -41,6 +41,11 @@ const SHOTS = {
         desc: 'Cage Shaft — the winding cage in its headframe',
         wait: 2600,
         eval: ['bare', 'TNT.game.room("cageShaft")', 'TNT.game.step(200)']
+    },
+    crystal: {
+        desc: 'Crystal Gallery — the trampoline, the roof rope and the vines',
+        wait: 2600,
+        eval: ['bare', 'TNT.game.room("crystalGallery")', 'TNT.game.step(120)']
     },
     deep: {
         desc: 'The Deep Cut — the flooded sump and the ceiling droppers',
@@ -51,6 +56,31 @@ const SHOTS = {
         desc: 'The Long Drift — the lava channel and the tram over it',
         wait: 2600,
         eval: ['bare', 'TNT.game.room("longDrift")', 'TNT.game.step(160)']
+    },
+    warps: {
+        desc: 'Sump Level — paired warp pads either side of the water',
+        wait: 2800,
+        eval: ['TNT.game.begin(1)', 'bare', 'TNT.game.room("sumpLevel")', 'TNT.game.step(120)']
+    },
+    flood: {
+        desc: 'Fire Damp — the seam filling up while you stand in it',
+        wait: 3000,
+        eval: ['TNT.game.begin(1)', 'bare', 'TNT.game.room("fireDamp")', 'TNT.game.step(1400)']
+    },
+    furnace: {
+        desc: 'The Furnace — Cinderdeep at its worst',
+        wait: 2800,
+        eval: ['TNT.game.begin(2)', 'bare', 'TNT.game.room("theFurnace")', 'TNT.game.step(140)']
+    },
+    escape: {
+        desc: 'The run out — the seam coming down',
+        wait: 2600,
+        eval: [
+            'bare',
+            'TNT.game.run.tntFound = TNT.game.run.mine.tntTotal - 1',
+            'TNT.game.run.escape = 28; TNT.game.run.bus.emit(TNT.EV.ESCAPE_STARTED, {seconds:28})',
+            'TNT.game.step(90)'
+        ]
     },
     vault: {
         desc: 'The Vault — the plunger, and the piston guarding it',
@@ -79,9 +109,9 @@ const SHOTS = {
         eval: ['bare', 'TNT.game.step(60)', 'TNT.game.run.energy = 12; TNT.game.run.danger = true', 'TNT.game.step(30)']
     },
     cinderdeep: {
-        desc: 'Cinderdeep, the third mine — lava where the spikes were',
+        desc: 'Cinderdeep — Slag Works, and a floor made of lava',
         wait: 2800,
-        eval: ['TNT.game.begin(2)', 'bare', 'TNT.game.room("powderStore")', 'TNT.game.step(120)']
+        eval: ['TNT.game.begin(2)', 'bare', 'TNT.game.room("slagWorks")', 'TNT.game.step(120)']
     },
     crt: {
         desc: 'Scanlines on',

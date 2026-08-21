@@ -55,6 +55,9 @@
         this.elapsed = 0;
         this.danger = false;
         this.allTntAnnounced = false;
+        this.medals = 0;
+        /** Seconds left on the run out, or 0 when it is not running. */
+        this.escape = 0;
 
         /** Sticks spent on blasts, newest last, so one can be handed back. */
         this._spentStack = [];
@@ -98,6 +101,8 @@
         this.tntFound = 0;
         this.danger = false;
         this.allTntAnnounced = false;
+        this.medals = 0;
+        this.escape = 0;
         this._spentStack.length = 0;
         this.bombs.length = 0;
 
@@ -106,6 +111,7 @@
         this.player.reset(this.mine.spawnX, this.mine.spawnY, false);
 
         this._setState('playing');
+        this.ents().seen = true;
         this.bus.emit(EV.MINE_STARTED, { mine: this.mine, index: index });
         this.bus.emit(EV.ROOM_CHANGED, { room: this.room(), dir: null });
     };
@@ -173,6 +179,7 @@
         this.player.update(dt, room, input, ents);
         this.player.carry();
 
+        if (this._checkWarp(input)) return;
         if (input.justPressed('plant')) this._plant();
         this._updateBombs(dt);
 
@@ -185,13 +192,46 @@
         this._checkRoomChange();
     };
 
-    /** Entities tick even while the camera is mid-flip or Tommy is dying. */
+    /**
+     * Entities tick even while the camera is mid-flip or Tommy is dying.
+     *
+     * Only the occupied room gets the player. The dog, the spider and the
+     * guardian all react to him, and handing them a player they cannot see
+     * would have every patrol in the mine converging on a room they are not in.
+     */
     Run.prototype._updateWorld = function (dt) {
         const ents = this.ents();
-        if (ents) ents.update(dt, this.bus);
+        if (ents) ents.update(dt, this.bus, this.player, true);
+    };
+
+    /**
+     * The run out.
+     *
+     * Lifting the last stick starts the seam coming down, and from that moment
+     * a hard countdown replaces the fuse as the thing that will kill you. This
+     * is Dynamite Dan's best idea: it turns a collection game into a
+     * route-planning one, because the whole mine is spent deciding *where to
+     * leave the twelfth stick* so that the walk back is one you can make.
+     *
+     * The fuse keeps burning underneath, so eating on the way out still matters
+     * — but food cannot buy you time on the countdown.
+     */
+    Run.prototype._burnEscape = function (dt) {
+        if (this.escape <= 0) return;
+        const before = Math.ceil(this.escape);
+        this.escape -= dt;
+        const now = Math.ceil(this.escape);
+        if (now !== before) this.bus.emit(EV.ESCAPE_TICK, { left: Math.max(0, now) });
+        if (this.escape <= 0) {
+            this.escape = 0;
+            this._die('collapse');
+        }
     };
 
     Run.prototype._burnFuse = function (dt) {
+        this._burnEscape(dt);
+        if (this.state !== 'playing') return;
+
         const rate = C.ENERGY_MAX / (C.FUSE_SECONDS * this.mine.fuseMul);
         this.energy -= rate * dt;
 
@@ -232,7 +272,9 @@
                     this.tntFound++;
                     if (this.tntFound >= this.mine.tntTotal && !this.allTntAnnounced) {
                         this.allTntAnnounced = true;
+                        this.escape = C.ESCAPE_SECONDS;
                         this.bus.emit(EV.ALL_TNT, { x: p.x, y: p.y });
+                        this.bus.emit(EV.ESCAPE_STARTED, { seconds: this.escape });
                     }
                     break;
                 case 'food':
@@ -253,17 +295,64 @@
         }
     };
 
-    /** All the ore in a room is worth a bonus; the ore itself never returns. */
+    /**
+     * A medal for stripping a room of every nugget.
+     *
+     * Carried over from Dynamite Dan, and it does more work than the points
+     * suggest: without it a flick-screen mine is a series of corridors you pass
+     * through once, and with it every room is somewhere you might choose to go
+     * back to. The minimap shows which ones are done, and clearing all nine is
+     * worth more than the nine medals put together.
+     */
     Run.prototype._checkRoomCleared = function () {
         const ents = this.ents();
-        if (ents.oreCleared) return;
+        if (ents.medal || ents.room.oreCount === 0) return;
         for (const p of ents.pickups) {
             if (p.kind === 'ore' && !p.taken) return;
         }
-        if (ents.room.oreCount === 0) return;
-        ents.oreCleared = true;
-        this.score += C.SCORE_ROOM_CLEAR;
-        this.bus.emit(EV.ROOM_CLEARED, { room: this.room() });
+        ents.medal = true;
+        this.medals++;
+        this.score += C.SCORE_MEDAL;
+        this.bus.emit(EV.ROOM_CLEARED, { room: this.room(), medals: this.medals });
+
+        if (this.medals === this.mine.rooms.filter(function (r) { return r.oreCount > 0; }).length) {
+            this.score += C.SCORE_ALL_MEDALS;
+            this.bus.emit(EV.ALL_MEDALS, { mine: this.mine });
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Warp pads
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Press Down on a pad to cross the room.
+     *
+     * Both pads are locked for a moment afterwards. Without it the arrival pad
+     * fires on the same held Down that triggered the departure and the player
+     * ping-pongs between the two until they let go — which reads as the game
+     * having crashed.
+     */
+    Run.prototype._checkWarp = function (input) {
+        const p = this.player;
+        if (!input.justPressed('down') || !p.onGround) return false;
+
+        for (const pad of this.ents().warps) {
+            if (pad.lock > 0 || !pad.partner) continue;
+            if (Math.abs(pad.x - p.x) > C.TILE * 0.7) continue;
+            if (Math.abs(pad.y - p.y) > C.TILE) continue;
+
+            const fromX = p.x, fromY = p.y;
+            pad.lock = C.TELEPORT_LOCK;
+            pad.partner.lock = C.TELEPORT_LOCK;
+            p.placeAt(pad.partner.x, pad.partner.y);
+            p.invuln = Math.max(p.invuln, 0.4);
+            this.bus.emit(EV.TELEPORT, {
+                fromX: fromX, fromY: fromY, toX: p.x, toY: p.y
+            });
+            return true;
+        }
+        return false;
     };
 
     /* ------------------------------------------------------------------ *
@@ -279,6 +368,13 @@
         // Lava is not survivable and never has been, invulnerability included:
         // a hazard that can be tanked is not a hazard, it is a toll.
         if (this._touchesTile(room, T.LAVA)) {
+            this._die('lava');
+            return;
+        }
+
+        // A flooding seam's surface is a pixel height, not a tile, so it has to
+        // be tested separately from the bed it rose out of.
+        if (ents.flood && ents.flood.level > 1 && p.y > ents.flood.surfaceY()) {
             this._die('lava');
             return;
         }
@@ -479,6 +575,7 @@
 
         this._setState('boom');
         this._timer = 0;
+        this.escape = 0;
         p.active = false;
         this.score += this.lives * C.SCORE_LIFE_BONUS;
         this.score += Math.max(0, C.SCORE_TIME_BASE - Math.floor(this.elapsed) * C.SCORE_TIME_DECAY);
@@ -532,6 +629,7 @@
         p.active = false;
         this._transition = { t: 0, len: 0.34, dir: dir };
         this._setState('transition');
+        this.ents().seen = true;
         this.bus.emit(EV.ROOM_CHANGED, { room: this.room(), dir: dir });
     };
 
@@ -588,6 +686,14 @@
 
         this.roomIndex = this.checkpoint.room;
         this.energy = C.ENERGY_MAX;
+
+        // Dying on the run out does not stop the clock — the seam is coming
+        // down either way — but it does buy back enough of it to be worth
+        // getting up for. Without the floor, one bad landing at forty seconds
+        // means respawning into a countdown that cannot be beaten, and the life
+        // is spent watching it run out.
+        if (this.escape > 0) this.escape = Math.max(this.escape, C.ESCAPE_SECONDS * 0.35);
+
         this.player.reset(this.checkpoint.x, this.checkpoint.y, true);
         this.player.invuln = C.RESPAWN_INVULN;
         this.bombs.length = 0;

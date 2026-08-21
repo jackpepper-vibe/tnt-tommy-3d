@@ -146,21 +146,85 @@ check('Tommy walks, and stops when told to', () => {
     return moved.toFixed(0) + 'px right, then stopped';
 });
 
-check('there is no way to leave the ground', () => {
+/**
+ * The single most important assertion in the suite.
+ *
+ * Every one of the twenty-seven rooms is authored on a three-row deck grid, so
+ * the jump has to clear three rows and miss four. Nudge `JUMP_V` or `GRAVITY`
+ * and the traversal of the entire game changes silently — rooms stay perfectly
+ * plausible in a screenshot while becoming either trivial or impossible.
+ */
+check('a jump clears three rows and misses four', () => {
     const h = harness();
     const p = h.run.player;
-    const floorY = p.y;
-    // Hammer every input there is, for a good long while, in every room the
-    // walk reaches. If any of it produces height, the whole design is void.
-    let highest = 0;
-    for (let i = 0; i < 8; i++) {
-        h.seconds(0.5, ['up', 'plant']);
-        h.seconds(0.5, ['right', 'up', 'plant']);
-        h.seconds(0.5, ['left', 'down', 'plant']);
-        if (p.mode === 'walk' && p.onGround) highest = Math.max(highest, floorY - p.y);
+    const g = C.GRAVITY;
+
+    const apex = C.JUMP_APEX;
+    const three = 3 * C.TILE;
+    const four = 4 * C.TILE;
+    assert(apex > three, 'a jump only reaches ' + apex.toFixed(0) + 'px, short of three rows (' + three + ')');
+    assert(apex < four, 'a jump reaches ' + apex.toFixed(0) + 'px, which clears four rows (' + four + ')');
+
+    // And prove it in the simulation, not just on paper.
+    p.placeAt(C.ROOM_W / 2, C.ROOM_H - C.TILE);
+    h.seconds(0.1, []);
+    const startY = p.y;
+    let peak = startY;
+    h.hold(['jump']);
+    h.tap('jump');
+    for (let i = 0; i < 90; i++) {
+        h.step(1);
+        peak = Math.min(peak, p.y);
     }
-    assert(highest <= 0.5, 'gained ' + highest.toFixed(1) + 'px of height without climbing');
-    return 'no jump found';
+    const risen = startY - peak;
+    assert(risen > three, 'held jump rose only ' + risen.toFixed(1) + 'px');
+    assert(risen < four + 4, 'held jump rose ' + risen.toFixed(1) + 'px, past four rows');
+    void g;
+    return 'apex ' + apex.toFixed(0) + 'px, measured ' + risen.toFixed(0) + 'px (3 rows = ' + three + ', 4 = ' + four + ')';
+});
+
+check('a tapped jump is shorter than a held one', () => {
+    const h = harness();
+    const p = h.run.player;
+
+    const rise = (holdSteps) => {
+        p.placeAt(C.ROOM_W / 2, C.ROOM_H - C.TILE);
+        p.vy = 0;
+        h.seconds(0.1, []);
+        const start = p.y;
+        let peak = start;
+        h.hold(['jump']);
+        h.tap('jump');
+        for (let i = 0; i < 90; i++) {
+            if (i === holdSteps) h.hold([]);
+            h.step(1);
+            peak = Math.min(peak, p.y);
+        }
+        return start - peak;
+    };
+
+    const tapped = rise(6);
+    const held = rise(90);
+    assert(tapped < held - 6,
+        'a tap rose ' + tapped.toFixed(1) + 'px and a hold ' + held.toFixed(1) + 'px — no variable height');
+    return 'tap ' + tapped.toFixed(0) + 'px vs hold ' + held.toFixed(0) + 'px';
+});
+
+check('coyote time lets you jump just after a ledge', () => {
+    const h = harness();
+    const p = h.run.player;
+    // Step off into open air, then jump a frame later.
+    p.placeAt(C.ROOM_W / 2, C.ROOM_H - C.TILE);
+    h.seconds(0.1, []);
+    p.onGround = false;
+    p.coyote = C.COYOTE_TIME;
+    const startY = p.y;
+    h.hold(['jump']);
+    h.tap('jump');
+    h.step(4);
+    assert(p.vy < 0, 'coyote jump did not fire (vy ' + p.vy.toFixed(0) + ')');
+    void startY;
+    return 'fired ' + (C.COYOTE_TIME * 1000).toFixed(0) + 'ms after leaving the ground';
 });
 
 /**
@@ -169,13 +233,15 @@ check('there is no way to leave the ground', () => {
  * means the check tests the mechanic, not the author's memory of the level.
  */
 function ladderFoot(room) {
-    const floorStand = C.ROWS - 2;
     for (let tx = 2; tx < C.COLS - 2; tx++) {
-        if (!Tiles.isClimbable(room.get(tx, floorStand))) continue;
-        let top = floorStand;
-        while (top > 1 && Tiles.isClimbable(room.get(tx, top - 1))) top--;
-        if (floorStand - top < 3) continue;
-        return { tx: tx, top: top, x: tx * C.TILE + C.TILE / 2, y: (floorStand + 1) * C.TILE };
+        for (let ty = C.ROWS - 2; ty > 2; ty--) {
+            if (!Tiles.isClimbable(room.get(tx, ty))) continue;
+            if (Tiles.isClimbable(room.get(tx, ty + 1))) continue;   // not the foot
+            let top = ty;
+            while (top > 1 && Tiles.isClimbable(room.get(tx, top - 1))) top--;
+            if (ty - top < 3) break;                                  // too short to test
+            return { tx: tx, top: top, x: tx * C.TILE + C.TILE / 2, y: (ty + 1) * C.TILE };
+        }
     }
     return null;
 }
@@ -220,16 +286,31 @@ check('a ladder can be remounted from above', () => {
     return 'descended ' + (p.y - yTop).toFixed(0) + 'px from the cap';
 });
 
-check('a five-tile drop is free, a shaft is not', () => {
-    const h = harness();
-    const p = h.run.player;
+/**
+ * Falling has to stay cheap. Punishing modest drops is what forced the wide
+ * level grid that made the mine feel like ladders and empty air — so this
+ * asserts the *generosity*, not the danger.
+ */
+check('falling is cheap and never fatal', () => {
     const g = C.GRAVITY;
-    const vFive = Math.sqrt(2 * g * 5 * C.TILE);
-    const vTen = Math.sqrt(2 * g * 10 * C.TILE);
-    assert(vFive < C.FALL_SAFE, 'a five-tile drop hurts (' + vFive.toFixed(0) + ' >= ' + C.FALL_SAFE + ')');
-    assert(vTen >= C.FALL_FATAL, 'a ten-tile drop survives (' + vTen.toFixed(0) + ' < ' + C.FALL_FATAL + ')');
-    void p;
-    return '5 tiles → ' + vFive.toFixed(0) + 'px/s, 10 tiles → ' + vTen.toFixed(0) + 'px/s';
+    const impact = (rows) => Math.min(C.MAX_FALL, Math.sqrt(2 * g * rows * C.TILE));
+
+    assert(impact(8) < C.FALL_SAFE,
+        'an eight-row drop hurts (' + impact(8).toFixed(0) + ' >= ' + C.FALL_SAFE + ')');
+    assert(C.FALL_FATAL === undefined,
+        'a fall can kill outright; both originals let you drop the height of a room');
+    assert(C.FALL_DMG < 20,
+        'the worst landing in the game costs ' + C.FALL_DMG + ' fuse, which is a punishment not a graze');
+    return '8 rows → ' + impact(8).toFixed(0) + 'px/s free · terminal ' +
+        C.MAX_FALL + 'px/s costs ' + C.FALL_DMG;
+});
+
+check('a trampoline goes higher than a jump can', () => {
+    assert(C.TRAMP_APEX > C.JUMP_APEX * 1.6,
+        'a bounce reaches ' + C.TRAMP_APEX.toFixed(0) + 'px against a jump\'s ' + C.JUMP_APEX.toFixed(0));
+    assert(C.TRAMP_APEX > 6 * C.TILE,
+        'a bounce clears only ' + (C.TRAMP_APEX / C.TILE).toFixed(1) + ' rows; it is meant to beat a ladder');
+    return (C.TRAMP_APEX / C.TILE).toFixed(1) + ' rows vs a jump\'s ' + (C.JUMP_APEX / C.TILE).toFixed(1);
 });
 
 /* ------------------------------------------------------------------ *
@@ -352,7 +433,7 @@ check('walking out of a doorway changes room', () => {
 check('the plunger refuses to fire early and fires when fed', () => {
     const h = harness();
     const run = h.run;
-    const vaultIdx = run.mine.rooms.findIndex(r => r.id === 'vault');
+    const vaultIdx = run.entities.findIndex(e => e.detonator);
     run.roomIndex = vaultIdx;
     const det = run.entities[vaultIdx].detonator;
     assert(det, 'the vault has no plunger');
@@ -376,7 +457,7 @@ check('a full run rolls into the next mine and then to victory', () => {
     const run = h.run;
     for (let m = 0; m < 3; m++) {
         const before = run.mineIndex;
-        const vaultIdx = run.mine.rooms.findIndex(r => r.id === 'vault');
+        const vaultIdx = run.entities.findIndex(e => e.detonator);
         run.roomIndex = vaultIdx;
         const det = run.entities[vaultIdx].detonator;
         run.player.reset(det.x, det.y, true);

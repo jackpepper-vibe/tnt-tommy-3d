@@ -1,56 +1,69 @@
 # TNT Tommy
 
-A mine platformer with no jump button.
+A flick-screen mine platformer. Twelve sticks of dynamite are scattered through
+nine rooms of a working seam. Collect the lot, get to the vault, and drop the
+plunger before the fuse burns out — then do it twice more, deeper down, with
+less time. Twenty-seven hand-built rooms across three mines.
 
-Twelve sticks of dynamite are scattered through nine rooms of a working mine.
-Collect the lot, get to the vault, and drop the plunger before your fuse burns
-out. Then do it twice more, deeper down, with less time.
-
-Built in vanilla JavaScript and three.js. No build step, no dependencies at
-runtime, no network — open `index.html` and it runs.
+Built in vanilla JavaScript and three.js. No build step, no runtime
+dependencies, no network — open `index.html` and it runs.
 
 ## The idea
 
-Tommy cannot jump. Every metre of height is a ladder, a hanging rope or the
-winding cage, which changes what a platformer *is*:
+**A jump clears three rows. Four needs a ladder.** Every room is a climbing
+frame built on that number: six decks three rows apart, so the level above is
+always a hop, and anything taller is a ladder, a hanging rope, the winding cage
+or a trampoline.
 
-- **A ledge with nothing leading to it is scenery**, not a challenge. Routes are
-  found rather than executed.
-- **Falling is how you travel downward**, so it is a deliberate move — you can
-  steer a drop most of the way across a room. One storey is always free. A shaft
-  is not, though a ladder in it will slow you all the way down.
+- **Falling is cheap.** Eight rows costs nothing and no drop is fatal, so
+  coming down is fast and climbing is the part you plan.
 - **Dynamite is the only thing that changes a room.** Fissured rock opens to a
   blast, and the stick comes out of the twelve you are collecting and goes back
   where you found it once it has gone off. Spending one costs you the walk, not
   the run.
+- **The last stick starts the clock.** Lift it and the seam begins coming down:
+  a hard countdown to reach the plunger. So the whole mine is spent deciding
+  *where to leave the twelfth stick*.
 
 The fuse is the energy bar and the clock at once. It drains on its own, damage
 takes a bite out of it, and food is the only way to put any back — so taking a
 hit and taking too long are the same mistake, and there is no safe way to stall.
+
+Strip every nugget from a room and it earns a medal; the minimap tracks which
+rooms still owe you one.
 
 ## Playing
 
 | | |
 |---|---|
 | Walk | <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> |
-| Ladders and ropes | <kbd>↑</kbd> <kbd>↓</kbd> or <kbd>W</kbd> <kbd>S</kbd> |
+| Jump | <kbd>Space</kbd>, <kbd>Z</kbd> — or <kbd>↑</kbd> when there is no ladder |
+| Ladders, ropes and warp pads | <kbd>↑</kbd> <kbd>↓</kbd> or <kbd>W</kbd> <kbd>S</kbd> |
 | Drop through boards | <kbd>↓</kbd> |
-| Plant a stick | <kbd>Space</kbd>, <kbd>Z</kbd> or <kbd>J</kbd> |
+| Plant a stick | <kbd>X</kbd> or <kbd>Shift</kbd> |
 | Scanlines | <kbd>K</kbd> |
 | Sound | <kbd>M</kbd> |
 
-On a phone the on-screen pad appears automatically.
+Hold jump for the full three rows, tap it for a short hop. On a phone the
+on-screen pad appears automatically.
 
 ## The three mines
 
-**Copperlode** teaches the vocabulary. **Blackdamp** mirrors the whole layout,
-rots the boards and swaps ladders for slower hanging ropes. **Cinderdeep** turns
-the map upside down — you start at the top and the plunger is at the bottom, so
-you descend against the fuse instead of climbing with it — and every spike bed
-is lava.
+**Copperlode** teaches the vocabulary — the deck grid, the drop-through, the
+rope and the trampoline — and nothing in it is lethal on contact except one
+fenced lava channel.
 
-Nine rooms are authored by hand; the other eighteen are derived from them, and
-all twenty-seven are checked for reachability under the no-jump rules before the
+**Blackdamp** is a different mine, not the first one mirrored: its own rooms,
+its own link graph, and two new things. Warp pads cut across the map in a way
+ladders cannot, and Fire Damp's lava *rises while you stand in it* and drains
+when you leave, so the room is on a clock the fuse knows nothing about.
+
+**Cinderdeep** replaces the spike beds with lava, floods two seams instead of
+one, puts guardians that walk through rock in most rooms, and runs the tightest
+fuse of the three. The Furnace is the hardest room in the game.
+
+All twenty-seven rooms are individually designed, and every one is machine-checked
+for reachability — every stick, tank and plunger provably gettable — before the
 game will build.
 
 ## Running it

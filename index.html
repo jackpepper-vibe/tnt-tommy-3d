@@ -44,10 +44,22 @@
             </div>
 
             <div class="hud__right">
-                <span class="kit" id="kit" title="Oxygen tank">O₂</span>
                 <span class="score" id="score">000000</span>
+                <span class="medals" id="medals" title="Rooms stripped of every nugget">
+                    <i class="medals__icon"></i><b id="medal-count">0</b><span class="medals__of">/</span><b id="medal-total">9</b>
+                </span>
+                <span class="kit" id="kit" title="Oxygen tank">O₂</span>
             </div>
         </div>
+
+        <!-- The seam coming down. Hidden until the last stick is lifted. -->
+        <div class="escape" id="escape" aria-live="assertive">
+            <span class="escape__label">SEAM COMING DOWN</span>
+            <span class="escape__time" id="escape-time">0:00</span>
+        </div>
+
+        <!-- Which rooms are done, and where you are. -->
+        <div class="minimap" id="minimap" aria-label="The mine"></div>
 
         <div class="room-name" id="room-name"></div>
         <div class="toast" id="toast"></div>
@@ -166,8 +178,9 @@
     <!-- World -->
     <script src="src/world/Tiles.js"></script>
     <script src="src/world/Paint.js"></script>
-    <script src="src/world/Rooms.js"></script>
-    <script src="src/world/Remix.js"></script>
+    <script src="src/world/Mine1.js"></script>
+    <script src="src/world/Mine2.js"></script>
+    <script src="src/world/Mine3.js"></script>
     <script src="src/world/World.js"></script>
 
     <!-- Simulation -->
