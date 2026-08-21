@@ -1,0 +1,559 @@
+/* ==========================================================================
+   TNT Tommy — shell styling.
+
+   Everything here composites over the WebGL canvas. Two rules govern the lot:
+
+     - The HUD must stay legible while the screen is shaking and the post pass
+       is pulling the picture toward the fire. Hence heavy text shadows and
+       solid backing plates rather than translucency alone.
+     - Nothing may intercept a pointer unless it is a control. The canvas is
+       under all of it and the touch pad has to be able to receive presses, so
+       `pointer-events` is off by default and switched on per control.
+   ========================================================================== */
+
+:root {
+    --ink: #f3e7d3;
+    --ink-dim: #a89880;
+    --gold: #ffc857;
+    --ember: #ff7a45;
+    --bad: #ff5c4d;
+    --good: #86dd66;
+    --panel: rgba(14, 10, 8, 0.86);
+    --edge: rgba(255, 200, 120, 0.22);
+    --shadow: 0 2px 0 rgba(0, 0, 0, 0.9), 0 0 14px rgba(0, 0, 0, 0.8);
+    --face: "Trebuchet MS", "Lucida Grande", system-ui, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #06050a;
+    color: var(--ink);
+    font-family: var(--face);
+    /* A held direction must not be read as a scroll gesture — see bindTouch. */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#world {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.shell {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+}
+
+.shell.is-hurt {
+    animation: hurt 0.22s steps(2);
+}
+
+@keyframes hurt {
+    0% { background: rgba(255, 60, 40, 0.18); }
+    100% { background: transparent; }
+}
+
+/* ==========================================================================
+   Head-up display
+   ========================================================================== */
+
+.hud {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem clamp(0.7rem, 2vw, 1.6rem);
+    font-size: clamp(0.72rem, 1.5vw, 0.95rem);
+    letter-spacing: 0.09em;
+    text-shadow: var(--shadow);
+}
+
+body[data-screen="title"] .hud,
+body[data-screen="gameover"] .hud,
+body[data-screen="victory"] .hud {
+    opacity: 0;
+}
+
+.hud__left,
+.hud__right {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.hud__right {
+    align-items: flex-end;
+}
+
+.hud__mid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* --- the fuse ------------------------------------------------------------ */
+
+.fuse {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fuse__label {
+    color: var(--ink-dim);
+    font-size: 0.78em;
+}
+
+.fuse__track {
+    position: relative;
+    width: clamp(120px, 20vw, 240px);
+    height: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--edge);
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.fuse__fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #6b3a1a 0%, var(--ember) 55%, var(--gold) 100%);
+    transition: width 0.12s linear;
+}
+
+.fuse__spark {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 60%, rgba(255, 220, 150, 0.35) 100%);
+    mix-blend-mode: screen;
+}
+
+.fuse.is-danger .fuse__track {
+    border-color: var(--bad);
+    animation: fusePulse 0.5s infinite alternate;
+}
+
+@keyframes fusePulse {
+    from { box-shadow: 0 0 0 rgba(255, 80, 60, 0); }
+    to { box-shadow: 0 0 14px rgba(255, 80, 60, 0.8); }
+}
+
+/* --- helmets ------------------------------------------------------------- */
+
+.lives {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.helmet {
+    width: 15px;
+    height: 11px;
+    background: var(--gold);
+    border-radius: 8px 8px 2px 2px;
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35), 0 1px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* --- objective ----------------------------------------------------------- */
+
+.mine {
+    color: var(--ink-dim);
+    font-size: 0.82em;
+    letter-spacing: 0.24em;
+}
+
+.tnt {
+    display: flex;
+    align-items: baseline;
+    gap: 0.28rem;
+    font-size: 1.25em;
+    font-weight: 700;
+}
+
+.tnt__icon {
+    width: 9px;
+    height: 15px;
+    background: #c0392b;
+    border-top: 3px solid #7a6038;
+    border-radius: 2px;
+    align-self: center;
+}
+
+.tnt__of {
+    color: var(--ink-dim);
+}
+
+.tnt__held {
+    font-size: 0.55em;
+    font-style: normal;
+    font-weight: 400;
+    color: var(--ink-dim);
+    letter-spacing: 0.12em;
+    margin-left: 0.5rem;
+}
+
+.tnt__held b {
+    color: var(--gold);
+}
+
+/* --- score and kit ------------------------------------------------------- */
+
+.score {
+    font-size: 1.35em;
+    font-weight: 700;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+
+.kit {
+    font-size: 0.8em;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.22);
+}
+
+.kit.is-on {
+    color: #7fdcf0;
+    border-color: #3aa6c0;
+    box-shadow: 0 0 10px rgba(90, 200, 222, 0.5);
+}
+
+/* ==========================================================================
+   Transient overlays
+   ========================================================================== */
+
+.room-name {
+    position: absolute;
+    top: 22%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: clamp(1.1rem, 3.4vw, 2.2rem);
+    letter-spacing: 0.3em;
+    color: var(--ink);
+    text-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.35s, transform 0.35s;
+}
+
+.room-name.is-shown {
+    opacity: 0.92;
+    transform: translateY(0);
+}
+
+.toast {
+    position: absolute;
+    bottom: 16%;
+    left: 50%;
+    transform: translate(-50%, 10px);
+    padding: 0.45rem 1.1rem;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    font-size: clamp(0.75rem, 1.7vw, 1rem);
+    letter-spacing: 0.18em;
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+}
+
+.toast.is-shown {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.toast--good { color: var(--good); }
+.toast--bad { color: var(--bad); }
+
+/*
+ * Floating score numbers sit in a box the same shape as the room, so a
+ * percentage position lands where the event happened at any window size —
+ * the HUD never has to know anything about the camera.
+ */
+.floats {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.float {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-size: clamp(0.7rem, 1.5vw, 0.95rem);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-shadow: var(--shadow);
+    animation: floatUp 1.1s ease-out forwards;
+}
+
+.float--gold { color: var(--gold); }
+.float--bad { color: var(--bad); }
+
+@keyframes floatUp {
+    0% { opacity: 0; transform: translate(-50%, -50%); }
+    15% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -220%); }
+}
+
+/* ==========================================================================
+   Screens
+   ========================================================================== */
+
+.screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: radial-gradient(ellipse at center, rgba(10, 7, 5, 0.72) 0%, rgba(4, 3, 2, 0.94) 75%);
+    pointer-events: auto;
+    overflow-y: auto;
+}
+
+.screen.is-active {
+    display: flex;
+}
+
+.card {
+    max-width: 720px;
+    text-align: center;
+}
+
+.card__eyebrow {
+    margin: 0 0 0.4rem;
+    color: var(--ember);
+    letter-spacing: 0.34em;
+    font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+    text-transform: uppercase;
+}
+
+.card__title {
+    margin: 0 0 0.8rem;
+    font-size: clamp(2.4rem, 9vw, 5rem);
+    letter-spacing: 0.06em;
+    line-height: 0.95;
+    color: var(--gold);
+    text-shadow: 0 4px 0 #6b2f10, 0 0 34px rgba(255, 140, 60, 0.45);
+}
+
+.card__title b {
+    display: block;
+    color: var(--ink);
+    text-shadow: 0 4px 0 #2a1a10, 0 0 26px rgba(255, 210, 150, 0.3);
+}
+
+.card__title--bad { color: var(--bad); text-shadow: 0 4px 0 #4a1210; }
+.card__title--good { color: var(--good); text-shadow: 0 4px 0 #17400f; }
+
+.card__tagline {
+    margin: 0 auto 1.6rem;
+    max-width: 46rem;
+    color: var(--ink-dim);
+    line-height: 1.6;
+    font-size: clamp(0.85rem, 2vw, 1.02rem);
+}
+
+.guide {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.8rem;
+    text-align: left;
+}
+
+.guide__item {
+    padding: 0.9rem 1rem;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+}
+
+.guide__item h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.9rem;
+    letter-spacing: 0.16em;
+    color: var(--gold);
+    text-transform: uppercase;
+}
+
+.guide__item p {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--ink-dim);
+}
+
+.btn {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #241505;
+    background: linear-gradient(180deg, var(--gold), #e2892b);
+    border: 0;
+    border-radius: 6px;
+    padding: 0.75rem 2.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #7a3c0d, 0 10px 30px rgba(0, 0, 0, 0.6);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 0 #7a3c0d, 0 14px 34px rgba(0, 0, 0, 0.65);
+}
+
+.btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #7a3c0d;
+}
+
+.card__keys {
+    margin: 1.4rem 0 0;
+    color: var(--ink-dim);
+    font-size: clamp(0.7rem, 1.6vw, 0.82rem);
+    letter-spacing: 0.06em;
+    line-height: 2;
+}
+
+kbd {
+    display: inline-block;
+    padding: 0.1rem 0.42rem;
+    margin: 0 0.1rem;
+    background: rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 0.92em;
+    color: var(--ink);
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0.6rem;
+    margin: 0 0 1.8rem;
+    padding: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+}
+
+.stats div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.stats dt {
+    font-size: 0.66rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+}
+
+.stats dd {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Touch controls
+
+   Shown only where there is no fine pointer. A keyboard player never sees them
+   and a phone player cannot play without them.
+   ========================================================================== */
+
+.pad {
+    display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .pad {
+        display: flex;
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 1rem clamp(0.8rem, 3vw, 2rem) calc(1rem + env(safe-area-inset-bottom));
+        align-items: flex-end;
+        justify-content: space-between;
+        pointer-events: none;
+    }
+
+    body[data-screen="title"] .pad,
+    body[data-screen="gameover"] .pad,
+    body[data-screen="victory"] .pad {
+        display: none;
+    }
+
+    .pad__dir {
+        position: relative;
+        width: 168px;
+        height: 168px;
+    }
+
+    .pad__btn {
+        pointer-events: auto;
+        position: absolute;
+        width: 56px;
+        height: 56px;
+        font: inherit;
+        font-size: 1.1rem;
+        color: var(--ink);
+        background: rgba(20, 14, 10, 0.62);
+        border: 1px solid var(--edge);
+        border-radius: 10px;
+        touch-action: none;
+    }
+
+    .pad__btn.is-down {
+        background: rgba(255, 180, 90, 0.35);
+    }
+
+    .pad__btn--up { left: 56px; top: 0; }
+    .pad__btn--left { left: 0; top: 56px; }
+    .pad__btn--right { left: 112px; top: 56px; }
+    .pad__btn--down { left: 56px; top: 112px; }
+
+    .pad__btn--plant {
+        position: static;
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: #241505;
+        background: linear-gradient(180deg, var(--gold), #e2892b);
+    }
+}
+
+/* Short landscape windows: the guide panels are the first thing to go. */
+@media (max-height: 520px) {
+    .guide { display: none; }
+    .card__tagline { margin-bottom: 1rem; }
+}

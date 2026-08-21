@@ -1,0 +1,634 @@
+/**
+ * TNT Tommy — the scene: renderer, camera, lighting, particles and post.
+ *
+ * Reads the run and draws it. Nothing in here writes to the simulation.
+ *
+ * THE FLIP
+ * --------
+ * Rooms do not scroll. Leaving one slides it off and the next one on, in the
+ * direction you left — the flick-screen transition both originals had. Two room
+ * meshes exist for the third of a second that takes, held in a container whose
+ * position is animated; actors ride in the container too, so Tommy arrives with
+ * the room rather than being teleported ahead of it.
+ *
+ * LIGHTING IS A POOL
+ * ------------------
+ * The mine is dark and lit by point sources: Tommy's helmet lamp, wall lamps,
+ * glowing sticks, lava, the blast. There are far more of those in a mine than a
+ * WebGL1 shader can afford, and — worse — changing the *number* of lights makes
+ * Three recompile every material in the scene, which stalls for a beat at
+ * exactly the wrong moment. So the count is fixed at `MAX_LIGHTS` forever, and
+ * each frame the nearest sources are assigned into the existing slots. Unused
+ * slots are dimmed to zero rather than removed.
+ *
+ * COLOUR THROUGH THE POST PASS
+ * ----------------------------
+ * The scene renders into a target that is explicitly tagged sRGB, so Three
+ * encodes on the way in. The composite shader then samples and writes those
+ * values through untouched. Custom shaders get no colour management at all, so
+ * doing anything else here means converting twice and washing the mine out to
+ * grey — which is the failure this whole art direction cannot survive.
+ */
+(function (TNT, THREE) {
+    'use strict';
+
+    const { C, Util, R3D, RoomMesh, Actors3D } = TNT;
+    const EV = TNT.EV;
+
+    /** Fixed for the life of the page. See the header. */
+    const MAX_LIGHTS = 8;
+    const MAX_PARTICLES = 500;
+
+    function Scene3D(canvas, run) {
+        this.canvas = canvas;
+        this.run = run;
+        this.t = 0;
+
+        this.renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            powerPreference: 'high-performance',
+            // Without this the drawing buffer is discarded as soon as the
+            // browser has composited it, and any capture taken while the frame
+            // loop is stopped comes back blank — which is precisely how the
+            // screenshot harness works. Every shot of this game was a black
+            // rectangle until this line existed, and the renderer was innocent
+            // the whole time: draw calls were being issued and the geometry was
+            // exactly where it should be. Verification is worth the small cost.
+            preserveDrawingBuffer: true
+        });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.setClearColor(0x000000, 1);
+
+        // Three's shader-error check reads `getProgramInfoLog().trim()` without
+        // guarding it. Software GL — which is exactly what the headless
+        // screenshot harness runs on — returns *null* rather than an empty
+        // string when a program links cleanly, so the check itself throws on a
+        // program that was perfectly fine. The symptom is a hard crash the
+        // first time any new material variant appears, which made the game
+        // impossible to capture. Nothing is lost by turning it off: it is a
+        // development diagnostic, and shader authoring here is one file.
+        this.renderer.debug.checkShaderErrors = false;
+
+        this.scene = new THREE.Scene();
+        this.worldGroup = new THREE.Group();
+        this.scene.add(this.worldGroup);
+
+        this.camera = new THREE.PerspectiveCamera(46, 1.75, 0.1, 200);
+        this.scene.add(this.camera);
+
+        /**
+         * `?nopost` renders the scene straight to the canvas.
+         *
+         * Kept because the composite pass is the one part of the pipeline that
+         * can fail invisibly — a broken shader there produces a black screen
+         * that looks exactly like a broken camera, a broken palette or an empty
+         * scene. Being able to take the pass out without editing anything turns
+         * an afternoon of bisecting into one screenshot.
+         */
+        this.usePost = !/[?&]nopost\b/.test(window.location.search);
+
+        this.palette = R3D.palette('copper');
+        this._initLights();
+        this._initParticles();
+        this._initPost();
+
+        this.actors = Actors3D.create(this.worldGroup);
+        this.roomView = null;
+        this.oldView = null;
+        this.slide = null;
+        this.offset = new THREE.Vector2(0, 0);
+
+        this.shake = 0;
+        this.shakeT = 0;
+        this.flash = 0;
+        this.crt = false;
+
+        this._listen();
+        this.resize();
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Lights
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Ambient, sky bounce, and the point-light pool.
+     *
+     * **Decay is 1, not 2.** Physically correct inverse-square falloff is wrong
+     * at this scale and it is worth being explicit about why: a world unit here
+     * is a *tile*, so a room is forty-two units across, and a lamp with
+     * quadratic decay is down to a twentieth of its strength four tiles out.
+     * Every room came out pitch black with a faint halo round Tommy's boots.
+     * Linear decay over a generous radius is what makes a lamp read as lighting
+     * a working rather than as a torch in a void.
+     */
+    Scene3D.prototype._initLights = function () {
+        const pal = this.palette;
+        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.75);
+        this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#1a1410'), 0.55);
+        this.scene.add(this.ambient, this.hemi);
+
+        this.lightPool = [];
+        for (let i = 0; i < MAX_LIGHTS; i++) {
+            const l = new THREE.PointLight(0xffffff, 0, 16, 1);
+            this.scene.add(l);
+            this.lightPool.push(l);
+        }
+        /** Rebuilt per frame; never allocated in the loop. */
+        this._candidates = [];
+    };
+
+    /**
+     * Swap the mine's palette.
+     *
+     * There is deliberately no scene fog. It was tried and removed for two
+     * reasons, in that order of importance. First it does nothing: the camera
+     * sits at a fixed distance and the whole playfield is a slab about three
+     * units deep, so every fragment lands at essentially the same depth and
+     * fog resolves to a flat tint the palette already applies — depth cueing
+     * here comes from `backFar` on the backdrop, which is a colour, not a
+     * distance. Second, turning it on adds a shader variant that fails to link
+     * under software GL, and Three then crashes reading the (null) info log of
+     * the program that failed — which is what a headless screenshot run is.
+     */
+    Scene3D.prototype._applyPalette = function (key) {
+        this.palette = R3D.palette(key);
+        this.ambient.color = new THREE.Color(this.palette.ambient);
+        this.hemi.color = new THREE.Color(this.palette.hemi);
+        this.renderer.setClearColor(new THREE.Color(this.palette.fog), 1);
+    };
+
+    Scene3D.prototype._syncLights = function () {
+        const run = this.run;
+        const player = run.player;
+        const cands = this._candidates;
+        cands.length = 0;
+
+        // Tommy's helmet lamp, always slot zero. It is the light the player
+        // navigates by, so it never loses its place to scenery.
+        const px = R3D.wx(player.x) + this.offset.x;
+        const py = R3D.wy(player.centreY()) + this.offset.y;
+        const flicker = 0.94 + Math.sin(this.t * 9) * 0.04 + Math.sin(this.t * 23) * 0.02;
+
+        const slots = this.lightPool;
+        slots[0].position.set(px, py, 2.4);
+        slots[0].color.set(this.palette.lamp);
+        slots[0].intensity = (run.state === 'title' ? 0.35 : 1.9) * flicker;
+        slots[0].distance = 24;
+
+        if (this.roomView) {
+            for (const src of this.roomView.lights) {
+                const dx = src.x + this.offset.x - px;
+                const dy = src.y + this.offset.y - py;
+                cands.push({ src: src, d2: dx * dx + dy * dy });
+            }
+        }
+        cands.sort(function (a, b) { return a.d2 - b.d2; });
+
+        let slot = 1;
+        for (let i = 0; i < cands.length && slot < MAX_LIGHTS - 1; i++, slot++) {
+            const s = cands[i].src;
+            const l = slots[slot];
+            l.position.set(s.x + this.offset.x, s.y + this.offset.y, 1.0);
+            l.color.set(s.colour);
+            const f = s.flicker ? 1 + Math.sin(this.t * (7 + slot * 3)) * s.flicker : 1;
+            l.intensity = s.energy * f;
+            l.distance = s.range;
+        }
+
+        // The last slot is kept free for the blast, which has to be able to
+        // outshine anything else in the room the instant it happens.
+        const blast = slots[MAX_LIGHTS - 1];
+        if (this.flash > 0.01) {
+            blast.position.set(this.flashX, this.flashY, 2.2);
+            blast.color.set('#ffcf8a');
+            blast.intensity = this.flash * 5;
+            blast.distance = 26;
+        } else {
+            blast.intensity = 0;
+        }
+
+        for (let i = slot; i < MAX_LIGHTS - 1; i++) slots[i].intensity = 0;
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Particles
+     * ------------------------------------------------------------------ */
+
+    Scene3D.prototype._initParticles = function () {
+        const positions = new Float32Array(MAX_PARTICLES * 3);
+        const colors = new Float32Array(MAX_PARTICLES * 3);
+        const sizes = new Float32Array(MAX_PARTICLES);
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+        const mat = new THREE.PointsMaterial({
+            size: 0.28,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            map: R3D.dotTexture(),
+            sizeAttenuation: true
+        });
+
+        this.points = new THREE.Points(geo, mat);
+        this.points.frustumCulled = false;
+        this.worldGroup.add(this.points);
+
+        /** Dead particles are recycled from a free list; nothing is allocated. */
+        this.particles = [];
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            this.particles.push({ life: 0, max: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, r: 1, g: 1, b: 1, drag: 0, grav: 0 });
+        }
+        this._pcursor = 0;
+    };
+
+    Scene3D.prototype.burst = function (x, y, opts) {
+        const o = opts || {};
+        const n = o.count || 14;
+        const colour = R3D.col(o.colour || '#ffb84d');
+        const wx = R3D.wx(x) + this.offset.x;
+        const wy = R3D.wy(y) + this.offset.y;
+
+        for (let i = 0; i < n; i++) {
+            const p = this.particles[this._pcursor];
+            this._pcursor = (this._pcursor + 1) % MAX_PARTICLES;
+            const a = Math.random() * Math.PI * 2;
+            const s = (o.speed || 4) * (0.35 + Math.random() * 0.65);
+            p.x = wx + (Math.random() - 0.5) * 0.3;
+            p.y = wy + (Math.random() - 0.5) * 0.3;
+            p.z = 0.5 + (Math.random() - 0.5) * 0.4;
+            p.vx = Math.cos(a) * s;
+            p.vy = Math.sin(a) * s + (o.lift || 0);
+            p.vz = (Math.random() - 0.5) * 0.6;
+            p.max = p.life = (o.life || 0.6) * (0.6 + Math.random() * 0.6);
+            p.r = colour.r; p.g = colour.g; p.b = colour.b;
+            p.grav = o.grav === undefined ? -9 : o.grav;
+            p.drag = o.drag === undefined ? 1.4 : o.drag;
+        }
+    };
+
+    Scene3D.prototype._updateParticles = function (dt) {
+        const pos = this.points.geometry.attributes.position.array;
+        const col = this.points.geometry.attributes.color.array;
+        let n = 0;
+
+        for (const p of this.particles) {
+            if (p.life <= 0) continue;
+            p.life -= dt;
+            if (p.life <= 0) continue;
+            p.vy += p.grav * dt;
+            const d = Math.exp(-p.drag * dt);
+            p.vx *= d; p.vy *= d; p.vz *= d;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.z += p.vz * dt;
+
+            const k = p.life / p.max;
+            pos[n * 3] = p.x;
+            pos[n * 3 + 1] = p.y;
+            pos[n * 3 + 2] = p.z;
+            col[n * 3] = p.r * k;
+            col[n * 3 + 1] = p.g * k;
+            col[n * 3 + 2] = p.b * k;
+            n++;
+        }
+
+        this.points.geometry.setDrawRange(0, n);
+        this.points.geometry.attributes.position.needsUpdate = true;
+        this.points.geometry.attributes.color.needsUpdate = true;
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Post
+     * ------------------------------------------------------------------ */
+
+    Scene3D.prototype._initPost = function () {
+        this.target = new THREE.WebGLRenderTarget(2, 2, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat
+        });
+        // Tagged so Three encodes on the way in and the composite can pass the
+        // values straight through. See the module header.
+        this.target.texture.encoding = THREE.sRGBEncoding;
+
+        this.postScene = new THREE.Scene();
+        this.postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        this.postUniforms = {
+            tDiffuse: { value: this.target.texture },
+            uResolution: { value: new THREE.Vector2(1, 1) },
+            uTime: { value: 0 },
+            uVignette: { value: 1.15 },
+            uBloom: { value: 0.85 },
+            uScanlines: { value: 0 },
+            uFlash: { value: 0 },
+            uDanger: { value: 0 }
+        };
+
+        const quad = new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 2),
+            new THREE.ShaderMaterial({
+                uniforms: this.postUniforms,
+                vertexShader: [
+                    'varying vec2 vUv;',
+                    'void main() {',
+                    '  vUv = uv;',
+                    '  gl_Position = vec4(position.xy, 0.0, 1.0);',
+                    '}'
+                ].join('\n'),
+                fragmentShader: [
+                    'uniform sampler2D tDiffuse;',
+                    'uniform vec2 uResolution;',
+                    'uniform float uTime, uVignette, uBloom, uScanlines, uFlash, uDanger;',
+                    'varying vec2 vUv;',
+                    '',
+                    '// Bright-pass blur, done in the composite rather than as its own',
+                    '// ping-pong pair of targets. Twelve taps on a ring is plenty for a',
+                    '// lamp-lit mine and costs one pass instead of five.',
+                    'vec3 bloom(vec2 uv) {',
+                    '  vec3 sum = vec3(0.0);',
+                    '  vec2 px = 2.6 / uResolution;',
+                    '  for (int i = 0; i < 12; i++) {',
+                    '    float a = float(i) * 0.5235988;',
+                    '    vec2 o = vec2(cos(a), sin(a));',
+                    '    sum += max(texture2D(tDiffuse, uv + o * px * 2.0).rgb - 0.55, 0.0);',
+                    '    sum += max(texture2D(tDiffuse, uv + o * px * 4.5).rgb - 0.55, 0.0);',
+                    '  }',
+                    '  return sum / 24.0;',
+                    '}',
+                    '',
+                    'void main() {',
+                    '  vec2 uv = vUv;',
+                    '  vec2 c = uv - 0.5;',
+                    '',
+                    '  // A touch of lens colour separation toward the edges. Subtle',
+                    '  // enough to read as glass rather than as a broken display.',
+                    '  float ca = 0.0016 * dot(c, c) * 4.0;',
+                    '  vec3 col;',
+                    '  col.r = texture2D(tDiffuse, uv + c * ca).r;',
+                    '  col.g = texture2D(tDiffuse, uv).g;',
+                    '  col.b = texture2D(tDiffuse, uv - c * ca).b;',
+                    '',
+                    '  col += bloom(uv) * uBloom;',
+                    '',
+                    '  // The fuse running low pulls the whole picture toward the fire.',
+                    '  col = mix(col, col * vec3(1.25, 0.72, 0.62), uDanger * (0.55 + 0.45 * sin(uTime * 6.0)));',
+                    '  col += vec3(1.0, 0.86, 0.66) * uFlash;',
+                    '',
+                    '  float v = 1.0 - dot(c, c) * uVignette;',
+                    '  col *= clamp(v, 0.0, 1.0);',
+                    '',
+                    '  if (uScanlines > 0.5) {',
+                    '    float line = sin(uv.y * uResolution.y * 1.6) * 0.5 + 0.5;',
+                    '    col *= 1.0 - (1.0 - line) * 0.14;',
+                    '  }',
+                    '',
+                    '  gl_FragColor = vec4(col, 1.0);',
+                    '}'
+                ].join('\n'),
+                depthTest: false,
+                depthWrite: false
+            })
+        );
+        quad.frustumCulled = false;
+        this.postScene.add(quad);
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Rooms
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Swap in a room, sliding the old one out if we walked there.
+     *
+     * `dir` is null when the room changes without travel — starting a mine, or
+     * respawning — and then the swap is instant. Sliding on a respawn would
+     * animate a room the player never left.
+     */
+    Scene3D.prototype.setRoom = function (room, dir) {
+        const built = RoomMesh.build(room, this.palette);
+
+        if (this.oldView) {
+            R3D.dispose(this.oldView.group);
+            this.oldView = null;
+        }
+
+        const off = new THREE.Vector2(0, 0);
+        if (dir === 'right') off.x = C.COLS;
+        else if (dir === 'left') off.x = -C.COLS;
+        else if (dir === 'up') off.y = C.ROWS;
+        else if (dir === 'down') off.y = -C.ROWS;
+
+        if (dir && this.roomView) {
+            this.oldView = this.roomView;
+            built.group.position.set(off.x, off.y, 0);
+            this.offset.set(off.x, off.y);
+            this.slide = { t: 0, len: 0.34, from: new THREE.Vector2(0, 0), to: off };
+        } else {
+            if (this.roomView) R3D.dispose(this.roomView.group);
+            built.group.position.set(0, 0, 0);
+            this.offset.set(0, 0);
+            this.slide = null;
+            this.worldGroup.position.set(0, 0, 0);
+        }
+
+        this.roomView = built;
+        this.worldGroup.add(built.group);
+        this.actors.group.position.set(this.offset.x, this.offset.y, 0);
+        this.points.position.set(0, 0, 0);
+    };
+
+    Scene3D.prototype._updateSlide = function (dt) {
+        if (!this.slide) return;
+        const s = this.slide;
+        s.t = Math.min(s.len, s.t + dt);
+        const k = Util.easeInOut(s.t / s.len);
+        this.worldGroup.position.set(-s.to.x * k, -s.to.y * k, 0);
+        if (s.t >= s.len) {
+            this.slide = null;
+            if (this.oldView) { R3D.dispose(this.oldView.group); this.oldView = null; }
+            this.roomView.group.position.set(0, 0, 0);
+            this.worldGroup.position.set(0, 0, 0);
+            this.offset.set(0, 0);
+            this.actors.group.position.set(0, 0, 0);
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Events
+     * ------------------------------------------------------------------ */
+
+    Scene3D.prototype._listen = function () {
+        const bus = this.run.bus;
+        const self = this;
+
+        bus.on(EV.MINE_STARTED, function (e) {
+            self._applyPalette(e.mine.palette);
+            self.roomView = self.roomView;   // palette applies on the next build
+        });
+
+        bus.on(EV.ROOM_CHANGED, function (e) {
+            self.setRoom(e.room, e.dir);
+        });
+
+        bus.on(EV.SHAKE, function (e) {
+            self.shake = Math.max(self.shake, e.amount);
+            self.shakeT = Math.max(self.shakeT, e.seconds);
+        });
+
+        bus.on(EV.PICKUP, function (e) {
+            const colour = e.kind === 'tnt' ? '#ffb84d'
+                : e.kind === 'heart' ? '#ff7aa0'
+                : e.kind === 'oxygen' ? '#5cc8de'
+                : e.kind === 'food' ? '#8fd45a' : '#ffe07a';
+            self.burst(e.x, e.y, { count: 14, colour: colour, speed: 3.4, life: 0.5, lift: 1.5 });
+        });
+
+        bus.on(EV.PLAYER_LANDED, function (e) {
+            self.burst(e.x, e.y, {
+                count: e.hard ? 16 : 7,
+                colour: '#8b93b5',
+                speed: e.hard ? 4 : 2,
+                life: 0.35,
+                grav: -6
+            });
+            if (e.hard) { self.shake = Math.max(self.shake, 0.45); self.shakeT = Math.max(self.shakeT, 0.18); }
+        });
+
+        bus.on(EV.PLAYER_HURT, function (e) {
+            self.burst(e.x, e.y - 10, { count: 18, colour: '#ff6a5c', speed: 5, life: 0.5 });
+        });
+
+        bus.on(EV.PLAYER_DIED, function (e) {
+            self.burst(e.x, e.y - 10, { count: 40, colour: '#ff7a5c', speed: 7, life: 0.9 });
+        });
+
+        bus.on(EV.BLAST, function (e) {
+            self.burst(e.x, e.y, { count: 70, colour: '#ffd06a', speed: 11, life: 0.85, grav: -7 });
+            self.burst(e.x, e.y, { count: 30, colour: '#ff5c3a', speed: 6, life: 1.1, grav: -3 });
+            self.flash = 1;
+            self.flashX = R3D.wx(e.x) + self.offset.x;
+            self.flashY = R3D.wy(e.y) + self.offset.y;
+        });
+
+        bus.on(EV.CRUMBLE, function (e) {
+            self.burst(e.x, e.y, { count: 12, colour: '#8a6a44', speed: 2.5, life: 0.6 });
+        });
+
+        bus.on(EV.BOULDER_SMASH, function (e) {
+            self.burst(e.x, e.y, { count: 16, colour: '#7a6a58', speed: 4, life: 0.5 });
+            self.shake = Math.max(self.shake, 0.4);
+            self.shakeT = Math.max(self.shakeT, 0.15);
+        });
+
+        bus.on(EV.CRUSH_SLAM, function (e) {
+            self.shake = Math.max(self.shake, 0.3);
+            self.shakeT = Math.max(self.shakeT, 0.12);
+        });
+
+        bus.on(EV.VENT_FIRED, function (e) {
+            self.burst(e.x, e.y - 8, { count: 10, colour: '#bfe4ff', speed: 2, life: 0.5, grav: 3, drag: 2.2 });
+        });
+
+        bus.on(EV.DETONATOR_FIRED, function (e) {
+            self.flash = 1.4;
+            self.flashX = R3D.wx(e.x) + self.offset.x;
+            self.flashY = R3D.wy(e.y) + self.offset.y;
+            for (let i = 0; i < 5; i++) {
+                self.burst(e.x + (Math.random() - 0.5) * 90, e.y - Math.random() * 60,
+                           { count: 40, colour: '#ffcf6a', speed: 12, life: 1.2, grav: -6 });
+            }
+        });
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Frame
+     * ------------------------------------------------------------------ */
+
+    Scene3D.prototype.resize = function () {
+        const w = this.canvas.clientWidth || window.innerWidth;
+        const h = this.canvas.clientHeight || window.innerHeight;
+        this.renderer.setSize(w, h, false);
+
+        const ratio = this.renderer.getPixelRatio();
+        this.target.setSize(Math.floor(w * ratio), Math.floor(h * ratio));
+        this.postUniforms.uResolution.value.set(w * ratio, h * ratio);
+
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        this._frameRoom();
+    };
+
+    /**
+     * Pull the camera back far enough that the whole room is on screen.
+     *
+     * Whichever of width or height is the binding constraint wins, so the room
+     * is always fully visible — a flick-screen game where part of the screen is
+     * off screen is not one. A little headroom is added so the frame is not
+     * flush against the rock.
+     */
+    Scene3D.prototype._frameRoom = function () {
+        const vFov = THREE.MathUtils.degToRad(this.camera.fov);
+        const needH = (C.ROWS / 2 + 0.4) / Math.tan(vFov / 2);
+        const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+        const needW = (C.COLS / 2 + 0.4) / Math.tan(hFov / 2);
+        this.camDist = Math.max(needH, needW);
+    };
+
+    Scene3D.prototype.draw = function (alpha, dt) {
+        const run = this.run;
+        this.t += dt;
+
+        this._updateSlide(dt);
+        this._updateParticles(dt);
+
+        if (this.shakeT > 0) {
+            this.shakeT -= dt;
+            if (this.shakeT <= 0) this.shake = 0;
+        }
+        this.shake = Util.damp(this.shake, 0, 5, dt);
+        this.flash = Util.damp(this.flash, 0, 4.5, dt);
+
+        // Camera: fixed on the room centre, nudged by shake only.
+        const jitterX = this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 1.4 : 0;
+        const jitterY = this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 1.4 : 0;
+        this.camera.position.set(C.COLS / 2 + jitterX, C.ROWS / 2 + jitterY, this.camDist);
+        this.camera.lookAt(C.COLS / 2, C.ROWS / 2, 0);
+
+        Actors3D.sync(this.actors, run, dt);
+        this._syncLights();
+
+        if (!this.usePost) {
+            this.renderer.setRenderTarget(null);
+            this.renderer.render(this.scene, this.camera);
+            return;
+        }
+
+        this.postUniforms.uTime.value = this.t;
+        this.postUniforms.uFlash.value = Math.min(this.flash * 0.35, 0.5);
+        this.postUniforms.uDanger.value = (run.state === 'playing' && run.danger) ? 0.55 : 0;
+        this.postUniforms.uScanlines.value = this.crt ? 1 : 0;
+
+        this.renderer.setRenderTarget(this.target);
+        this.renderer.clear();
+        this.renderer.render(this.scene, this.camera);
+
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.postScene, this.postCamera);
+    };
+
+    Scene3D.prototype.toggleCrt = function () {
+        this.crt = !this.crt;
+        return this.crt;
+    };
+
+    TNT.Scene3D = Scene3D;
+})(window.TNT = window.TNT || {}, window.THREE);

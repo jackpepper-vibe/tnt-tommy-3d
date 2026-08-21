@@ -1,0 +1,28 @@
+{
+  "name": "tnt-tommy",
+  "version": "1.0.0",
+  "description": "A mine platformer with no jump button. Twelve sticks of dynamite, three seams, one burning fuse — every metre of height is a ladder, a rope or a cage.",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "shot": "node scripts/shot.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "rooms": "node scripts/dump-rooms.mjs",
+    "validate": "node scripts/validate-world.mjs",
+    "test": "node scripts/smoke.mjs && node scripts/validate-world.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jackpepper-vibe/tnt-tommy.git"
+  },
+  "keywords": ["platformer", "threejs", "webgl", "game"],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jackpepper-vibe/tnt-tommy/issues"
+  },
+  "homepage": "https://github.com/jackpepper-vibe/tnt-tommy#readme",
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

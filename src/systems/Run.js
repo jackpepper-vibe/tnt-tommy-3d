@@ -38,8 +38,14 @@
         this.state = 'title';
         this.mineIndex = 0;
         this.mine = this.mines[0];
-        this.entities = [];
-        this.roomIndex = 0;
+
+        // The title screen composites over a live room, so a run has to exist
+        // from the moment the page loads — entities built, a room selected and
+        // Tommy parked at the spawn. Leaving these empty until `startMine` was
+        // the first version, and the renderer has nothing to draw behind the
+        // title card.
+        this.entities = Entities.forMine(this.mine);
+        this.roomIndex = this.mine.spawnRoom;
 
         this.lives = C.LIVES_START;
         this.energy = C.ENERGY_MAX;
@@ -54,7 +60,8 @@
         this._spentStack = [];
         this.bombs = [];
 
-        this.checkpoint = { room: 0, x: 0, y: 0 };
+        this.checkpoint = { room: this.roomIndex, x: this.mine.spawnX, y: this.mine.spawnY };
+        this.player.placeAt(this.mine.spawnX, this.mine.spawnY);
         this._checkpointDwell = 0;
         this._timer = 0;
         this._transition = null;

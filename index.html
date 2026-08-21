@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description"
+        content="A mine platformer with no jump button. Twelve sticks of dynamite, three seams, one burning fuse — and every metre of height is a ladder, a rope or a cage.">
+    <meta name="color-scheme" content="dark">
+    <title>TNT Tommy</title>
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+
+<body data-screen="title">
+
+    <!-- The mine. Everything below composites over it. -->
+    <canvas id="world" aria-label="The mine"></canvas>
+
+    <div id="shell" class="shell">
+
+        <!-- ============================================================ -->
+        <!-- Head-up display                                              -->
+        <!-- ============================================================ -->
+        <div class="hud" id="hud">
+            <div class="hud__left">
+                <div class="fuse" id="fuse" aria-label="Fuse">
+                    <span class="fuse__label">FUSE</span>
+                    <div class="fuse__track">
+                        <div class="fuse__fill" id="fuse-fill"></div>
+                        <div class="fuse__spark"></div>
+                    </div>
+                </div>
+                <div class="lives" id="lives" aria-label="Helmets remaining"></div>
+            </div>
+
+            <div class="hud__mid">
+                <span class="mine" id="mine-name">COPPERLODE</span>
+                <span class="tnt">
+                    <i class="tnt__icon"></i>
+                    <b id="tnt-count">0</b><span class="tnt__of">/</span><b id="tnt-total">12</b>
+                    <em class="tnt__held" title="Sticks in hand, spendable on a fissure">carrying <b id="tnt-held">0</b></em>
+                </span>
+            </div>
+
+            <div class="hud__right">
+                <span class="kit" id="kit" title="Oxygen tank">O₂</span>
+                <span class="score" id="score">000000</span>
+            </div>
+        </div>
+
+        <div class="room-name" id="room-name"></div>
+        <div class="toast" id="toast"></div>
+        <div class="floats" id="floats" aria-hidden="true"></div>
+
+        <!-- ============================================================ -->
+        <!-- Title                                                        -->
+        <!-- ============================================================ -->
+        <section class="screen is-active" id="screen-title" aria-label="Title screen">
+            <div class="card">
+                <p class="card__eyebrow">There is no jump button</p>
+                <h1 class="card__title">TNT <b>Tommy</b></h1>
+                <p class="card__tagline">
+                    Twelve sticks of dynamite are scattered through nine rooms of a
+                    working mine. Collect the lot, get to the vault, and drop the
+                    plunger before your fuse burns out. Then do it twice more,
+                    deeper down, with less time.
+                </p>
+
+                <div class="guide">
+                    <div class="guide__item">
+                        <h3>Climb for it</h3>
+                        <p>Tommy cannot jump. Every metre of height is a ladder, a
+                            hanging rope or the winding cage — so a ledge with nothing
+                            leading to it is scenery, not a challenge.</p>
+                    </div>
+                    <div class="guide__item">
+                        <h3>Fall on purpose</h3>
+                        <p>Dropping is how you travel downward, and you can steer one
+                            most of the way. A storey is free. A shaft is not — but a
+                            ladder in it will slow you all the way down.</p>
+                    </div>
+                    <div class="guide__item">
+                        <h3>Spend a stick</h3>
+                        <p>Fissured rock opens to dynamite. The stick comes out of the
+                            twelve and goes back where you found it once it has gone
+                            off, so it costs you the walk, not the run.</p>
+                    </div>
+                </div>
+
+                <button class="btn" data-confirm id="start-btn">Down the shaft</button>
+                <p class="card__keys">
+                    <kbd>←</kbd><kbd>→</kbd> walk ·
+                    <kbd>↑</kbd><kbd>↓</kbd> ladders, ropes, drop through boards ·
+                    <kbd>Space</kbd> plant a stick ·
+                    <kbd>K</kbd> scanlines · <kbd>M</kbd> sound
+                </p>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Game over                                                    -->
+        <!-- ============================================================ -->
+        <section class="screen" id="screen-over" aria-label="Game over">
+            <div class="card card--end">
+                <h2 class="card__title card__title--bad">The fuse won</h2>
+                <p class="card__tagline" id="over-line"></p>
+                <dl class="stats">
+                    <div><dt>Score</dt><dd id="over-score">000000</dd></div>
+                    <div><dt>Best</dt><dd id="over-best">000000</dd></div>
+                    <div><dt>Reached</dt><dd id="over-mine">—</dd></div>
+                    <div><dt>Sticks</dt><dd id="over-tnt">0 / 12</dd></div>
+                    <div><dt>Time</dt><dd id="over-time">0:00</dd></div>
+                </dl>
+                <button class="btn" data-confirm>Go back down</button>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Victory                                                      -->
+        <!-- ============================================================ -->
+        <section class="screen" id="screen-win" aria-label="Victory">
+            <div class="card card--end">
+                <h2 class="card__title card__title--good">All three seams</h2>
+                <p class="card__tagline" id="win-line"></p>
+                <dl class="stats">
+                    <div><dt>Score</dt><dd id="win-score">000000</dd></div>
+                    <div><dt>Best</dt><dd id="win-best">000000</dd></div>
+                    <div><dt>Last seam</dt><dd id="win-mine">—</dd></div>
+                    <div><dt>Sticks</dt><dd id="win-tnt">12 / 12</dd></div>
+                    <div><dt>Time</dt><dd id="win-time">0:00</dd></div>
+                </dl>
+                <button class="btn" data-confirm>Run it again</button>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Touch controls                                               -->
+        <!-- ============================================================ -->
+        <div class="pad" id="pad" aria-hidden="true">
+            <div class="pad__dir">
+                <button class="pad__btn pad__btn--up" data-key="up">▲</button>
+                <button class="pad__btn pad__btn--left" data-key="left">◀</button>
+                <button class="pad__btn pad__btn--right" data-key="right">▶</button>
+                <button class="pad__btn pad__btn--down" data-key="down">▼</button>
+            </div>
+            <button class="pad__btn pad__btn--plant" data-key="plant">TNT</button>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- Engine. Load order matters: each layer depends only on those above -->
+    <!-- ================================================================ -->
+
+    <!-- Three.js is vendored rather than pulled from a CDN: the screenshot
+         harness loads this page over file:// with no network at all. -->
+    <script src="vendor/three.min.js"></script>
+
+    <!-- Core -->
+    <script src="src/core/Constants.js"></script>
+    <script src="src/core/Util.js"></script>
+    <script src="src/core/EventBus.js"></script>
+    <script src="src/core/Input.js"></script>
+    <script src="src/core/Loop.js"></script>
+
+    <!-- World -->
+    <script src="src/world/Tiles.js"></script>
+    <script src="src/world/Paint.js"></script>
+    <script src="src/world/Rooms.js"></script>
+    <script src="src/world/Remix.js"></script>
+    <script src="src/world/World.js"></script>
+
+    <!-- Simulation -->
+    <script src="src/entities/Entities.js"></script>
+    <script src="src/entities/Player.js"></script>
+    <script src="src/systems/Run.js"></script>
+
+    <!-- ===== 3D PRESENTATION LAYER ===== -->
+    <!-- Everything below this line reads the simulation and never writes to it. -->
+    <script src="src/r3d/R3D.js"></script>
+    <script src="src/r3d/RoomMesh.js"></script>
+    <script src="src/r3d/Actors3D.js"></script>
+    <script src="src/r3d/Scene3D.js"></script>
+
+    <!-- Shell -->
+    <script src="src/systems/Audio.js"></script>
+    <script src="src/systems/Hud.js"></script>
+    <script src="src/systems/Screens.js"></script>
+
+    <script src="src/boot.js"></script>
+</body>
+
+</html>

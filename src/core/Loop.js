@@ -29,6 +29,18 @@
         this.host = host;
         this.input = input;
         this.running = false;
+        /**
+         * Freeze the simulation without stopping the frame loop.
+         *
+         * A harness needs a deterministic state, which means the simulation
+         * must stop advancing. It is tempting to stop the whole loop for that,
+         * and it does not work: with no animation frame pending, the browser
+         * composites the canvas from whatever it likes and a capture comes back
+         * black no matter what was rendered into it. Keeping `draw` running and
+         * freezing only `update` gives both — a state that holds still and a
+         * canvas that keeps painting it.
+         */
+        this.frozen = false;
         this.accumulator = 0;
         this.lastTime = 0;
         /** Wall-clock seconds the loop has actually stepped. */
@@ -61,6 +73,13 @@
         this.lastTime = now;
         if (!(dt > 0)) dt = 0;
         if (dt > 0.25) dt = 0.25;   // a tab that was hidden hands back seconds
+
+        if (this.frozen) {
+            this.accumulator = 0;
+            this.lastSteps = 0;
+            this.host.draw(0, dt);
+            return;
+        }
 
         this.accumulator += dt;
 
