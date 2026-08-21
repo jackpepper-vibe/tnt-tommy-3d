@@ -1,0 +1,651 @@
+/**
+ * TNT Tommy — the run: game state, rules and the loop body.
+ *
+ * This is the only module that writes to everything else. The player moves
+ * itself, entities move themselves, and `Run` decides what any of it means:
+ * what you picked up, what hit you, when the room changes, when the fuse runs
+ * out. Presentation hears about all of it through the bus and never by being
+ * called directly.
+ *
+ * THE FUSE
+ * --------
+ * One bar is the energy meter and the clock at once. It drains on its own,
+ * damage takes a bite, food is the only way to put any back, and at zero you
+ * die. Carried over from the Godot build because it does something a separate
+ * timer cannot: it makes taking a hit and taking too long the *same* mistake,
+ * so there is never a safe way to stall.
+ *
+ * STATES
+ * ------
+ *   title → playing ⇄ transition
+ *              ↓ dying → playing | gameover
+ *              ↓ boom → cleared → playing (next mine) | victory
+ */
+(function (TNT) {
+    'use strict';
+
+    const { C, Util, Tiles, World, Entities, Player, EventBus } = TNT;
+    const T = C.Tile;
+    const EV = TNT.EV;
+
+    const STATES = ['title', 'playing', 'transition', 'dying', 'boom', 'cleared', 'gameover', 'victory'];
+
+    function Run() {
+        this.bus = new EventBus();
+        this.mines = World.buildAll();
+        this.player = new Player(this.bus);
+
+        this.state = 'title';
+        this.mineIndex = 0;
+        this.mine = this.mines[0];
+        this.entities = [];
+        this.roomIndex = 0;
+
+        this.lives = C.LIVES_START;
+        this.energy = C.ENERGY_MAX;
+        this.score = 0;
+        this.tntHeld = 0;
+        this.tntFound = 0;
+        this.elapsed = 0;
+        this.danger = false;
+        this.allTntAnnounced = false;
+
+        /** Sticks spent on blasts, newest last, so one can be handed back. */
+        this._spentStack = [];
+        this.bombs = [];
+
+        this.checkpoint = { room: 0, x: 0, y: 0 };
+        this._checkpointDwell = 0;
+        this._timer = 0;
+        this._transition = null;
+        this.best = loadBest();
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Flow
+     * ------------------------------------------------------------------ */
+
+    Run.prototype._setState = function (next) {
+        if (this.state === next) return;
+        if (STATES.indexOf(next) < 0) throw new Error('unknown state "' + next + '"');
+        const from = this.state;
+        this.state = next;
+        this.bus.emit(EV.STATE_CHANGED, { from: from, to: next });
+    };
+
+    Run.prototype.startRun = function () {
+        this.lives = C.LIVES_START;
+        this.score = 0;
+        this.elapsed = 0;
+        this.startMine(0);
+    };
+
+    Run.prototype.startMine = function (index) {
+        this.mineIndex = index;
+        this.mine = this.mines[index];
+        this.mine.reset();
+        this.entities = Entities.forMine(this.mine);
+
+        this.energy = C.ENERGY_MAX;
+        this.tntHeld = 0;
+        this.tntFound = 0;
+        this.danger = false;
+        this.allTntAnnounced = false;
+        this._spentStack.length = 0;
+        this.bombs.length = 0;
+
+        this.roomIndex = this.mine.spawnRoom;
+        this.checkpoint = { room: this.mine.spawnRoom, x: this.mine.spawnX, y: this.mine.spawnY };
+        this.player.reset(this.mine.spawnX, this.mine.spawnY, false);
+
+        this._setState('playing');
+        this.bus.emit(EV.MINE_STARTED, { mine: this.mine, index: index });
+        this.bus.emit(EV.ROOM_CHANGED, { room: this.room(), dir: null });
+    };
+
+    Run.prototype.room = function () {
+        return this.mine.rooms[this.roomIndex];
+    };
+
+    Run.prototype.ents = function () {
+        return this.entities[this.roomIndex];
+    };
+
+    /** Total sticks still to find in this mine. */
+    Run.prototype.tntRemaining = function () {
+        return Math.max(0, this.mine.tntTotal - this.tntFound);
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Update
+     * ------------------------------------------------------------------ */
+
+    Run.prototype.update = function (dt, input) {
+        this._timer += dt;
+
+        switch (this.state) {
+            case 'playing':
+                this._updatePlaying(dt, input);
+                break;
+            case 'transition':
+                this._transition.t += dt;
+                if (this._transition.t >= this._transition.len) {
+                    this._transition = null;
+                    this.player.active = true;
+                    this._setState('playing');
+                }
+                // Rooms keep running during a flip so a patrol is where you
+                // last saw it when the camera arrives, not reset by the pause.
+                this._updateWorld(dt);
+                break;
+            case 'dying':
+                this._timer += 0;
+                this._updateWorld(dt);
+                if (this._timer >= C.DEATH_FREEZE) this._respawn();
+                break;
+            case 'boom':
+                this._updateWorld(dt);
+                if (this._timer >= 1.5) this._afterBoom();
+                break;
+            default:
+                break;
+        }
+    };
+
+    Run.prototype._updatePlaying = function (dt, input) {
+        this.elapsed += dt;
+
+        this._burnFuse(dt);
+        if (this.state !== 'playing') return;
+
+        this._updateWorld(dt);
+
+        const room = this.room();
+        const ents = this.ents();
+
+        this.player.update(dt, room, input, ents);
+        this.player.carry();
+
+        if (input.justPressed('plant')) this._plant();
+        this._updateBombs(dt);
+
+        this._collectPickups();
+        this._checkHazards(dt);
+        if (this.state !== 'playing') return;
+
+        this._checkDetonator(input);
+        this._updateCheckpoint(dt);
+        this._checkRoomChange();
+    };
+
+    /** Entities tick even while the camera is mid-flip or Tommy is dying. */
+    Run.prototype._updateWorld = function (dt) {
+        const ents = this.ents();
+        if (ents) ents.update(dt, this.bus);
+    };
+
+    Run.prototype._burnFuse = function (dt) {
+        const rate = C.ENERGY_MAX / (C.FUSE_SECONDS * this.mine.fuseMul);
+        this.energy -= rate * dt;
+
+        if (this.player.inWater && !this.player.hasOxygen) {
+            this.energy -= C.DROWN_RATE * dt;
+        }
+
+        // Hysteresis, or the track flaps between the two either side of the
+        // threshold every time you eat.
+        if (!this.danger && this.energy < C.DANGER_BELOW) this.danger = true;
+        else if (this.danger && this.energy > C.DANGER_CLEAR) this.danger = false;
+
+        if (this.energy <= 0) {
+            this.energy = 0;
+            this._die('fuse');
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Pickups
+     * ------------------------------------------------------------------ */
+
+    Run.prototype._collectPickups = function () {
+        const ents = this.ents();
+        const pb = this.player.box();
+
+        for (const p of ents.pickups) {
+            if (p.taken) continue;
+            const b = p.box();
+            if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
+
+            p.take();
+            this.score += p.spec.score;
+
+            switch (p.kind) {
+                case 'tnt':
+                    this.tntHeld++;
+                    this.tntFound++;
+                    if (this.tntFound >= this.mine.tntTotal && !this.allTntAnnounced) {
+                        this.allTntAnnounced = true;
+                        this.bus.emit(EV.ALL_TNT, { x: p.x, y: p.y });
+                    }
+                    break;
+                case 'food':
+                    this.energy = Math.min(C.ENERGY_MAX, this.energy + C.FOOD_ENERGY);
+                    break;
+                case 'heart':
+                    this.lives = Math.min(C.LIVES_MAX, this.lives + 1);
+                    break;
+                case 'oxygen':
+                    this.player.hasOxygen = true;
+                    break;
+                default:
+                    break;
+            }
+
+            this.bus.emit(EV.PICKUP, { kind: p.kind, x: p.x, y: p.y, value: p.spec.score });
+            this._checkRoomCleared();
+        }
+    };
+
+    /** All the ore in a room is worth a bonus; the ore itself never returns. */
+    Run.prototype._checkRoomCleared = function () {
+        const ents = this.ents();
+        if (ents.oreCleared) return;
+        for (const p of ents.pickups) {
+            if (p.kind === 'ore' && !p.taken) return;
+        }
+        if (ents.room.oreCount === 0) return;
+        ents.oreCleared = true;
+        this.score += C.SCORE_ROOM_CLEAR;
+        this.bus.emit(EV.ROOM_CLEARED, { room: this.room() });
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Hazards
+     * ------------------------------------------------------------------ */
+
+    Run.prototype._checkHazards = function (dt) {
+        const p = this.player;
+        const room = this.room();
+        const ents = this.ents();
+        const pb = p.box();
+
+        // Lava is not survivable and never has been, invulnerability included:
+        // a hazard that can be tanked is not a hazard, it is a toll.
+        if (this._touchesTile(room, T.LAVA)) {
+            this._die('lava');
+            return;
+        }
+
+        if (p.invuln > 0) return;
+
+        if (this._touchesTile(room, T.SPIKE)) {
+            this._hurt(C.DMG_SPIKE, 'spike', -p.facing);
+            return;
+        }
+
+        for (const e of ents.enemies) {
+            if (e.dead) continue;
+            const b = e.box();
+            if (Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) {
+                this._hurt(e.spec.damage, e.kind, p.x < b.x ? -1 : 1);
+                return;
+            }
+        }
+
+        for (const c of ents.crushers) {
+            if (c.state !== 'slam') continue;
+            const b = c.box();
+            if (Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) {
+                this._hurt(C.DMG_CRUSH, 'crusher', p.x < b.x ? -1 : 1);
+                return;
+            }
+        }
+
+        for (const bo of ents.boulders) {
+            if (!bo.falling) continue;
+            const b = bo.box();
+            if (Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) {
+                this._hurt(C.DMG_BOULDER, 'boulder', p.x < b.x ? -1 : 1);
+                return;
+            }
+        }
+
+        for (const v of ents.vents) {
+            if (v.state !== 'blast') continue;
+            const b = v.box();
+            if (b.h > 2 && Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) {
+                this._hurt(C.DMG_VENT, 'vent', p.x < v.x ? -1 : 1);
+                p.vx += (p.x < v.x ? -1 : 1) * C.VENT_SHOVE;
+                return;
+            }
+        }
+    };
+
+    /** Any tile of `kind` overlapping the body. */
+    Run.prototype._touchesTile = function (room, kind) {
+        const p = this.player;
+        const x0 = Math.floor((p.x - C.PLAYER_W / 2 + 2) / C.TILE);
+        const x1 = Math.floor((p.x + C.PLAYER_W / 2 - 2) / C.TILE);
+        const y0 = Math.floor((p.y - C.PLAYER_H + 3) / C.TILE);
+        const y1 = Math.floor((p.y - 1) / C.TILE);
+        for (let ty = y0; ty <= y1; ty++) {
+            for (let tx = x0; tx <= x1; tx++) {
+                if (room.get(tx, ty) === kind) return true;
+            }
+        }
+        return false;
+    };
+
+    Run.prototype._hurt = function (amount, cause, knockDir) {
+        const p = this.player;
+        this.energy -= amount;
+        p.knock(knockDir);
+        this.bus.emit(EV.PLAYER_HURT, { x: p.x, y: p.y, cause: cause, amount: amount });
+        this.bus.emit(EV.SHAKE, { amount: 0.55, seconds: 0.22 });
+        if (this.energy <= 0) {
+            this.energy = 0;
+            this._die(cause);
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Dynamite
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Plant a stick.
+     *
+     * The stick comes out of the twelve you are collecting, and goes back to
+     * where you found it once it has gone off. So a blast costs a walk, not
+     * progress — which is the only way this works as a mechanic: a resource you
+     * can permanently strand yourself by spending would turn every fissure into
+     * a save-scumming decision.
+     */
+    Run.prototype._plant = function () {
+        const p = this.player;
+        if (this.tntHeld <= 0 || p.blastCooldown > 0 || !p.onGround) return;
+
+        const ents = this.ents();
+        let source = null;
+        for (let i = ents.pickups.length - 1; i >= 0; i--) {
+            const pk = ents.pickups[i];
+            if (pk.kind === 'tnt' && pk.taken) { source = pk; break; }
+        }
+        // The stick may have been found in another room; that is fine, it goes
+        // back to whichever room it came from when the bomb goes off.
+        if (!source) source = this._findTakenTntAnywhere();
+        if (!source) return;
+
+        this.tntHeld--;
+        this._spentStack.push(source);
+        p.blastCooldown = C.BLAST_COOLDOWN;
+
+        this.bombs.push({ x: p.x, y: p.y - 4, fuse: C.BLAST_FUSE, room: this.roomIndex });
+        this.bus.emit(EV.BLAST_PLANTED, { x: p.x, y: p.y });
+    };
+
+    Run.prototype._findTakenTntAnywhere = function () {
+        for (const set of this.entities) {
+            for (const pk of set.pickups) {
+                if (pk.kind === 'tnt' && pk.taken && this._spentStack.indexOf(pk) < 0) return pk;
+            }
+        }
+        return null;
+    };
+
+    Run.prototype._updateBombs = function (dt) {
+        for (let i = this.bombs.length - 1; i >= 0; i--) {
+            const b = this.bombs[i];
+            b.fuse -= dt;
+            if (b.fuse > 0) continue;
+            this.bombs.splice(i, 1);
+            this._detonate(b);
+        }
+    };
+
+    Run.prototype._detonate = function (bomb) {
+        const room = this.mine.rooms[bomb.room];
+        const ents = this.entities[bomb.room];
+
+        let broke = 0;
+        const r = Math.ceil(C.BLAST_RADIUS / C.TILE);
+        const cx = Math.floor(bomb.x / C.TILE);
+        const cy = Math.floor(bomb.y / C.TILE);
+        for (let ty = cy - r; ty <= cy + r; ty++) {
+            for (let tx = cx - r; tx <= cx + r; tx++) {
+                if (room.get(tx, ty) !== T.CRACKED) continue;
+                const dx = (tx + 0.5) * C.TILE - bomb.x;
+                const dy = (ty + 0.5) * C.TILE - bomb.y;
+                if (Math.hypot(dx, dy) > C.BLAST_RADIUS) continue;
+                room.set(tx, ty, T.EMPTY);
+                broke++;
+            }
+        }
+
+        const killed = ents.killNear(bomb.x, bomb.y, C.BLAST_KILL_R);
+        this.score += killed * C.SCORE_ENEMY;
+
+        // The spent stick goes home.
+        const source = this._spentStack.shift();
+        if (source) {
+            source.taken = false;
+            source.timer = 0;
+            this.tntFound--;
+        }
+
+        // Standing in your own blast is a hit like any other.
+        if (bomb.room === this.roomIndex && this.player.invuln <= 0) {
+            const p = this.player;
+            if (Math.hypot(p.x - bomb.x, p.centreY() - bomb.y) < C.BLAST_KILL_R) {
+                this._hurt(C.DMG_ENEMY, 'blast', p.x < bomb.x ? -1 : 1);
+            }
+        }
+
+        this.bus.emit(EV.BLAST, { x: bomb.x, y: bomb.y, broke: broke, killed: killed });
+        this.bus.emit(EV.SHAKE, { amount: 1, seconds: 0.4 });
+    };
+
+    /* ------------------------------------------------------------------ *
+     * The plunger
+     * ------------------------------------------------------------------ */
+
+    Run.prototype._checkDetonator = function (input) {
+        const ents = this.ents();
+        const det = ents.detonator;
+        if (!det) return;
+
+        const p = this.player;
+        if (Math.hypot(p.x - det.x, p.y - det.y) > 20) {
+            this._detHinted = false;
+            return;
+        }
+
+        if (this.tntFound < this.mine.tntTotal) {
+            if (!this._detHinted) {
+                this._detHinted = true;
+                this.bus.emit(EV.DETONATOR_DENIED, {
+                    x: det.x, y: det.y, needed: this.mine.tntTotal - this.tntFound
+                });
+            }
+            return;
+        }
+
+        this._setState('boom');
+        this._timer = 0;
+        p.active = false;
+        this.score += this.lives * C.SCORE_LIFE_BONUS;
+        this.score += Math.max(0, C.SCORE_TIME_BASE - Math.floor(this.elapsed) * C.SCORE_TIME_DECAY);
+        this.bus.emit(EV.DETONATOR_FIRED, { x: det.x, y: det.y });
+        this.bus.emit(EV.SHAKE, { amount: 1.4, seconds: 1.4 });
+    };
+
+    Run.prototype._afterBoom = function () {
+        if (this.mineIndex + 1 < this.mines.length) {
+            this.startMine(this.mineIndex + 1);
+        } else {
+            this._finish('victory');
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Rooms
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Leave the room by whichever edge Tommy crossed.
+     *
+     * The exit is picked from the *position*, not from which key is held: a
+     * player carried out of a doorway by a conveyor or a lift has still left the
+     * room, and asking about input here would strand them in the frame.
+     */
+    Run.prototype._checkRoomChange = function () {
+        const p = this.player;
+        let dir = null;
+        if (p.x < 0) dir = 'left';
+        else if (p.x > C.ROOM_W) dir = 'right';
+        else if (p.y < 0) dir = 'up';
+        else if (p.y > C.ROOM_H) dir = 'down';
+        if (!dir) return;
+
+        const next = this.room().neighbours[dir];
+        if (next < 0) {
+            // A sealed edge. Put him back rather than let him leave the mine.
+            p.x = Util.clamp(p.x, C.PLAYER_W, C.ROOM_W - C.PLAYER_W);
+            p.y = Util.clamp(p.y, C.PLAYER_H, C.ROOM_H - 1);
+            return;
+        }
+
+        const pos = World.transitionPos(dir, p.x, p.y);
+        this.roomIndex = next;
+        p.x = pos.x;
+        p.y = pos.y;
+        p.ridingLift = null;
+        p.fallSpeed = 0;
+
+        p.active = false;
+        this._transition = { t: 0, len: 0.34, dir: dir };
+        this._setState('transition');
+        this.bus.emit(EV.ROOM_CHANGED, { room: this.room(), dir: dir });
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Dying
+     * ------------------------------------------------------------------ */
+
+    /**
+     * A rolling checkpoint: wherever you were last standing safely.
+     *
+     * Not the room entrance. With a burning fuse, sending the player back to the
+     * door costs them the walk *and* the fuse they spent on it, which compounds
+     * a mistake into a lost run. Standing still on solid ground for a third of a
+     * second is enough to bank a position.
+     */
+    Run.prototype._updateCheckpoint = function (dt) {
+        const p = this.player;
+        const safe = p.onGround && p.mode === 'walk' && !p.inWater && !this._touchesTile(this.room(), T.SPIKE);
+        if (!safe) {
+            this._checkpointDwell = 0;
+            return;
+        }
+        this._checkpointDwell += dt;
+        if (this._checkpointDwell >= C.CHECKPOINT_DWELL) {
+            this._checkpointDwell = 0;
+            this.checkpoint = { room: this.roomIndex, x: p.x, y: p.y };
+        }
+    };
+
+    Run.prototype._die = function (cause) {
+        if (this.state !== 'playing') return;
+        const p = this.player;
+        p.alive = false;
+        p.active = false;
+        this._timer = 0;
+        this._setState('dying');
+        this.bus.emit(EV.PLAYER_DIED, { x: p.x, y: p.y, cause: cause });
+        this.bus.emit(EV.SHAKE, { amount: 0.8, seconds: 0.35 });
+    };
+
+    Run.prototype._respawn = function () {
+        this.lives--;
+        if (this.lives <= 0) {
+            this.lives = 0;
+            this._finish('gameover');
+            return;
+        }
+
+        // Rewind the room's machinery so a respawn is not immediately into the
+        // downstroke of the piston that just killed you. Pickups are pointedly
+        // left alone — rebuilding the whole room would resurrect the sticks you
+        // already banked, which turns dying into a way to farm a room.
+        this.entities[this.checkpoint.room].rewind();
+
+        this.roomIndex = this.checkpoint.room;
+        this.energy = C.ENERGY_MAX;
+        this.player.reset(this.checkpoint.x, this.checkpoint.y, true);
+        this.player.invuln = C.RESPAWN_INVULN;
+        this.bombs.length = 0;
+        this.danger = false;
+
+        this._setState('playing');
+        this.bus.emit(EV.PLAYER_RESPAWN, { x: this.player.x, y: this.player.y });
+        this.bus.emit(EV.ROOM_CHANGED, { room: this.room(), dir: null });
+    };
+
+    Run.prototype._finish = function (state) {
+        this.player.active = false;
+        this._setState(state);
+        if (this.score > this.best) {
+            this.best = this.score;
+            saveBest(this.best);
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Shell input
+     * ------------------------------------------------------------------ */
+
+    /** Enter / click, from a title or end screen. */
+    Run.prototype.confirm = function () {
+        if (this.state === 'title' || this.state === 'gameover' || this.state === 'victory') {
+            this.startRun();
+            return true;
+        }
+        return false;
+    };
+
+    Run.prototype.toTitle = function () {
+        this.player.active = false;
+        this._setState('title');
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Persistence
+     * ------------------------------------------------------------------ */
+
+    /**
+     * `localStorage` is unavailable on `file://` in some browsers and throws
+     * rather than returning null. The screenshot harness runs from `file://`, so
+     * a best score that cannot be read must not be a crash.
+     */
+    function loadBest() {
+        try {
+            const raw = window.localStorage.getItem(C.STORAGE_KEY);
+            if (!raw) return 0;
+            const data = JSON.parse(raw);
+            return Number(data.best) || 0;
+        } catch (err) {
+            return 0;
+        }
+    }
+
+    function saveBest(best) {
+        try {
+            window.localStorage.setItem(C.STORAGE_KEY, JSON.stringify({ best: best }));
+        } catch (err) {
+            /* nothing to be done, and nothing worth interrupting the run for */
+        }
+    }
+
+    Run.STATES = STATES;
+    TNT.Run = Run;
+})(window.TNT = window.TNT || {});
