@@ -2,3 +2,4 @@
 shots/
 package-lock.json
 .vercel/
+.vercel
