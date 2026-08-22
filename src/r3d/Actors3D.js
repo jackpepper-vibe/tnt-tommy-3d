@@ -517,6 +517,11 @@
             b.box(0.17, 0.34, 0.43, 0.03, 0.18, 0.04, dark, F.FRONT);
         }, solid, 12);
 
+        /** One tile of water surface, bobbed per tile by the sync pass. */
+        set.pools.wave = new Pool(set.group, function (b) {
+            b.plate(0, 0, 0, 1, 0.34, R3D.col('#ffffff'));
+        }, R3D.haloMaterial('#7fc4ff', 0.5), 24);
+
         set.pools.warp = new Pool(set.group, function (b) {
             b.plate(0, 0, 0, 1, 1, R3D.col('#ffffff'));
         }, R3D.haloMaterial('#b78bff', 0.55), 6);
@@ -651,6 +656,20 @@
         for (const l of ents.lifts) {
             const mesh = set.pools.lift.next();
             mesh.position.set(R3D.wx(l.x) + C.LIFT_W / 2, R3D.wy(l.y) - 0.17, ACTOR_Z - 0.15);
+        }
+
+        /*
+         * The water surface, one plate per column, each on its own phase.
+         *
+         * Baked into the terrain it was a flat blue rectangle — the one thing
+         * in a room that cannot survive being still. Offsetting each tile by
+         * its own column gives a travelling wave for the cost of a sine.
+         */
+        for (const cell of ents.waterTops) {
+            const wave = set.pools.wave.next();
+            const bob = Math.sin(t * 2.1 + cell.tx * 0.7) * 0.055;
+            wave.position.set(cell.tx + 0.5, C.ROWS - cell.ty - 0.06 + bob, ACTOR_Z - 0.25);
+            wave.scale.set(1, 1 + Math.sin(t * 3.3 + cell.tx * 0.9) * 0.22, 1);
         }
 
         /*

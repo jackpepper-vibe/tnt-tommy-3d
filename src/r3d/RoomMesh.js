@@ -67,7 +67,7 @@
         const rng = Util.rng(0x7A11 + room.index * 2654435761);
 
         backdrop(group, pal, rng);
-        rockRuns(room, rock, pal);
+        rockRuns(room, rock, glow, pal);
         trim(room, wood, plain, glow, pal, lights);
         decor(room, wood, rock, glow, pal, lights, rng);
 
@@ -97,7 +97,8 @@
      * Rock
      * ------------------------------------------------------------------ */
 
-    function rockRuns(room, b, pal) {
+    /** @param {R3D.Builder} g  the additive pass, for the glow in a fissure */
+    function rockRuns(room, b, g, pal) {
         const rockCols = pal.rock.map(R3D.col);
         const topCol = R3D.col(pal.rockTop);
         const mossCol = R3D.col(pal.moss);
@@ -149,14 +150,36 @@
                     }
                 }
 
-                // Fissured rock gets a visible seam, or the one tile in the mine
-                // you are supposed to blow open looks exactly like the wall.
+                /*
+                 * Fissured rock: the one tile in the mine you are supposed to
+                 * blow open, so it cannot look like the wall it is set into.
+                 *
+                 * Seam lines alone were not enough — thin dark marks on dark
+                 * rock read as texture. It now gets loose blocks half out of
+                 * the face, wide gaps between them, and a warm rim where the
+                 * light gets behind, so the whole tile reads as *unsound*
+                 * rather than as decorated stone.
+                 */
                 if (t === T.CRACKED) {
+                    const face = ROCK_Z + ROCK_D / 2;
                     for (let i = 0; i < run; i++) {
-                        b.box(tx + i + 0.5, R3D.tileY(ty), ROCK_Z + ROCK_D / 2 + 0.02,
-                              0.14, 0.86, 0.05, R3D.col('#101010'), F.FRONT);
-                        b.box(tx + i + 0.72, R3D.tileY(ty) - 0.2, ROCK_Z + ROCK_D / 2 + 0.02,
-                              0.1, 0.42, 0.05, R3D.col('#101010'), F.FRONT);
+                        const cx = tx + i + 0.5;
+                        const cy = R3D.tileY(ty);
+                        const h = Util.tileHash(tx + i, ty);
+                        // Loose blocks, sitting proud and slightly rotated by offset.
+                        for (let k = 0; k < 4; k++) {
+                            const ox = ((h >> (k * 3)) % 5 - 2) * 0.13;
+                            const oy = ((h >> (k * 3 + 2)) % 5 - 2) * 0.13;
+                            b.box(cx + ox, cy + oy, face - 0.06 + (k % 2) * 0.1,
+                                  0.34, 0.3, 0.22,
+                                  R3D.mixCol(pal.rock[1], '#000000', 0.15), F.SLAB,
+                                  R3D.col(pal.rockTop));
+                        }
+                        // The gaps between them, and light leaking through.
+                        b.box(cx, cy, face + 0.06, 0.07, 0.94, 0.05, R3D.col('#0b0b0d'), F.FRONT);
+                        b.box(cx, cy + 0.1, face + 0.06, 0.94, 0.06, 0.05, R3D.col('#0b0b0d'), F.FRONT);
+                        g.box(cx, cy, face + 0.08, 0.1, 0.9, 0.03,
+                              R3D.col('#8a4a20'), F.FRONT);
                     }
                 }
 
@@ -327,10 +350,24 @@
                     }
 
                     case T.WATER: {
-                        const surface = room.get(tx, ty - 1) !== T.WATER;
-                        g.box(x, y, TRIM_Z + 0.34, 1, 1, 0.02, R3D.mixCol(pal.water, '#000000', 0.55), F.FRONT);
-                        if (surface) {
-                            g.box(x, y + 0.44, TRIM_Z + 0.36, 1, 0.12, 0.02, waterCol, F.FRONT);
+                        /*
+                         * Body, floor caustic and a bright meniscus at the top.
+                         *
+                         * The surface tiles are handled by `Actors3D`, which
+                         * moves them — still water is the one thing that
+                         * unmistakably reads as a flat coloured rectangle, and
+                         * a sump you are supposed to be nervous about should
+                         * not look like a swatch.
+                         */
+                        const deep = R3D.mixCol(pal.water, '#000000', 0.5);
+                        g.box(x, y, TRIM_Z + 0.34, 1, 1, 0.02, deep, F.FRONT);
+                        // Light banding down the column, brighter near the top.
+                        const depth = Util.tileHash(tx, ty) % 3;
+                        g.box(x, y + 0.2 - depth * 0.12, TRIM_Z + 0.35, 1, 0.1, 0.02,
+                              R3D.mixCol(pal.water, '#ffffff', 0.18), F.FRONT);
+                        if (Tiles.isFloor(room.get(tx, ty + 1))) {
+                            g.box(x, y - 0.42, TRIM_Z + 0.35, 1, 0.14, 0.02,
+                                  R3D.mixCol(pal.water, '#ffffff', 0.3), F.FRONT);
                         }
                         break;
                     }
@@ -508,10 +545,17 @@
             const tx = rng.int(1, C.COLS - 2);
             const ty = rng.int(0, C.ROWS - 10);
             if (!isRock(room, tx, ty) || room.get(tx, ty + 1) !== T.EMPTY) continue;
-            const len = rng.range(0.4, 1.1);
+            // Cones, tip down, in a cluster — a stalactite is a spike of rock,
+            // and drawn as a box it is a stalagmite-shaped brick.
+            const len = rng.range(0.5, 1.4);
             const x = R3D.tileX(tx) + rng.range(-0.2, 0.2);
             const y = R3D.tileY(ty) - 0.5 - len / 2;
-            rock.box(x, y, R3D.BACK_Z + 0.9, 0.26, len, 0.26, R3D.col(pal.rock[2]), F.SLAB);
+            const z = R3D.BACK_Z + 1.3;
+            rock.cone(x, y, z, rng.range(0.14, 0.22), len, R3D.col(pal.rock[2]), false, 7);
+            if (rng.chance(0.6)) {
+                rock.cone(x + rng.range(-0.34, 0.34), y + 0.16, z - 0.2,
+                          rng.range(0.08, 0.14), len * 0.6, R3D.col(pal.rock[0]), false, 6);
+            }
             made++;
         }
 
@@ -574,13 +618,23 @@
             const tx = rng.int(2, C.COLS - 3);
             const ty = rng.int(0, C.ROWS - 12);
             if (!isRock(room, tx, ty) || room.get(tx, ty + 1) !== T.EMPTY) continue;
+            // Actual links, alternating their axis the way a chain hangs, and
+            // a hook at the top. A chain drawn as one long thin box is a wire.
             const len = rng.range(1.2, 3.4);
             const x = R3D.tileX(tx);
             const top = R3D.tileY(ty) - 0.5;
-            b.box(x, top - len / 2, R3D.BACK_Z + 0.75, 0.1, len, 0.1,
-                  R3D.col('#3a3a42'), F.SLAB);
-            b.box(x, top - len, R3D.BACK_Z + 0.75, 0.26, 0.22, 0.26,
-                  R3D.col('#4a4a54'), F.SLAB);
+            const z = R3D.BACK_Z + 0.75;
+            const iron = R3D.col('#454550');
+            const ironLit = R3D.col('#6a6a78');
+            const links = Math.max(3, Math.round(len / 0.19));
+            for (let k = 0; k < links; k++) {
+                const ly = top - 0.1 - k * (len / links);
+                const flat = k % 2 === 0;
+                b.cyl(x, ly, z, 0.075, 0.045, flat ? 'z' : 'x',
+                      k % 2 ? iron : ironLit, 7);
+            }
+            b.cyl(x, top - len - 0.06, z, 0.045, 0.24, 'y', iron, 6);
+            b.sphere(x, top - len - 0.2, z, 0.1, ironLit, 8, 6);
             made++;
         }
 

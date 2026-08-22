@@ -702,6 +702,8 @@
          * their positions never change, only their state does.
          */
         this.crumbleTiles = [];
+        /** Top row of every column of water, for the animated surface. */
+        this.waterTops = [];
         this.detonator = null;
         this.warps = [];
         this.flood = null;
@@ -769,6 +771,8 @@
                     this.detonator = { x: tileCentre(tx), y: ty * C.TILE + C.TILE };
                 } else if (t === T.CRUMBLE) {
                     this.crumbleTiles.push({ tx: tx, ty: ty });
+                } else if (t === T.WATER && room.get(tx, ty - 1) !== T.WATER) {
+                    this.waterTops.push({ tx: tx, ty: ty });
                 } else if (t === T.LAVA) {
                     lavaLow = Math.max(lavaLow, ty);
                     lavaHigh = Math.min(lavaHigh, ty);
