@@ -931,6 +931,63 @@
         return _dot;
     };
 
+    /**
+     * The heat coming off a lava channel: bright along the bottom edge, gone by
+     * the top, and faded out at both ends.
+     *
+     * This exists because the haze used to be an additive *box* emitted per lava
+     * tile, one and a half tiles wide on a one tile pitch. Every overlap added
+     * to itself, so a channel came out as a curtain of hard vertical stripes —
+     * the brightest thing in the room and the worst-looking. Heat has no edges,
+     * so neither does this.
+     */
+    let _haze = null;
+    R3D.hazeTexture = function () {
+        if (_haze) return _haze;
+        const w = 128, h = 128;
+        const cv = document.createElement('canvas');
+        cv.width = w;
+        cv.height = h;
+        const ctx = cv.getContext('2d');
+
+        // Vertical falloff: the surface is at the bottom of the canvas.
+        const up = ctx.createLinearGradient(0, h, 0, 0);
+        up.addColorStop(0.00, 'rgba(255,255,255,0.85)');
+        up.addColorStop(0.18, 'rgba(255,255,255,0.42)');
+        up.addColorStop(0.50, 'rgba(255,255,255,0.14)');
+        up.addColorStop(1.00, 'rgba(255,255,255,0)');
+        ctx.fillStyle = up;
+        ctx.fillRect(0, 0, w, h);
+
+        // Then taper both ends off, so a run does not stop against thin air.
+        const ends = ctx.createLinearGradient(0, 0, w, 0);
+        ends.addColorStop(0.00, 'rgba(0,0,0,0)');
+        ends.addColorStop(0.16, 'rgba(0,0,0,1)');
+        ends.addColorStop(0.84, 'rgba(0,0,0,1)');
+        ends.addColorStop(1.00, 'rgba(0,0,0,0)');
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.fillStyle = ends;
+        ctx.fillRect(0, 0, w, h);
+
+        _haze = new THREE.CanvasTexture(cv);
+        _haze.needsUpdate = true;
+        return _haze;
+    };
+
+    /** An additive plate carrying the heat falloff, tinted by `colour`. */
+    R3D.hazeMaterial = function (colour, opacity) {
+        const m = new THREE.MeshBasicMaterial({
+            color: colour,
+            map: R3D.hazeTexture(),
+            transparent: true,
+            opacity: opacity === undefined ? 1 : opacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        m.userData.shared = true;
+        return m;
+    };
+
     /** An additive sprite material carrying the soft dot, tinted by `colour`. */
     R3D.haloMaterial = function (colour, opacity) {
         const m = new THREE.MeshBasicMaterial({

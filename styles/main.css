@@ -453,6 +453,188 @@ body[data-screen="victory"] .minimap {
     text-align: center;
 }
 
+/* ==========================================================================
+   Title card — carried over from the Dynamite Dan build
+
+   The portrait beside the logo, twin sticks flanking it, a fuse burning
+   underneath, the seams named as chips, and embers drifting up past the lot.
+   ========================================================================== */
+
+#title-card {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 26px;
+    max-width: 900px;
+    padding: 22px 26px;
+    background: rgba(12, 8, 6, 0.86);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.7);
+}
+
+#tommy-hero {
+    flex: none;
+    width: 240px;
+    align-self: stretch;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--edge);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6);
+}
+
+#title-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-width: 0;
+}
+
+.logo-wrap {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.logo-tnt {
+    flex: none;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+
+#title-main h1 {
+    margin: 0;
+    font-size: clamp(1.9rem, 5vw, 3.1rem);
+    letter-spacing: 0.08em;
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 0 3px 0 #6b2f10, 0 0 30px rgba(255, 140, 60, 0.45);
+}
+
+/* The fuse under the logo, with a spark running along it. */
+.fuse-line {
+    position: relative;
+    width: 320px;
+    max-width: 100%;
+    height: 3px;
+    margin: 12px 0 6px;
+    background: linear-gradient(90deg, #6a4218, #b8823a);
+    border-radius: 2px;
+}
+
+.fuse-spark {
+    position: absolute;
+    top: -5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #ffd24a 40%, rgba(255, 140, 40, 0) 70%);
+    animation: fuse-burn 3.4s linear infinite;
+}
+
+@keyframes fuse-burn {
+    0% { left: -4px; }
+    100% { left: 312px; }
+}
+
+#tagline {
+    margin-top: 4px;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--ember);
+}
+
+#title-main p {
+    margin: 12px 0 0;
+    max-width: 42rem;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: var(--ink-dim);
+}
+
+/* The three seams, in the order you meet them. */
+.ships-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.ship-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 10px;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    color: var(--ink-dim);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+}
+
+.ship-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: none;
+    box-shadow: 0 0 8px currentColor;
+}
+
+.ship-1 .ship-dot { background: #ff8c2a; color: #ff8c2a; }
+.ship-2 .ship-dot { background: #5a8ac8; color: #5a8ac8; }
+.ship-3 .ship-dot { background: #d83a28; color: #d83a28; }
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 16px;
+    margin: 16px 0 18px;
+    font-size: 0.68rem;
+    color: var(--ink-dim);
+}
+
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend b { color: #d8b878; font-weight: normal; letter-spacing: 1px; }
+
+/* Embers drifting up past the card. */
+.ember {
+    position: absolute;
+    bottom: -12px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #ff9a3c;
+    box-shadow: 0 0 8px #ff7a2c;
+    opacity: 0;
+    animation: ember-rise linear infinite;
+    pointer-events: none;
+}
+
+@keyframes ember-rise {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    12% { opacity: 0.75; }
+    88% { opacity: 0.45; }
+    100% { transform: translateY(-102vh) translateX(26px); opacity: 0; }
+}
+
+.ember:nth-child(1) { left: 8%;  animation-duration: 8s;    animation-delay: 0s; }
+.ember:nth-child(2) { left: 22%; animation-duration: 11s;   animation-delay: 2.4s; width: 3px; height: 3px; }
+.ember:nth-child(3) { left: 37%; animation-duration: 9s;    animation-delay: 4.8s; }
+.ember:nth-child(4) { left: 52%; animation-duration: 12.5s; animation-delay: 1.2s; width: 3px; height: 3px; }
+.ember:nth-child(5) { left: 67%; animation-duration: 8.5s;  animation-delay: 3.6s; }
+.ember:nth-child(6) { left: 80%; animation-duration: 10s;   animation-delay: 0.8s; }
+.ember:nth-child(7) { left: 91%; animation-duration: 9.5s;  animation-delay: 5.5s; width: 3px; height: 3px; }
+
+/* Portrait above the text once there is no room for it beside. */
+@media (max-width: 760px) {
+    #title-card { flex-direction: column; align-items: center; gap: 12px; }
+    #tommy-hero { width: 172px; height: 150px; align-self: center; }
+}
+
 .card__eyebrow {
     margin: 0 0 0.4rem;
     color: var(--ember);

@@ -68,45 +68,73 @@
         <!-- ============================================================ -->
         <!-- Title                                                        -->
         <!-- ============================================================ -->
+        <!--
+            The title card, carried over from the Dynamite Dan build: the hero
+            portrait, twin sticks flanking the logo, a fuse burning under it,
+            the three seams named as chips, and embers drifting up the screen.
+        -->
         <section class="screen is-active" id="screen-title" aria-label="Title screen">
-            <div class="card">
-                <p class="card__eyebrow">There is no jump button</p>
-                <h1 class="card__title">TNT <b>Tommy</b></h1>
-                <p class="card__tagline">
-                    Twelve sticks of dynamite are scattered through nine rooms of a
-                    working mine. Collect the lot, get to the vault, and drop the
-                    plunger before your fuse burns out. Then do it twice more,
-                    deeper down, with less time.
-                </p>
+            <span class="ember"></span><span class="ember"></span><span class="ember"></span>
+            <span class="ember"></span><span class="ember"></span><span class="ember"></span>
+            <span class="ember"></span>
 
-                <div class="guide">
-                    <div class="guide__item">
-                        <h3>Climb for it</h3>
-                        <p>Tommy cannot jump. Every metre of height is a ladder, a
-                            hanging rope or the winding cage — so a ledge with nothing
-                            leading to it is scenery, not a challenge.</p>
+            <div id="title-card">
+                <img id="tommy-hero" src="assets/img/tommy.jpg" alt="TNT Tommy">
+
+                <div id="title-main">
+                    <div class="logo-wrap">
+                        <svg class="logo-tnt" width="40" height="56" viewBox="0 0 40 56" aria-hidden="true">
+                            <rect x="6" y="18" width="9" height="34" rx="2" fill="#b81e10"/>
+                            <rect x="6" y="18" width="3" height="34" fill="#e85040"/>
+                            <rect x="16" y="14" width="9" height="38" rx="2" fill="#d82a14"/>
+                            <rect x="16" y="14" width="3" height="38" fill="#f06050"/>
+                            <rect x="26" y="20" width="9" height="32" rx="2" fill="#b81e10"/>
+                            <rect x="6" y="32" width="29" height="7" fill="#f0e8d0"/>
+                            <path d="M21 14 Q24 8 20 4" stroke="#6a4218" stroke-width="2" fill="none"/>
+                            <circle cx="20" cy="3" r="3" fill="#ffd24a"/>
+                            <circle cx="20" cy="3" r="1.4" fill="#fff"/>
+                        </svg>
+                        <h1>TNT TOMMY</h1>
+                        <svg class="logo-tnt" width="40" height="56" viewBox="0 0 40 56"
+                             style="transform:scaleX(-1)" aria-hidden="true">
+                            <rect x="6" y="18" width="9" height="34" rx="2" fill="#b81e10"/>
+                            <rect x="6" y="18" width="3" height="34" fill="#e85040"/>
+                            <rect x="16" y="14" width="9" height="38" rx="2" fill="#d82a14"/>
+                            <rect x="16" y="14" width="3" height="38" fill="#f06050"/>
+                            <rect x="26" y="20" width="9" height="32" rx="2" fill="#b81e10"/>
+                            <rect x="6" y="32" width="29" height="7" fill="#f0e8d0"/>
+                            <path d="M21 14 Q24 8 20 4" stroke="#6a4218" stroke-width="2" fill="none"/>
+                            <circle cx="20" cy="3" r="3" fill="#ffd24a"/>
+                            <circle cx="20" cy="3" r="1.4" fill="#fff"/>
+                        </svg>
                     </div>
-                    <div class="guide__item">
-                        <h3>Fall on purpose</h3>
-                        <p>Dropping is how you travel downward, and you can steer one
-                            most of the way. A storey is free. A shaft is not — but a
-                            ladder in it will slow you all the way down.</p>
+
+                    <div class="fuse-line"><div class="fuse-spark"></div></div>
+                    <div id="tagline">BRING DOWN ALL THREE SEAMS</div>
+
+                    <p>Twelve sticks of dynamite are scattered through nine rooms of a
+                       working mine. Collect the lot, reach the vault, and drop the
+                       plunger — then run, because lifting the last stick starts the
+                       seam coming down. Food keeps your fuse alight; the faster you
+                       are, the more of it you keep.</p>
+
+                    <div class="ships-row">
+                        <span class="ship-chip ship-1"><span class="ship-dot"></span>COPPERLODE</span>
+                        <span class="ship-chip ship-2"><span class="ship-dot"></span>BLACKDAMP</span>
+                        <span class="ship-chip ship-3"><span class="ship-dot"></span>CINDERDEEP</span>
                     </div>
-                    <div class="guide__item">
-                        <h3>Spend a stick</h3>
-                        <p>Fissured rock opens to dynamite. The stick comes out of the
-                            twelve and goes back where you found it once it has gone
-                            off, so it costs you the walk, not the run.</p>
+
+                    <div class="legend">
+                        <span><kbd>&larr;</kbd><kbd>&rarr;</kbd> <b>MOVE</b></span>
+                        <span><kbd>SPACE</kbd> <b>JUMP</b></span>
+                        <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> <b>CLIMB</b></span>
+                        <span><kbd>X</kbd> <b>BLAST</b></span>
+                        <span><kbd>K</kbd> <b>SCANLINES</b></span>
+                        <span><kbd>M</kbd> <b>SOUND</b></span>
                     </div>
+
+                    <button class="btn" data-confirm id="start-btn">&#9656; DOWN THE SHAFT</button>
                 </div>
-
-                <button class="btn" data-confirm id="start-btn">Down the shaft</button>
-                <p class="card__keys">
-                    <kbd>←</kbd><kbd>→</kbd> walk ·
-                    <kbd>↑</kbd><kbd>↓</kbd> ladders, ropes, drop through boards ·
-                    <kbd>Space</kbd> plant a stick ·
-                    <kbd>K</kbd> scanlines · <kbd>M</kbd> sound
-                </p>
             </div>
         </section>
 

@@ -90,6 +90,8 @@
         const helmet = R3D.col('#ffc233');
         const helmetLight = R3D.col('#ffe08a');
         const strap = R3D.col('#8a6a3a');
+        const hair = R3D.col('#c4441c');
+        const hairLit = R3D.col('#e86a2c');
 
         /*
          * AUTHORED IN PROFILE, FACING +X.
@@ -128,9 +130,19 @@
         head.position.y = 0.70;
         head.add(part(function (b) {
             b.box(0.01, 0.02, 0, 0.34, 0.36, 0.34, skin);
-            // Nose and moustache at the front — the profile's whole read.
+            // Nose at the front — the profile's whole read — and a red
+            // moustache to match the hair below the helmet.
             b.box(0.19, 0.00, 0, 0.10, 0.10, 0.11, skin);
-            b.box(0.17, -0.09, 0, 0.13, 0.06, 0.16, R3D.col('#6b4a28'));
+            b.box(0.17, -0.09, 0, 0.13, 0.06, 0.16, hair);
+            // Red hair: sideburns, a fringe under the brim, and a tuft at the
+            // nape. It has to sit *below* the helmet or none of it is seen.
+            b.box(-0.16, 0.04, 0, 0.09, 0.24, 0.33, hair);
+            b.box(-0.06, 0.12, 0, 0.30, 0.13, 0.36, hair);
+            b.box(0.13, 0.10, 0, 0.15, 0.10, 0.30, hairLit);
+            for (const sz of [1, -1]) {
+                b.box(0.02, 0.03, sz * 0.16, 0.22, 0.16, 0.05, hair);
+            }
+            b.cone(-0.22, 0.02, 0, 0.08, 0.18, hairLit, false, 5);
             // Helmet: dome, with the brim jutting forward over the face.
             b.box(0.01, 0.26, 0, 0.40, 0.20, 0.42, helmet, F.ALL, helmetLight);
             b.box(0.01, 0.36, 0, 0.28, 0.10, 0.32, helmetLight, F.ALL, helmetLight);
@@ -462,6 +474,73 @@
             b.sphere(0.04, -0.20, -0.14, 0.12, R3D.col('#493d31'), 8, 6);
         },
 
+        /**
+         * The tram: a flat-bed truck on flanged wheels.
+         *
+         * Split from the cage, which it used to share a rig with — so the thing
+         * ferrying you over a lava channel was drawn as a roofed cage on a
+         * rope, hanging from nothing, sliding along the floor. A horizontal
+         * lift and a vertical one are different machines and have to look it:
+         * this one has wheels and a low side, and nothing above waist height so
+         * it never hides what you are jumping onto.
+         */
+        tram: function (b) {
+            const w = C.LIFT_W;
+
+            /*
+             * Dark iron, and it has to stay dark. The first pass used a mid
+             * grey-brown with a pale highlight on every large face, which over a
+             * lava channel — the brightest background in the game — read as a
+             * white bathtub. The highlight is now a thin edge only, and what
+             * lifts the underside is a warm bounce from the melt below rather
+             * than a lighter base colour.
+             */
+            const iron = R3D.col('#2a2420');
+            const ironLit = R3D.col('#453b33');
+            const edge = R3D.col('#6d5c4c');
+            const heat = R3D.col('#a8431a');
+            const wheel = R3D.col('#1c1917');
+
+            // Deck. Boarded rather than one plate, so the top face — the
+            // largest thing on it, and the one facing the camera — is not a
+            // single flat panel catching the light.
+            b.box(0, 0, 0, w, 0.2, 0.9, iron, F.ALL, ironLit);
+            const boards = 5;
+            const bw = (w - 0.36) / boards;
+            for (let i = 0; i < boards; i++) {
+                b.box(-w / 2 + 0.18 + bw * (i + 0.5), 0.11, 0, bw - 0.05, 0.03, 0.74,
+                      ironLit, F.SLAB);
+            }
+            // The underside takes a bounce off whatever it is crossing.
+            b.box(0, -0.11, 0.08, w - 0.14, 0.05, 0.62, heat, F.SLAB);
+
+            // Lips front and back, low enough to see over.
+            b.box(0, 0.12, 0.42, w, 0.12, 0.07, ironLit, F.ALL, edge);
+            b.box(0, 0.12, -0.42, w, 0.12, 0.07, iron, F.ALL, ironLit);
+            // Side plates with rivets, capped by a thin worn edge.
+            for (const sx of [-1, 1]) {
+                b.box(sx * (w / 2 - 0.06), 0.1, 0, 0.12, 0.18, 0.86, iron, F.ALL, ironLit);
+                b.box(sx * (w / 2 - 0.06), 0.2, 0, 0.13, 0.025, 0.86, edge, F.SLAB);
+                for (let i = 0; i < 3; i++) {
+                    b.sphere(sx * (w / 2 - 0.02), 0.11, -0.28 + i * 0.28, 0.032, edge, 6, 5);
+                }
+            }
+            // Wheels, flanged, on stub axles.
+            for (const sx of [-1, 1]) {
+                for (const sz of [-1, 1]) {
+                    const wx = sx * (w / 2 - 0.5);
+                    const wz = sz * 0.36;
+                    b.cyl(wx, -0.17, wz, 0.18, 0.1, 'z', wheel, 12, R3D.col('#342e29'));
+                    b.cyl(wx, -0.17, wz, 0.21, 0.03, 'z', ironLit, 12);
+                    b.cyl(wx, -0.17, 0, 0.05, 0.72, 'z', R3D.col('#241f1c'), 6);
+                }
+            }
+            // Coupling hooks at each end.
+            for (const sx of [-1, 1]) {
+                b.cyl(sx * (w / 2 + 0.08), -0.02, 0, 0.05, 0.2, 'x', ironLit, 6);
+            }
+        },
+
         /** The winding cage: a floor, four corner posts and a hanging rope. */
         lift: function (b) {
             const w = C.LIFT_W;
@@ -646,6 +725,14 @@
             b.plate(0, 0, 0, 1, 0.34, R3D.col('#ffffff'));
         }, R3D.haloMaterial('#7fc4ff', 0.5), 24);
 
+        /** One tile of molten surface, and a bubble rising out of it. */
+        set.pools.molten = new Pool(set.group, function (b) {
+            b.plate(0, 0, 0, 1, 0.4, R3D.col('#ffffff'));
+        }, R3D.haloMaterial('#ff9a3c', 0.8), 40);
+        set.pools.bubble = new Pool(set.group, function (b) {
+            b.sphere(0, 0, 0, 0.5, R3D.col('#ffd27a'), 8, 6);
+        }, R3D.glowMaterial(0.85), 20);
+
         set.pools.warp = new Pool(set.group, function (b) {
             b.plate(0, 0, 0, 1, 1, R3D.col('#ffffff'));
         }, R3D.haloMaterial('#b78bff', 0.55), 6);
@@ -806,8 +893,14 @@
             tint(mesh, v.state === 'blast' ? '#dff2ff' : '#7fa8c0', 0.75);
         }
         for (const l of ents.lifts) {
-            const mesh = set.pools.lift.next();
+            // A tram and a cage are different machines — see the `tram` rig.
+            const mesh = set.pools[l.axis === 'h' ? 'tram' : 'lift'].next();
             mesh.position.set(R3D.wx(l.x) + C.LIFT_W / 2, R3D.wy(l.y) - 0.17, ACTOR_Z - 0.15);
+            if (l.axis === 'h') {
+                // Wheels turn with the distance travelled.
+                mesh.rotation.z = 0;
+                mesh.position.y += Math.sin(t * 9 + l.x * 0.2) * 0.012;   // track judder
+            }
         }
 
         /*
@@ -822,6 +915,35 @@
             const bob = Math.sin(t * 2.1 + cell.tx * 0.7) * 0.055;
             wave.position.set(cell.tx + 0.5, C.ROWS - cell.ty - 0.06 + bob, ACTOR_Z - 0.25);
             wave.scale.set(1, 1 + Math.sin(t * 3.3 + cell.tx * 0.9) * 0.22, 1);
+        }
+
+        /*
+         * The molten surface: a bright band that swells and slides, with
+         * bubbles welling up through it.
+         *
+         * Baked geometry gave lava a straight edge, and a straight edge is the
+         * one thing molten rock never has. Two sines out of phase per tile is
+         * enough to keep the line moving, and a bubble every few tiles is what
+         * makes it read as liquid rather than as a glowing stripe.
+         */
+        for (let i = 0; i < ents.lavaTops.length; i++) {
+            const cell = ents.lavaTops[i];
+            const bx = cell.tx + 0.5;
+            const by = C.ROWS - cell.ty - 0.56;
+            const phase = cell.tx * 0.8;
+
+            const skin = set.pools.molten.next();
+            skin.position.set(bx, by + Math.sin(t * 1.7 + phase) * 0.05, ACTOR_Z - 0.22);
+            skin.scale.set(1, 0.8 + Math.sin(t * 2.9 + phase) * 0.34, 1);
+
+            // A bubble on every third tile, on its own slow cycle.
+            if (cell.tx % 3 === 0) {
+                const k = (t * 0.5 + cell.tx * 0.37) % 1;
+                const bub = set.pools.bubble.next();
+                const s = Math.sin(k * Math.PI) * 0.22;
+                bub.position.set(bx + Math.sin(phase) * 0.2, by + k * 0.5, ACTOR_Z - 0.2);
+                bub.scale.setScalar(Math.max(0.01, s));
+            }
         }
 
         /*

@@ -85,6 +85,8 @@
         add(wood, 'timber', 'timber');
         add(plain, 'fittings', null);
 
+        heatHaze(room, group, pal);
+
         if (!shade.isEmpty()) {
             // Contact shadows: multiplied down onto whatever is behind them,
             // so they darken the backdrop rather than adding a grey rectangle
@@ -110,6 +112,50 @@
 
         return { group: group, lights: lights };
     };
+
+    /* ------------------------------------------------------------------ *
+     * Heat
+     * ------------------------------------------------------------------ */
+
+    /**
+     * The air over a lava channel, as one soft plate per horizontal run.
+     *
+     * Emitted per *run* and not per tile on purpose. Per tile it was an additive
+     * quad wider than the tile it belonged to, so neighbours overlapped and the
+     * overlaps added — a channel came out banded like a barcode. One plate over
+     * the whole run, carrying a falloff that reaches zero at every edge, has no
+     * seams in it at all.
+     */
+    function heatHaze(room, group, pal) {
+        const tint = R3D.mixCol(pal.lava, '#ffb45a', 0.35);
+
+        for (let ty = 0; ty < C.ROWS; ty++) {
+            let tx = 0;
+            while (tx < C.COLS) {
+                if (room.get(tx, ty) !== T.LAVA) { tx++; continue; }
+
+                // A run of lava, and only its *exposed* top edge gives off heat.
+                const start = tx;
+                let run = 0;
+                while (tx + run < C.COLS && room.get(tx + run, ty) === T.LAVA) run++;
+                tx = start + run;
+                if (room.get(start, ty - 1) === T.LAVA) continue;
+
+                const width = run + 2.2;
+                const height = 3.4;
+                const geo = new THREE.PlaneGeometry(width, height);
+                const mesh = new THREE.Mesh(geo, R3D.hazeMaterial(tint, 0.5));
+                mesh.position.set(
+                    start + run / 2,
+                    R3D.tileY(ty) + 0.5 + height / 2,
+                    TRIM_Z + 0.4
+                );
+                mesh.name = 'heat';
+                mesh.renderOrder = 3;
+                group.add(mesh);
+            }
+        }
+    }
 
     /* ------------------------------------------------------------------ *
      * Rock
@@ -432,24 +478,125 @@
 
                     case T.LAVA: {
                         /*
-                         * Three layers, brightest last: a dark crust, the molten
-                         * body, and a near-white line at the surface. Lava is
-                         * the loudest thing in these rooms and it has to be — a
-                         * single flat band read as an orange stripe, and a
-                         * player has to know instantly that this one is not a
-                         * hazard they can take a hit from.
+                         * BRIGHT MELT, DARK ISLANDS.
+                         *
+                         * The two previous attempts both got the values the
+                         * wrong way round: a dark crust covering the tile with
+                         * thin bright veins scratched into it. Photograph a lava
+                         * channel and the opposite is true — the melt is the
+                         * brightest thing in frame by a long way, near white
+                         * where it is thinnest, and the *crust* is the dark
+                         * part: broken plates floating on top with a white-hot
+                         * rim where they are being pulled apart.
+                         *
+                         * So the melt goes on the additive pass, where lighting
+                         * cannot dim it, and the crust goes on the lit pass on
+                         * top of it. Hash the plate positions off the tile so a
+                         * long channel does not repeat.
                          */
-                        p.box(x, y + 0.15, TRIM_Z, 1, 0.7, TRIM_D, R3D.col('#3d1108'), F.SLAB);
-                        g.box(x, y + 0.16, TRIM_Z + 0.30, 1, 0.66, 0.03,
-                              R3D.mixCol(pal.lava, '#000000', 0.45), F.FRONT);
-                        g.box(x, y + 0.40, TRIM_Z + 0.32, 1, 0.26, 0.03, lavaCol, F.FRONT);
-                        g.box(x, y + 0.47, TRIM_Z + 0.34, 1, 0.10, 0.03,
-                              R3D.col('#fff0b0'), F.FRONT);
-                        // The heat haze above it.
-                        g.box(x, y + 0.85, TRIM_Z + 0.28, 1.4, 0.9, 0.02,
-                              R3D.mixCol(pal.lava, '#000000', 0.78), F.FRONT);
-                        if (tx % 3 === 0) {
-                            lights.push({ x: x, y: y + 0.5, colour: pal.lava, energy: 1.5, range: 13, flicker: 0.35 });
+                        const lh = Util.tileHash(tx, ty);
+                        /** Hashed digit `n` wide, taken from bit `s` up. */
+                        const bit = function (s, n) { return (lh >>> s) % n; };
+
+                        const melt = pal.lava;
+                        /*
+                         * Near black, and lower than looks right in isolation.
+                         * The crust sits directly in front of a point light with
+                         * the room's largest energy, so anything mid-toned here
+                         * washes straight out to orange and the plates stop
+                         * reading as cooled rock at all.
+                         */
+                        const crust = R3D.col('#180804');
+                        const crustLit = R3D.col('#22100a');
+                        const hot = R3D.mixCol(melt, '#fff2c8', 0.3);
+                        const covered = room.get(tx, ty - 1) === T.LAVA;
+
+                        /*
+                         * THE SILHOUETTE IS THE WHOLE JOB.
+                         *
+                         * The last pass got the colour right and still looked
+                         * wrong, because every tile filled to exactly the same
+                         * height: a long channel was a poured orange rectangle
+                         * with a dead-straight line of crust dashes along the
+                         * top, like hazard tape. Molten rock has no straight
+                         * edge anywhere on it.
+                         *
+                         * So the fill height is hashed per *half tile*. The
+                         * neighbours hash differently, so a run comes out as a
+                         * stepped, uneven skyline with no rhythm to it — which
+                         * is what makes it read as liquid rather than as a
+                         * painted block.
+                         */
+                        const lip = [
+                            covered ? 0.5 : 0.5 - bit(0, 4) * 0.05,
+                            covered ? 0.5 : 0.5 - bit(5, 4) * 0.05
+                        ];
+
+                        // Channel wall, seen behind and below the melt.
+                        p.box(x, y - 0.15, TRIM_Z - 0.1, 1, 0.7, TRIM_D, crust, F.SLAB);
+
+                        for (let k = 0; k < 2; k++) {
+                            const hx = x - 0.25 + k * 0.5;
+                            const top = y + lip[k];
+                            const depth = top - (y - 0.5);
+
+                            // Body, then a hotter zone near the surface, then a
+                            // near-white lip where it is thinnest.
+                            g.box(hx, top - depth / 2, TRIM_Z + 0.3, 0.5, depth, 0.03,
+                                  R3D.mixCol(melt, '#000000', 0.5), F.FRONT);
+                            if (!covered) {
+                                g.box(hx, top - 0.13, TRIM_Z + 0.31, 0.5, 0.26, 0.03,
+                                      R3D.mixCol(melt, '#000000', 0.14), F.FRONT);
+                                g.box(hx, top - 0.03, TRIM_Z + 0.32, 0.5, 0.07, 0.03, hot, F.FRONT);
+                            }
+                        }
+
+                        /*
+                         * A plate of cooled crust on roughly half the tiles.
+                         * Skipping tiles matters as much as varying them: two
+                         * plates on every tile was a repeating dash however the
+                         * widths were hashed.
+                         */
+                        if (!covered && bit(9, 4) > 0) {
+                            const side = bit(11, 2);
+                            const pw = 0.3 + bit(13, 3) * 0.09;
+                            const px = x - 0.22 + side * 0.44;
+                            const ph = 0.13 + bit(16, 3) * 0.045;
+                            const top = y + lip[side] + 0.04;
+                            /*
+                             * Shallow in z and unlightened on top. Deeper plates
+                             * showed a large top face, and a top face this close
+                             * to the channel light washes out to the same orange
+                             * as the melt — so the plates came out bright side
+                             * up and dark side on, the exact inverse of a cooled
+                             * raft floating on molten rock. In front of the melt
+                             * as well, so the surface bands cannot paint over
+                             * them.
+                             */
+                            p.box(px, top - ph / 2, TRIM_Z + 0.3, pw, ph, TRIM_D * 0.42,
+                                  crust, F.SLAB, crustLit);
+                            // Pulled apart along its underside.
+                            g.box(px, top - ph, TRIM_Z + 0.46, pw + 0.07, 0.04, 0.03, hot, F.FRONT);
+                        }
+
+                        // A crack running down into the body of it.
+                        if (bit(19, 3) === 0) {
+                            g.box(x + (bit(21, 5) - 2) * 0.16, y - 0.1, TRIM_Z + 0.34,
+                                  0.05, 0.5, 0.03, R3D.mixCol(melt, '#fff2c8', 0.3), F.FRONT);
+                        }
+
+                        /*
+                         * One light every few tiles, staggered off the hash and
+                         * sunk below the surface. Evenly spaced lights sitting
+                         * on the surface pooled on the channel wall behind, and
+                         * a row of identical glowing ovals at a fixed pitch
+                         * reads as a line of lamps under the melt.
+                         */
+                        if (!covered && (tx + bit(24, 3)) % 4 === 0) {
+                            lights.push({
+                                x: x, y: y - 0.1, colour: pal.lava,
+                                energy: 1.5, range: 13, flicker: 0.4
+                            });
                         }
                         break;
                     }

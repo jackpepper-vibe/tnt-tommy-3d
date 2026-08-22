@@ -704,6 +704,8 @@
         this.crumbleTiles = [];
         /** Top row of every column of water, for the animated surface. */
         this.waterTops = [];
+        /** ...and of lava, which needs it more. */
+        this.lavaTops = [];
         this.detonator = null;
         this.warps = [];
         this.flood = null;
@@ -776,6 +778,10 @@
                 } else if (t === T.LAVA) {
                     lavaLow = Math.max(lavaLow, ty);
                     lavaHigh = Math.min(lavaHigh, ty);
+                    // Exposed lava gets a moving surface drawn over it.
+                    if (room.get(tx, ty - 1) !== T.LAVA) {
+                        this.lavaTops.push({ tx: tx, ty: ty });
+                    }
                 }
             }
         }
