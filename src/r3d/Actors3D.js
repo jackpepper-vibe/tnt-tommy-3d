@@ -256,13 +256,42 @@
          * Positive Z swings a limb *backward*, so the near and far pairs take
          * opposite signs and cross at the middle of the cycle.
          */
+        // Only the climb uses the X axis; everything else is a profile pose and
+        // must not inherit a lift left over from the last rung.
+        u.armL.rotation.x = u.armR.rotation.x = 0;
+        u.legL.rotation.x = u.legR.rotation.x = 0;
+        u.body.rotation.x = u.head.rotation.x = 0;
+
         if (pose === 'climb') {
-            // Reaching up the rungs, one hand over the other.
-            u.armL.rotation.z = 2.4 + swing * 0.5;
-            u.armR.rotation.z = 2.4 - swing * 0.5;
-            u.legL.rotation.z = -0.25 + swing * 0.5;
-            u.legR.rotation.z = -0.25 - swing * 0.5;
-            u.head.rotation.z = -0.12;
+            /*
+             * SEEN FROM BEHIND, SO THE SWINGS MOVE TO X.
+             *
+             * A climber faces the ladder, so the profile that serves every other
+             * stance is the one view that makes no sense here — in profile he
+             * hangs off the rungs sideways. The turn is handled by the `face`
+             * scalar below; what changes here is the axis.
+             *
+             * Once he is turned a quarter turn, the rig's local Z points across
+             * the screen and its local X points into it. Limb swings about Z
+             * therefore go straight into the screen and vanish, and the whole
+             * climb reads as a man standing still. About X they swing across the
+             * screen, where they can be seen.
+             *
+             * The near/far split becomes left/right at the same time, which is
+             * what puts both hands on the ladder either side of his head.
+             */
+            const liftN = Math.PI - 0.28 + swing * 0.2;
+            const liftF = Math.PI - 0.28 - swing * 0.2;
+            u.armL.rotation.x = liftN;         // near arm — screen right
+            u.armR.rotation.x = -liftF;        // far arm  — screen left
+            u.legL.rotation.x = -0.15 - swing * 0.22;
+            u.legR.rotation.x = 0.15 - swing * 0.22;
+            // Weight shifting from one foot to the other as he goes up.
+            u.body.rotation.x = swing * 0.07;
+            u.head.rotation.x = swing * 0.05;
+            u.armL.rotation.z = u.armR.rotation.z = 0;
+            u.legL.rotation.z = u.legR.rotation.z = 0;
+            u.head.rotation.z = 0;
         } else if (pose === 'rope') {
             // Hanging by both hands, legs loose beneath.
             u.armL.rotation.z = 2.85;
@@ -306,13 +335,19 @@
          * input, and the real `dt` is used so it does not vary with framerate.
          */
         /*
-         * He stays in profile at all times, including on a ladder. The rig is
-         * authored facing +X, so this flips him between facing right and facing
-         * left rather than toward and away from the camera.
+         * Profile everywhere except a ladder, where you see his back.
+         *
+         * The scalar already does this for free. It maps -1 and +1 to the two
+         * profiles, and the angle it feeds is `(1 - face) * PI/2` — so **zero**
+         * lands exactly on a quarter turn, which is his back to the camera.
+         * Damping toward 0 while climbing therefore turns him to the ladder
+         * through the same path, at the same rate, with no second scalar and no
+         * risk of a rotation resolving the long way round.
          */
         const u2 = g.userData;
         if (u2.face === undefined) u2.face = 1;
-        u2.face = Util.damp(u2.face, player.facing >= 0 ? 1 : -1, 30, dt || 1 / 60);
+        const facing = pose === 'climb' ? 0 : (player.facing >= 0 ? 1 : -1);
+        u2.face = Util.damp(u2.face, facing, 30, dt || 1 / 60);
         g.rotation.y = (1 - u2.face) * 0.5 * Math.PI;
 
         // A run leans into its direction; a stop straightens up. In profile
