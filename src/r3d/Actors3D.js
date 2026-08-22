@@ -23,6 +23,23 @@
     const ACTOR_Z = 0.45;
     /** Tommy is drawn a shade larger than his collision box. See `buildTommy`. */
     const TOMMY_SCALE = 1.12;
+
+    /**
+     * How far below the rig's origin his boots actually are.
+     *
+     * The rig is authored around the hips — the leg groups hang at y 0.14 and
+     * the boot sits 0.44 below that — so its lowest point is 0.30 *under* the
+     * origin. `player.y` is the sole of his foot, so placing the origin there
+     * buried him nearly a third of a tile into whatever he was standing on,
+     * which is why he looked like he was wading through the platform rather
+     * than standing on it.
+     *
+     * Corrected at placement rather than by shifting a dozen numbers through
+     * the rig, which would have to be kept in step every time a limb moves.
+     * Scaled, because the group's scale applies to its children and not to its
+     * own position.
+     */
+    const TOMMY_FOOT = 0.30;
     const Actors3D = {};
 
     /** One merged mesh from a builder callback, with a shared material. */
@@ -673,7 +690,13 @@
         for (const k in set.pools) set.pools[k].begin();
 
         // Tommy.
-        set.tommy.position.set(R3D.wx(player.x), R3D.wy(player.y), ACTOR_Z);
+        // `player.y` is the sole of his foot; the rig hangs 0.30 below its own
+        // origin. See `TOMMY_FOOT`.
+        set.tommy.position.set(
+            R3D.wx(player.x),
+            R3D.wy(player.y) + TOMMY_FOOT * TOMMY_SCALE,
+            ACTOR_Z
+        );
         poseTommy(set.tommy, player, t, dt);
         if (run.state === 'title') set.tommy.visible = false;
 
