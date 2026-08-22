@@ -138,7 +138,7 @@
      * and "on a rope" are two of the four things you spend the game doing, and
      * if they look like standing the player cannot tell what they are holding.
      */
-    function poseTommy(g, player, t) {
+    function poseTommy(g, player, t, dt) {
         const u = g.userData;
         const pose = player.pose();
         const speed = Math.abs(player.vx);
@@ -151,10 +151,29 @@
         const k = TOMMY_SCALE;
         g.scale.set(k * (1 + sq * 0.3), k * (1 - sq * 0.28), k * (1 + sq * 0.15));
 
+        /*
+         * The stride is driven by *distance covered*, not by wall time.
+         *
+         * Running the cycle off `t` means the legs move at a fixed rate however
+         * fast he is going, so he moonwalks when slow and skates when fast.
+         * Advancing the phase by `vx · dt` locks the feet to the ground, which
+         * is most of what makes a walk read as walking.
+         */
+        const step = dt || 1 / 60;
+        if (u.stride === undefined) u.stride = 0;
+        if (pose === 'run') u.stride += Math.abs(player.vx) * step * 0.085;
+        else if (pose === 'climb') u.stride += Math.abs(player.vy) * step * 0.10;
+        else if (pose === 'rope') u.stride += Math.abs(player.vx) * step * 0.08;
+
         let swing = 0;
-        if (pose === 'run') swing = Math.sin(t * 13) * Util.clamp(speed / C.MOVE_MAX, 0, 1) * 0.9;
-        else if (pose === 'climb') swing = Math.sin(t * 8) * 0.55;
-        else if (pose === 'rope') swing = Math.sin(t * 6) * 0.4;
+        if (pose === 'run') swing = Math.sin(u.stride) * Util.clamp(speed / C.MOVE_MAX, 0.35, 1) * 1.05;
+        else if (pose === 'climb') swing = Math.sin(u.stride) * 0.6;
+        else if (pose === 'rope') swing = Math.sin(u.stride) * 0.45;
+
+        // A stride bobs the body: twice a cycle, once per footfall.
+        const bob = pose === 'run' ? Math.abs(Math.sin(u.stride)) * 0.045 : 0;
+        u.body.position.y = bob;
+        u.head.position.y = 0.70 + bob;
 
         if (pose === 'climb') {
             // Facing the ladder, hands above the head.
@@ -191,11 +210,34 @@
             u.head.rotation.x = 0;
         }
 
-        // Turning: the whole rig yaws, except on a ladder where he faces in.
-        if (pose !== 'climb') {
-            const want = player.facing >= 0 ? 0 : Math.PI;
-            g.rotation.y = Util.damp(g.rotation.y, want, 22, 1 / 60);
-        }
+        /*
+         * Turning.
+         *
+         * Damped as a **scalar** from -1 to 1 and only then converted to an
+         * angle, rather than damping the angle itself. Damping the angle meant
+         * every turn interpolated between 0 and PI, so a flip while the
+         * previous one was still settling could resolve the long way round and
+         * spin him through his own back — which is what "he turns backwards
+         * sometimes" was. A scalar cannot wrap, so it cannot pick a direction.
+         *
+         * Fast, too: an eighth of a second, not a lazy swing. In a game about
+         * changing direction on a narrow plank the turn has to keep up with the
+         * input, and the real `dt` is used so it does not vary with framerate.
+         */
+        const u2 = g.userData;
+        if (u2.face === undefined) u2.face = 1;
+        // On a ladder he faces the rungs, so the target is always "toward the
+        // camera" — damped like any other turn rather than snapped, or stepping
+        // onto a ladder while running left jumps him round in one frame.
+        const wantFace = (pose === 'climb') ? 1 : (player.facing >= 0 ? 1 : -1);
+        u2.face = Util.damp(u2.face, wantFace, 30, dt || 1 / 60);
+        g.rotation.y = (1 - u2.face) * 0.5 * Math.PI;
+
+        // A run leans into its direction; a stop straightens up.
+        const lean = pose === 'run' ? Util.clamp(player.vx / C.MOVE_MAX, -1, 1) * 0.13 : 0;
+        u2.lean = Util.damp(u2.lean || 0, lean, 12, dt || 1 / 60);
+        u.body.rotation.x = -Math.abs(u2.lean) * 0.5;
+        u.head.position.x = u2.lean * 0.5;
 
         // Invulnerability blink, at twelve a second — fast enough to read as a
         // state and slow enough not to be a strobe.
@@ -567,7 +609,7 @@
 
         // Tommy.
         set.tommy.position.set(R3D.wx(player.x), R3D.wy(player.y), ACTOR_Z);
-        poseTommy(set.tommy, player, t);
+        poseTommy(set.tommy, player, t, dt);
         if (run.state === 'title') set.tommy.visible = false;
 
         // Pickups.

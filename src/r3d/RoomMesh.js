@@ -506,17 +506,31 @@
             const metal = R3D.col('#4a4038');
             const brass = R3D.col('#c9a15e');
 
-            b.cyl(x, y + 0.72, z, 0.035, 0.62, 'y', metal, 6);          // chain
-            b.cyl(x, y + 0.36, z, 0.13, 0.10, 'y', brass, 10);           // cap
-            b.cyl(x, y + 0.10, z, 0.155, 0.44, 'y', R3D.col('#e0b878'), 10);  // glass
-            b.cyl(x, y - 0.16, z, 0.14, 0.09, 'y', brass, 10);           // base
-            // Guard bars, so it reads as a lamp rather than a jar.
-            for (const dx of [-0.13, 0.13]) {
-                b.cyl(x + dx, y + 0.10, z, 0.022, 0.46, 'y', metal, 4);
+            /*
+             * Two things made this read as blocks. The guard bars were drawn
+             * as four-segment cylinders — and a four-segment cylinder *is* a
+             * square prism, so the lamp had two little posts stuck to it. And
+             * the halo behind it was a flat quad, i.e. a square of light on the
+             * wall. Both are gone: the cage is a ring of fine uprights with
+             * enough segments to be round, and the glow is a cylinder.
+             */
+            b.cyl(x, y + 0.74, z, 0.028, 0.56, 'y', metal, 6);           // chain
+            b.cyl(x, y + 0.44, z, 0.05, 0.1, 'y', metal, 6);             // eye
+            b.cone(x, y + 0.34, z, 0.15, 0.16, brass, true, 12);         // domed cap
+            b.cyl(x, y + 0.08, z, 0.145, 0.42, 'y', R3D.col('#e8c68a'), 12);  // glass
+            b.cyl(x, y - 0.15, z, 0.16, 0.08, 'y', brass, 12);           // base
+            b.cyl(x, y - 0.21, z, 0.11, 0.05, 'y', metal, 10);           // foot
+
+            // A cage of six fine uprights around the glass.
+            for (let k = 0; k < 6; k++) {
+                const a = (k / 6) * Math.PI * 2;
+                b.cyl(x + Math.cos(a) * 0.145, y + 0.08, z + Math.sin(a) * 0.145,
+                      0.014, 0.42, 'y', metal, 5);
             }
-            // The wick, and the halo it throws on the rock behind.
-            g.cyl(x, y + 0.08, z + 0.04, 0.07, 0.22, 'y', R3D.col('#fff3c8'), 8);
-            g.box(x, y + 0.08, z + 0.1, 0.9, 0.9, 0.02, R3D.col(pal.lamp), F.FRONT);
+
+            // The wick, and the light it throws — round, not a panel.
+            g.cyl(x, y + 0.06, z, 0.06, 0.2, 'y', R3D.col('#fff3c8'), 8);
+            g.cyl(x, y + 0.06, z + 0.06, 0.4, 0.04, 'z', R3D.col(pal.lamp), 14);
 
             lights.push({ x: x, y: y + 0.1, colour: pal.lamp, energy: 1.25, range: 17, flicker: 0.2 });
             hung++;
