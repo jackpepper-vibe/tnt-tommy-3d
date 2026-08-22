@@ -356,12 +356,23 @@
             ctx.fillStyle = 'rgba(255,255,255,0.16)';
             ctx.fillRect(rnd.int(0, S - 3), rnd.int(0, S - 1), rnd.int(2, 5), 1);
         }
-        // The lit lip along the top of a block.
-        const grad = ctx.createLinearGradient(0, 0, 0, 6);
-        grad.addColorStop(0, 'rgba(255,255,255,0.34)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        /*
+         * Soft volume across the tile: bright at the top, falling away to a
+         * dark contact band at the bottom.
+         *
+         * Flat Lambert on a flat face gives a flat fill, and no amount of
+         * chisel marks makes that read as a rounded mass — the reference art
+         * gets its softness from a gradient across every single surface, not
+         * from detail. This is the cheapest possible version of that, and it is
+         * doing most of the work.
+         */
+        const grad = ctx.createLinearGradient(0, 0, 0, S);
+        grad.addColorStop(0.00, 'rgba(255,255,255,0.30)');
+        grad.addColorStop(0.22, 'rgba(255,255,255,0.10)');
+        grad.addColorStop(0.62, 'rgba(0,0,0,0.06)');
+        grad.addColorStop(1.00, 'rgba(0,0,0,0.30)');
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, S, 6);
+        ctx.fillRect(0, 0, S, S);
 
         return cv;
     }
@@ -395,6 +406,14 @@
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(4, 5, 2, 2);
         ctx.fillRect(4, S - 7, 2, 2);
+
+        // The same soft volume the rock gets — see `rockCanvas`.
+        const shade = ctx.createLinearGradient(0, 0, 0, S);
+        shade.addColorStop(0.00, 'rgba(255,255,255,0.26)');
+        shade.addColorStop(0.30, 'rgba(255,255,255,0.06)');
+        shade.addColorStop(1.00, 'rgba(0,0,0,0.34)');
+        ctx.fillStyle = shade;
+        ctx.fillRect(0, 0, S, S);
 
         return cv;
     }
@@ -448,6 +467,21 @@
             ctx.fill();
         };
 
+        /**
+         * Atmospheric perspective.
+         *
+         * The thing the reference art does that this did not: distance makes a
+         * thing **paler and flatter**, not merely darker. Every layer here was
+         * a different shade of the same dark rock, so the sheets read as three
+         * cut-outs at three depths rather than as a cavern receding — depth
+         * comes from *losing contrast*, not from stacking silhouettes.
+         *
+         * `haze` is how far each layer is pushed toward the air colour. The far
+         * ridges are more than half air.
+         */
+        const air = pal.backHaze || pal.backGlow || pal.back;
+        const veil = function (colour, amount) { return mixHex(colour, air, amount); };
+
         if (layer === 0) {
             // The ramp. Darker at the roof, warmer toward the floor, because
             // the light in a mine comes from what is burning down there.
@@ -458,8 +492,8 @@
             ctx.fillStyle = sky;
             ctx.fillRect(0, 0, W, H);
 
-            ridge(H * 0.40, H * 0.20, 52, mixHex(pal.backFar, pal.rock[0], 0.26));
-            ridge(H * 0.54, H * 0.17, 38, mixHex(pal.backFar, pal.rock[0], 0.42));
+            ridge(H * 0.40, H * 0.20, 52, veil(pal.rock[0], 0.72));
+            ridge(H * 0.54, H * 0.17, 38, veil(pal.rock[0], 0.58));
 
             // Distant lamps, deep in the workings.
             for (let i = 0; i < 16; i++) {
@@ -479,17 +513,11 @@
         // one sits in front of the last rather than merging with it.
         ctx.clearRect(0, 0, W, H);
         if (layer === 1) {
-            ridge(H * 0.66, H * 0.16, 30, mixHex(pal.back, pal.rock[2], 0.62));
-            ctx.globalCompositeOperation = 'source-atop';
-            const haze = ctx.createLinearGradient(0, H * 0.5, 0, H);
-            haze.addColorStop(0, 'rgba(255,255,255,0.10)');
-            haze.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = haze;
-            ctx.fillRect(0, 0, W, H);
+            ridge(H * 0.66, H * 0.16, 30, veil(pal.rock[2], 0.40));
         } else {
-            ridge(H * 0.82, H * 0.12, 22, mixHex(pal.back, pal.rock[2], 0.88));
+            ridge(H * 0.82, H * 0.12, 22, veil(pal.rock[2], 0.18));
             // Pit props silhouetted against the workings behind them.
-            ctx.fillStyle = mixHex(pal.back, '#000000', 0.45);
+            ctx.fillStyle = veil(mixHex(pal.rock[2], '#000000', 0.4), 0.12);
             for (let i = 0; i < 7; i++) {
                 const x = rnd.range(10, W - 10);
                 const h = rnd.range(H * 0.16, H * 0.34);
@@ -497,6 +525,17 @@
                 ctx.fillRect(x - 16, H - h, 37, 5);
             }
         }
+
+        // A wash of air over the whole sheet, heavier lower down where there
+        // is more of it between the eye and the rock. This is what turns three
+        // stacked silhouettes into distance.
+        ctx.globalCompositeOperation = 'source-atop';
+        const wash = ctx.createLinearGradient(0, H * 0.35, 0, H);
+        wash.addColorStop(0, 'rgba(255,255,255,0)');
+        wash.addColorStop(1, 'rgba(255,255,255,' + (layer === 1 ? 0.16 : 0.09) + ')');
+        ctx.fillStyle = wash;
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'source-over';
         return cv;
     }
 

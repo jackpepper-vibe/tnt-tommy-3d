@@ -63,12 +63,14 @@
         const wood = new R3D.Builder();
         const plain = new R3D.Builder();
         const glow = new R3D.Builder();
+        /** Multiplied down onto the backdrop — contact shadows, not light. */
+        const shade = new R3D.Builder();
         const lights = [];
         const rng = Util.rng(0x7A11 + room.index * 2654435761);
 
         backdrop(group, pal, rng);
         rockRuns(room, rock, glow, pal);
-        trim(room, wood, plain, glow, pal, lights);
+        trim(room, wood, plain, glow, shade, pal, lights);
         decor(room, wood, rock, glow, pal, lights, rng);
 
         const add = function (builder, name, texture, order) {
@@ -82,6 +84,22 @@
         add(rock, 'rock', 'rock0');
         add(wood, 'timber', 'timber');
         add(plain, 'fittings', null);
+
+        if (!shade.isEmpty()) {
+            // Contact shadows: multiplied down onto whatever is behind them,
+            // so they darken the backdrop rather than adding a grey rectangle
+            // to it. Drawn before the glow pass and after the solids.
+            const mesh = new THREE.Mesh(shade.geometry(), new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.5,
+                blending: THREE.MultiplyBlending,
+                depthWrite: false
+            }));
+            mesh.name = 'contact';
+            mesh.renderOrder = 1;
+            group.add(mesh);
+        }
 
         if (!glow.isEmpty()) {
             const mesh = new THREE.Mesh(glow.geometry(), R3D.glowMaterial(0.85));
@@ -201,8 +219,9 @@
      * @param {R3D.Builder} b  timber — boards, ladders, ropes, props
      * @param {R3D.Builder} p  untextured fittings — spikes, belts, machinery
      * @param {R3D.Builder} g  the additive glow pass
+     * @param {R3D.Builder} s  the multiply pass — contact shadows
      */
-    function trim(room, b, p, g, pal, lights) {
+    function trim(room, b, p, g, s, pal, lights) {
         const timber = R3D.col(pal.timber);
         const timberTop = R3D.col(pal.timberTop);
         const ladderCol = R3D.col(pal.ladder);
@@ -258,6 +277,17 @@
                             // A bracket under the boards every few tiles.
                             b.box(x, y - 0.02, TRIM_Z, 0.18, 0.30, 0.26, timber, F.SLAB);
                         }
+                        /*
+                         * Contact shading: a dark band hanging just under the
+                         * board, on the backdrop side.
+                         *
+                         * Every platform in the reference art has one, and it
+                         * is what stops a ledge looking pasted onto the
+                         * background. Cheap — one unlit quad — and it does more
+                         * for grounding than any amount of lighting.
+                         */
+                        s.box(x, y + 0.02, TRIM_Z - 0.6, 1.2, 0.5, 0.02,
+                              R3D.col('#6a5c50'), F.FRONT);
                         break;
                     }
 
