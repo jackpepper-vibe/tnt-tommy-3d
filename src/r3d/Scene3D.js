@@ -136,8 +136,8 @@
      */
     Scene3D.prototype._initLights = function () {
         const pal = this.palette;
-        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.62);
-        this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#1a1410'), 0.45);
+        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.78);
+        this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#241c16'), 0.58);
 
         /**
          * A key light, raked down from the front-left.

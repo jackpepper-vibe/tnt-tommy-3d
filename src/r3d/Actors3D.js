@@ -687,14 +687,34 @@
             mesh.rotation.y = p.kind === 'ore' ? t * 2.4 + p.phase : Math.sin(t + p.phase) * 0.25;
 
             if (p.spec.glow) {
-                // Tight and bright. A wide faint halo does not read as glow at
-                // this scale — it reads as a dirty lens, and there are a dozen
-                // of them on screen at once.
-                const halo = set.pools.glowSprite.next();
-                halo.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.12);
-                const pulse = 0.95 + Math.sin(t * 3 + p.phase) * 0.12;
-                halo.scale.set(pulse, pulse, 1);
-                tint(halo, p.kind === 'tnt' ? '#ff8a3c' : (p.kind === 'oxygen' ? '#5cc8de' : '#ffd84a'), 0.75);
+                /*
+                 * Two halos: a tight bright core and a wider soft one.
+                 *
+                 * A single halo has to choose between reading as *emissive*
+                 * (tight and hot) and reading as *light in the room* (wide and
+                 * soft), and at this scale one alone does neither. Stacking
+                 * them is what makes a coin look lit from inside rather than
+                 * painted yellow — and with the ambient now carrying real
+                 * colour, collectables need the extra push to stay the
+                 * brightest thing on screen.
+                 */
+                const hot = p.kind === 'tnt' ? '#ffb060'
+                    : (p.kind === 'oxygen' ? '#8fe4f4'
+                    : (p.kind === 'heart' ? '#ffd0e0' : '#fff0a0'));
+                const warm = p.kind === 'tnt' ? '#ff7a2c'
+                    : (p.kind === 'oxygen' ? '#3ab4d8'
+                    : (p.kind === 'heart' ? '#ff6a94' : '#ffc41e'));
+
+                const pulse = 0.9 + Math.sin(t * 3 + p.phase) * 0.1;
+                const core = set.pools.glowSprite.next();
+                core.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.1);
+                core.scale.set(pulse * 0.72, pulse * 0.72, 1);
+                tint(core, hot, 0.95);
+
+                const bloom = set.pools.glowSprite.next();
+                bloom.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.16);
+                bloom.scale.set(pulse * 2.0, pulse * 2.0, 1);
+                tint(bloom, warm, 0.34);
             }
         }
 

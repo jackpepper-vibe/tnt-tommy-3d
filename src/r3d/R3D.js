@@ -128,14 +128,26 @@
              * looked empty. The backdrop is not scenery here: it is the only
              * thing telling you that you are underground rather than in space.
              */
-            back:      '#33261a',
-            backFar:   '#241a13',
+            back:      '#3a2d1e',
+            backFar:   '#2a2018',
             /** The warm floor of the backdrop ramp — see `backdropCanvas`. */
-            backGlow:  '#5a3a20',
+            backGlow:  '#6b4526',
+            /** Daylight through the opening at the roof. */
+            sky:       '#7fb8d8',
+            skyLow:    '#a8cfe0',
             fog:       '#1c150e',
-            ambient:   '#4a4260',
-            hemi:      '#5b5170',
-            lamp:      '#ffb867',
+            /**
+             * Ambient carries a real hue rather than a neutral grey-brown. A
+             * desaturated ambient makes every surface in the room tend toward
+             * the same mud regardless of its own colour; a tinted one lets the
+             * cool rock and the warm timber stay different from each other in
+             * the shadows as well as in the light.
+             */
+            ambient:   '#5d5a86',
+            hemi:      '#6f6b96',
+            lamp:      '#ffc07a',
+            grass:     '#5fbf46',
+            grassDark: '#3d8a2c',
             crystal:   ['#5fd8ff', '#c48bff'],
             spike:     '#9aa0ad',
             water:     '#2f7cbd',
@@ -149,13 +161,17 @@
             timberTop: '#ab7f4b',
             ladder:    '#8794a1',
             rope:      '#a8a389',
-            back:      '#232c38',
-            backFar:   '#161c25',
-            backGlow:  '#3c4c63',
+            back:      '#2a3648',
+            backFar:   '#1b232f',
+            backGlow:  '#4a5f7d',
+            sky:       '#6f9dc4',
+            skyLow:    '#93b8d2',
             fog:       '#141a21',
-            ambient:   '#415271',
-            hemi:      '#4e5f80',
+            ambient:   '#4e6590',
+            hemi:      '#5b74a0',
             lamp:      '#9fd0ff',
+            grass:     '#4f9e6b',
+            grassDark: '#357049',
             crystal:   ['#6ff0dc', '#8fb8ff'],
             spike:     '#a6b0bd',
             water:     '#2a6494',
@@ -175,12 +191,16 @@
              * silhouettes reading against it rather than disappearing into it.
              */
             back:      '#4a1c14',
-            backFar:   '#240d0a',
-            backGlow:  '#8a3418',
+            backFar:   '#2c110c',
+            backGlow:  '#9c3a19',
+            sky:       '#c05a2a',
+            skyLow:    '#e08a45',
             fog:       '#23100b',
-            ambient:   '#6b3a3c',
-            hemi:      '#7d4442',
+            ambient:   '#7d4548',
+            hemi:      '#8e4f4c',
             lamp:      '#ffa055',
+            grass:     '#8a7a2c',
+            grassDark: '#5c5119',
             crystal:   ['#ffbe6e', '#ff7a62'],
             spike:     '#b09a8e',
             water:     '#3f6a88',
@@ -483,22 +503,67 @@
         const veil = function (colour, amount) { return mixHex(colour, air, amount); };
 
         if (layer === 0) {
-            // The ramp. Darker at the roof, warmer toward the floor, because
-            // the light in a mine comes from what is burning down there.
+            /*
+             * The far layer: an opening to the sky at the roof, the workings
+             * below it, and shafts of daylight coming down through the gap.
+             *
+             * The opening is what gives the mine a *top*. Without one the roof
+             * is just where the picture stops, and every room feels like the
+             * inside of a box however well the rest of it is drawn — the light
+             * has to be coming from somewhere.
+             */
             const sky = ctx.createLinearGradient(0, 0, 0, H);
-            sky.addColorStop(0, pal.backFar);
-            sky.addColorStop(0.55, pal.back);
-            sky.addColorStop(1, pal.backGlow || pal.back);
+            sky.addColorStop(0.00, pal.sky || pal.backFar);
+            sky.addColorStop(0.16, pal.skyLow || pal.backFar);
+            sky.addColorStop(0.52, pal.back);
+            sky.addColorStop(1.00, pal.backGlow || pal.back);
             ctx.fillStyle = sky;
             ctx.fillRect(0, 0, W, H);
 
-            ridge(H * 0.40, H * 0.20, 52, veil(pal.rock[0], 0.72));
-            ridge(H * 0.54, H * 0.17, 38, veil(pal.rock[0], 0.58));
+            // The mouth of the shaft, cut out of the rock at the top.
+            ctx.fillStyle = veil(pal.rock[0], 0.60);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, H * 0.30);
+            ctx.lineTo(W * 0.18, H * 0.22);
+            ctx.lineTo(W * 0.30, H * 0.06);
+            ctx.lineTo(W * 0.34, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(W, 0);
+            ctx.lineTo(W, H * 0.30);
+            ctx.lineTo(W * 0.82, H * 0.20);
+            ctx.lineTo(W * 0.70, H * 0.05);
+            ctx.lineTo(W * 0.66, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Light shafts falling through the opening.
+            for (let i = 0; i < 5; i++) {
+                const top = W * (0.38 + i * 0.055);
+                const spread = 26 + i * 9;
+                const drop = H * rnd.range(0.55, 0.95);
+                const shaft = ctx.createLinearGradient(top, 0, top + spread, drop);
+                shaft.addColorStop(0, 'rgba(255,235,190,0.30)');
+                shaft.addColorStop(1, 'rgba(255,235,190,0)');
+                ctx.fillStyle = shaft;
+                ctx.beginPath();
+                ctx.moveTo(top - 7, 0);
+                ctx.lineTo(top + 9, 0);
+                ctx.lineTo(top + spread + 22, drop);
+                ctx.lineTo(top + spread - 10, drop);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            ridge(H * 0.44, H * 0.18, 52, veil(pal.rock[0], 0.72));
+            ridge(H * 0.56, H * 0.16, 38, veil(pal.rock[0], 0.58));
 
             // Distant lamps, deep in the workings.
             for (let i = 0; i < 16; i++) {
                 const x = rnd.range(0, W);
-                const y = rnd.range(H * 0.45, H * 0.92);
+                const y = rnd.range(H * 0.5, H * 0.92);
                 const r = rnd.range(4, 12);
                 const g = ctx.createRadialGradient(x, y, 0, x, y, r);
                 g.addColorStop(0, 'rgba(255,190,110,0.55)');
@@ -514,6 +579,32 @@
         ctx.clearRect(0, 0, W, H);
         if (layer === 1) {
             ridge(H * 0.66, H * 0.16, 30, veil(pal.rock[2], 0.40));
+
+            // Mid-ground pillars: columns of rock left standing between the
+            // workings, tapering as they rise. They give the middle distance
+            // something with a vertical edge, which ridges alone never do.
+            const pillar = veil(pal.rock[1], 0.30);
+            const pillarLit = veil(pal.rockTop, 0.34);
+            for (let i = 0; i < 5; i++) {
+                const x = rnd.range(W * 0.05, W * 0.95);
+                const wTop = rnd.range(16, 30);
+                const wBot = wTop + rnd.range(8, 20);
+                const top = rnd.range(H * 0.18, H * 0.42);
+                ctx.fillStyle = pillar;
+                ctx.beginPath();
+                ctx.moveTo(x - wTop / 2, top);
+                ctx.lineTo(x + wTop / 2, top);
+                ctx.lineTo(x + wBot / 2, H);
+                ctx.lineTo(x - wBot / 2, H);
+                ctx.closePath();
+                ctx.fill();
+                // A lit edge down the side the shafts fall on.
+                ctx.fillStyle = pillarLit;
+                ctx.fillRect(x + wTop / 2 - 5, top, 5, H - top);
+                // A capital where it meets the roof.
+                ctx.fillStyle = pillar;
+                ctx.fillRect(x - wTop / 2 - 7, top - 7, wTop + 14, 9);
+            }
         } else {
             ridge(H * 0.82, H * 0.12, 22, veil(pal.rock[2], 0.18));
             // Pit props silhouetted against the workings behind them.

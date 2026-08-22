@@ -161,11 +161,28 @@
                     // Shadow under the overhang.
                     b.box(tx + run / 2, capY - 0.14, ROCK_Z + ROCK_D / 2 + 0.02,
                           run, 0.07, 0.04, R3D.mixCol(pal.rock[2], '#000000', 0.55), F.FRONT);
+                    /*
+                     * Moss along the lit rock edge, and tufts out of it — the
+                     * same green cap the platforms get. Rock is the largest
+                     * single area of colour in a room, so this is where the
+                     * brown is most worth breaking.
+                     */
+                    const grass = R3D.col(pal.grass || '#5fbf46');
+                    const grassDk = R3D.col(pal.grassDark || '#3d8a2c');
+                    b.box(tx + run / 2, capY + 0.15, ROCK_Z + ROCK_D / 2 + 0.14,
+                          run, 0.12, ROCK_D * 0.34, grassDk, F.SLAB, grass);
                     for (let i = 0; i < run; i++) {
-                        if (Util.tileHash(tx + i, ty) % 4 !== 0) continue;
-                        b.box(tx + i + 0.5, capY + 0.14, ROCK_Z + ROCK_D / 2 + 0.16,
-                              0.86, 0.14, 0.06, mossCol, F.SLAB, mossCol);
+                        const h = Util.tileHash(tx + i, ty);
+                        if (h % 3 === 0) {
+                            b.box(tx + i + 0.5, capY + 0.06, ROCK_Z + ROCK_D / 2 + 0.28,
+                                  0.7, 0.16, 0.06, grassDk, F.FRONT);
+                        }
+                        if (h % 4 === 1) {
+                            b.cone(tx + i + 0.5 + ((h % 5) - 2) * 0.12, capY + 0.3,
+                                   ROCK_Z + ROCK_D / 2 + 0.16, 0.055, 0.22, grass, true, 5);
+                        }
                     }
+                    void mossCol;
                 }
 
                 /*
@@ -232,6 +249,8 @@
         const lavaCol = R3D.col(pal.lava);
         const waterCol = R3D.col(pal.water);
         const crumbleCol = R3D.mixCol(pal.timber, '#2a2018', 0.45);
+        const grassCol = R3D.col(pal.grassDark || '#3d8a2c');
+        const grassLit = R3D.col(pal.grass || '#5fbf46');
 
         for (let ty = 0; ty < C.ROWS; ty++) {
             for (let tx = 0; tx < C.COLS; tx++) {
@@ -265,17 +284,73 @@
                          * Boards sit at the top of their tile because that is
                          * the surface the physics lands you on.
                          */
+                        const leftEnd = room.get(tx - 1, ty) !== T.PLATFORM;
+                        const rightEnd = room.get(tx + 1, ty) !== T.PLATFORM;
+                        // Varied thickness along a run, so a deck is not a
+                        // ruler. Keyed to the tile so it never shimmers.
+                        const vary = (Util.tileHash(tx, ty) % 5) * 0.012;
+
                         // Deck: proud of the body in Z and a touch wider.
-                        b.box(x, y + 0.40, TRIM_Z + 0.12, 1, 0.18, TRIM_D + 0.22,
+                        b.box(x, y + 0.40, TRIM_Z + 0.12, 1, 0.18 + vary, TRIM_D + 0.22,
                               timberTop, F.SLAB, timberTop);
                         // Body: narrower, darker, hanging under the deck.
-                        b.box(x, y + 0.20, TRIM_Z, 1, 0.24, TRIM_D, timber, F.SLAB);
+                        b.box(x, y + 0.20, TRIM_Z, 1, 0.24 + vary, TRIM_D, timber, F.SLAB);
                         // The shadow line where one meets the other.
                         b.box(x, y + 0.29, TRIM_Z + TRIM_D / 2 + 0.12, 1, 0.05, 0.04,
                               R3D.mixCol(pal.timber, '#000000', 0.6), F.FRONT);
+
+                        /*
+                         * Rounded ends.
+                         *
+                         * A run of platform tiles has square corners at each
+                         * end, and a row of hard right angles is most of what
+                         * makes scaffolding look like scaffolding. A capped
+                         * cylinder on the end turns the silhouette from a bar
+                         * into a beam. Only at the ends — inside a run there is
+                         * nothing to round off.
+                         */
+                        for (const end of [leftEnd ? -1 : 0, rightEnd ? 1 : 0]) {
+                            if (!end) continue;
+                            b.cyl(x + end * 0.5, y + 0.40, TRIM_Z + 0.12, 0.09 + vary / 2,
+                                  TRIM_D + 0.22, 'z', timberTop, 8, timberTop);
+                            b.cyl(x + end * 0.46, y + 0.20, TRIM_Z, 0.12 + vary / 2,
+                                  TRIM_D, 'z', timber, 8);
+                        }
+
                         if (Util.tileHash(tx, ty) % 3 === 0) {
                             // A bracket under the boards every few tiles.
                             b.box(x, y - 0.02, TRIM_Z, 0.18, 0.30, 0.26, timber, F.SLAB);
+                        }
+
+                        /*
+                         * The green cap.
+                         *
+                         * Every platform gets a layer of moss along its top
+                         * edge, overhanging slightly, with tufts standing up
+                         * out of it. It is the single cheapest way to break a
+                         * wall of brown: one bright, cool colour laid along
+                         * exactly the line the player's eye is already
+                         * following, which is the top of every walkable
+                         * surface — so it doubles as readability, not only
+                         * decoration.
+                         */
+                        b.box(x, y + 0.505 + vary, TRIM_Z + 0.14, 1.04, 0.1, TRIM_D + 0.26,
+                              grassCol, F.SLAB, grassLit);
+                        // A ragged lower fringe hanging over the front edge.
+                        const fringe = Util.tileHash(tx + 7, ty) % 4;
+                        for (let i = 0; i < 3; i++) {
+                            if ((fringe >> i) & 1) continue;
+                            b.box(x - 0.3 + i * 0.3, y + 0.42 + vary,
+                                  TRIM_Z + TRIM_D / 2 + 0.24, 0.24, 0.12, 0.06,
+                                  grassCol, F.FRONT);
+                        }
+                        // Tufts standing up out of the moss.
+                        const tufts = Util.tileHash(tx, ty + 3) % 3;
+                        for (let i = 0; i <= tufts; i++) {
+                            const ox = -0.32 + ((Util.tileHash(tx + i, ty) % 7) / 7) * 0.64;
+                            const h = 0.14 + (Util.tileHash(tx, ty + i) % 4) * 0.05;
+                            b.cone(x + ox, y + 0.58 + vary + h / 2, TRIM_Z + 0.2,
+                                   0.05, h, grassLit, true, 5);
                         }
                         /*
                          * Contact shading: a dark band hanging just under the
@@ -726,13 +801,65 @@
             made++;
         }
 
-        // Cut timbering on the back wall: the ribs of the working, receding.
-        for (let x = 3; x < C.COLS - 3; x += rng.int(6, 10)) {
-            const h = rng.range(5, 11);
-            const y = rng.range(h / 2 + 1, C.ROWS - h / 2 - 1);
-            b.box(x, y, R3D.BACK_Z + 0.5, 0.22, h, 0.22, R3D.col(pal.timber), F.SLAB);
-            b.box(x, y + h / 2, R3D.BACK_Z + 0.5, 2.2, 0.24, 0.24,
-                  R3D.col(pal.timber), F.SLAB);
+        /*
+         * Timbered arches on the back wall — two posts, a lintel, and braces
+         * across the corners.
+         *
+         * This is the one piece of dressing that says "somebody built this".
+         * Rock and moss make a cave; a row of arches receding into it makes a
+         * *working*, and it gives the middle distance a repeating rhythm for
+         * the eye to measure depth against.
+         */
+        const beam = R3D.mixCol(pal.timber, '#000000', 0.3);
+        const beamLit = R3D.mixCol(pal.timberTop, '#000000', 0.25);
+        for (let x = 4; x < C.COLS - 4; x += rng.int(7, 12)) {
+            const h = rng.range(5.5, 10);
+            const w = rng.range(2.6, 4.2);
+            const base = rng.range(0.5, C.ROWS - h - 1);
+            const top = base + h;
+            const z = R3D.BACK_Z + 0.5;
+            for (const s of [-1, 1]) {
+                b.box(x + s * w / 2, base + h / 2, z, 0.26, h, 0.26, beam, F.SLAB, beamLit);
+                // Corner brace.
+                b.box(x + s * (w / 2 - 0.42), top - 0.5, z, 0.9, 0.18, 0.2, beam, F.SLAB);
+            }
+            b.box(x, top, z, w + 0.5, 0.3, 0.3, beam, F.SLAB, beamLit);
+            b.box(x, top + 0.22, z, w + 0.9, 0.14, 0.24, beamLit, F.SLAB, beamLit);
+        }
+
+        /*
+         * Vines hanging off the front edge of platforms and ledges.
+         *
+         * Drawn as a run of short segments with a slight drift so they curl
+         * rather than hang plumb, and they finish in a leaf. Together with the
+         * moss caps this is what stops the middle of a room being empty air
+         * between one brown board and the next.
+         */
+        const vineCol = R3D.col(pal.grassDark || '#3d8a2c');
+        const leafCol = R3D.col(pal.grass || '#5fbf46');
+        for (let attempt = 0, made = 0; attempt < 200 && made < 12; attempt++) {
+            const tx = rng.int(2, C.COLS - 3);
+            const ty = rng.int(2, C.ROWS - 6);
+            if (!Tiles.isFloor(room.get(tx, ty))) continue;
+            if (room.get(tx, ty + 1) !== T.EMPTY || room.get(tx, ty + 2) !== T.EMPTY) continue;
+
+            const x = R3D.tileX(tx) + rng.range(-0.3, 0.3);
+            const top = R3D.tileY(ty) - 0.5;
+            const z = TRIM_Z + TRIM_D / 2 + 0.2;
+            const len = rng.range(0.9, 2.6);
+            const segs = Math.max(3, Math.round(len / 0.28));
+            let drift = 0;
+            for (let k = 0; k < segs; k++) {
+                drift += rng.range(-0.05, 0.05);
+                const sy = top - 0.14 - k * (len / segs);
+                b.cyl(x + drift, sy, z, 0.045, len / segs + 0.04, 'y', vineCol, 5);
+                if (k % 2 === 1) {
+                    b.box(x + drift + (k % 4 === 1 ? 0.12 : -0.12), sy, z,
+                          0.18, 0.08, 0.05, leafCol, F.SLAB);
+                }
+            }
+            b.cone(x + drift, top - len - 0.1, z, 0.07, 0.18, leafCol, false, 5);
+            made++;
         }
     }
 
