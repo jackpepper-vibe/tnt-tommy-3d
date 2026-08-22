@@ -74,58 +74,101 @@
         const helmetLight = R3D.col('#ffe08a');
         const strap = R3D.col('#8a6a3a');
 
+        /*
+         * AUTHORED IN PROFILE, FACING +X.
+         *
+         * He used to face the camera, which meant you watched his front walking
+         * right and his back walking left — and a character who turns his back
+         * on you is a character you cannot read. Platformers are drawn in
+         * profile for the same reason they always have been: the direction of
+         * travel is the single most important thing on screen, and a silhouette
+         * facing along it says so without any animation at all.
+         *
+         *   X  the way he faces — chest at +X, back at -X. This is the axis the
+         *      camera sees, so the *profile* is the silhouette.
+         *   Y  up.
+         *   Z  shoulder width, into the screen. Barely seen; it only separates
+         *      the near limb from the far one.
+         *
+         * `rotation.y` still flips between 0 and PI, so the turn code is
+         * unchanged — it now flips him between facing right and facing left
+         * rather than toward and away.
+         */
         const body = part(function (b) {
-            b.box(0, 0.36, 0, 0.54, 0.46, 0.36, coat, F.ALL, coatLight);
-            // Shoulders, so the torso is not a plain cuboid.
-            b.box(0, 0.54, 0, 0.62, 0.14, 0.38, coatLight, F.ALL, coatLight);
-            // Belt and buckle — the hard break at the waist.
-            b.box(0, 0.16, 0, 0.58, 0.11, 0.38, strap, F.ALL);
-            b.box(0, 0.16, 0.20, 0.13, 0.13, 0.04, R3D.col('#ffe6a0'), F.FRONT);
-            b.box(0, 0.30, 0.19, 0.26, 0.14, 0.04, coatDark, F.FRONT);
+            b.box(0.02, 0.36, 0, 0.38, 0.46, 0.44, coat, F.ALL, coatLight);
+            // Chest, slightly proud at the front, and a back that isn't flat.
+            b.box(0.14, 0.40, 0, 0.16, 0.30, 0.40, coatLight, F.ALL, coatLight);
+            b.box(-0.16, 0.34, 0, 0.10, 0.36, 0.38, coatDark, F.ALL);
+            // Shoulders.
+            b.box(0.02, 0.56, 0, 0.42, 0.13, 0.48, coatLight, F.ALL, coatLight);
+            // Belt, with the buckle on the near hip.
+            b.box(0.02, 0.16, 0, 0.42, 0.11, 0.46, strap, F.ALL);
+            b.box(0.20, 0.16, 0, 0.09, 0.12, 0.14, R3D.col('#ffe6a0'));
         }, mat);
         g.add(body);
 
         const head = new THREE.Group();
         head.position.y = 0.70;
         head.add(part(function (b) {
-            b.box(0, 0.02, 0, 0.40, 0.36, 0.34, skin);
-            // Helmet: a dome with a brim that overhangs the face.
-            b.box(0, 0.26, 0, 0.48, 0.20, 0.42, helmet, F.ALL, helmetLight);
-            b.box(0, 0.36, 0, 0.34, 0.10, 0.30, helmetLight, F.ALL, helmetLight);
-            b.box(0, 0.17, 0.24, 0.50, 0.08, 0.16, helmet, F.ALL, helmetLight);
-            // Lamp housing on the brow.
-            b.box(0, 0.24, 0.23, 0.17, 0.13, 0.10, R3D.col('#4a4a52'), F.ALL);
-            // Eyes and a moustache — enough face to have a direction.
-            b.box(-0.09, 0.04, 0.18, 0.06, 0.07, 0.02, R3D.col('#221a14'), F.FRONT);
-            b.box(0.09, 0.04, 0.18, 0.06, 0.07, 0.02, R3D.col('#221a14'), F.FRONT);
-            b.box(0, -0.08, 0.18, 0.22, 0.06, 0.02, R3D.col('#6b4a28'), F.FRONT);
+            b.box(0.01, 0.02, 0, 0.34, 0.36, 0.34, skin);
+            // Nose and moustache at the front — the profile's whole read.
+            b.box(0.19, 0.00, 0, 0.10, 0.10, 0.11, skin);
+            b.box(0.17, -0.09, 0, 0.13, 0.06, 0.16, R3D.col('#6b4a28'));
+            // Helmet: dome, with the brim jutting forward over the face.
+            b.box(0.01, 0.26, 0, 0.40, 0.20, 0.42, helmet, F.ALL, helmetLight);
+            b.box(0.01, 0.36, 0, 0.28, 0.10, 0.32, helmetLight, F.ALL, helmetLight);
+            b.box(0.22, 0.19, 0, 0.20, 0.08, 0.40, helmet, F.ALL, helmetLight);
+            // Lamp on the front of the brim, pointing the way he walks.
+            b.box(0.26, 0.25, 0, 0.11, 0.13, 0.15, R3D.col('#4a4a52'), F.ALL);
+            // One eye, on the side we can see.
+            b.box(0.12, 0.05, 0.16, 0.06, 0.08, 0.03, R3D.col('#221a14'));
+            // Ear, on the near side.
+            b.box(-0.03, 0.01, 0.17, 0.08, 0.10, 0.03, skin);
         }, mat));
         head.add(part(function (b) {
-            b.box(0, 0.24, 0.30, 0.13, 0.10, 0.05, R3D.col('#fff6d0'), F.ALL);
+            b.box(0.33, 0.25, 0, 0.05, 0.11, 0.13, R3D.col('#fff6d0'), F.ALL);
         }, glowMat));
         g.add(head);
 
-        const legL = new THREE.Group();
-        legL.position.set(-0.14, 0.14, 0);
-        legL.add(part(function (b) {
-            b.box(0, -0.18, 0, 0.20, 0.34, 0.22, trouser);
-            b.box(0, -0.38, 0.04, 0.23, 0.12, 0.30, boot, F.ALL, R3D.col('#2e2823'));
+        /*
+         * Limbs are separated in **Z**, not X — near leg and far leg — and they
+         * swing about **Z**, which in profile is the forward/back stride. The
+         * far pair is darkened so the two do not merge into one shape when they
+         * cross.
+         */
+        const legNear = new THREE.Group();
+        legNear.position.set(0.01, 0.14, 0.12);
+        legNear.add(part(function (b) {
+            b.box(0, -0.18, 0, 0.19, 0.34, 0.19, trouser);
+            b.box(0.05, -0.38, 0, 0.30, 0.12, 0.20, boot, F.ALL, R3D.col('#2e2823'));
         }, mat));
-        const legR = legL.clone();
-        legR.position.x = 0.14;
-        g.add(legL, legR);
-
-        const armL = new THREE.Group();
-        armL.position.set(-0.32, 0.54, 0);
-        armL.add(part(function (b) {
-            b.box(0, -0.16, 0, 0.15, 0.32, 0.17, coat, F.ALL, coatLight);
-            b.box(0, -0.36, 0, 0.17, 0.12, 0.19, skin);
+        const legFar = new THREE.Group();
+        legFar.position.set(0.01, 0.14, -0.12);
+        legFar.add(part(function (b) {
+            b.box(0, -0.18, 0, 0.19, 0.34, 0.19, R3D.mixCol('#33384a', '#000000', 0.3));
+            b.box(0.05, -0.38, 0, 0.30, 0.12, 0.20, R3D.mixCol('#1d1a17', '#000000', 0.3));
         }, mat));
-        const armR = armL.clone();
-        armR.position.x = 0.32;
-        g.add(armL, armR);
+        g.add(legNear, legFar);
 
-        g.userData = { head: head, legL: legL, legR: legR, armL: armL, armR: armR, body: body };
+        const armNear = new THREE.Group();
+        armNear.position.set(0.02, 0.54, 0.22);
+        armNear.add(part(function (b) {
+            b.box(0, -0.16, 0, 0.15, 0.32, 0.16, coat, F.ALL, coatLight);
+            b.box(0, -0.36, 0, 0.16, 0.12, 0.17, skin);
+        }, mat));
+        const armFar = new THREE.Group();
+        armFar.position.set(0.02, 0.54, -0.22);
+        armFar.add(part(function (b) {
+            b.box(0, -0.16, 0, 0.15, 0.32, 0.16, R3D.mixCol('#3d8ec4', '#000000', 0.34));
+            b.box(0, -0.36, 0, 0.16, 0.12, 0.17, R3D.mixCol('#e8b487', '#000000', 0.34));
+        }, mat));
+        g.add(armNear, armFar);
+
+        g.userData = {
+            head: head, body: body,
+            legL: legNear, legR: legFar,
+            armL: armNear, armR: armFar
+        };
         // Slightly larger than life. He has to win against a room of boxes.
         g.scale.setScalar(TOMMY_SCALE);
         return g;
@@ -175,39 +218,48 @@
         u.body.position.y = bob;
         u.head.position.y = 0.70 + bob;
 
+        /*
+         * All swings are about **Z**. The rig is authored in profile facing +X,
+         * so Z is the axis that carries a stride forward and back; rotating
+         * about X — which is what this did when he faced the camera — now just
+         * splays the limbs sideways into the screen.
+         *
+         * Positive Z swings a limb *backward*, so the near and far pairs take
+         * opposite signs and cross at the middle of the cycle.
+         */
         if (pose === 'climb') {
-            // Facing the ladder, hands above the head.
-            g.rotation.y = 0;
-            u.armL.rotation.x = -2.5 + swing;
-            u.armR.rotation.x = -2.5 - swing;
-            u.legL.rotation.x = 0.3 - swing * 0.6;
-            u.legR.rotation.x = 0.3 + swing * 0.6;
-            u.head.rotation.x = -0.15;
+            // Reaching up the rungs, one hand over the other.
+            u.armL.rotation.z = 2.4 + swing * 0.5;
+            u.armR.rotation.z = 2.4 - swing * 0.5;
+            u.legL.rotation.z = -0.25 + swing * 0.5;
+            u.legR.rotation.z = -0.25 - swing * 0.5;
+            u.head.rotation.z = -0.12;
         } else if (pose === 'rope') {
-            // Hanging by both hands, legs loose.
-            u.armL.rotation.x = -2.9;
-            u.armR.rotation.x = -2.9;
-            u.legL.rotation.x = swing * 0.5;
-            u.legR.rotation.x = -swing * 0.5;
-            u.head.rotation.x = -0.25;
+            // Hanging by both hands, legs loose beneath.
+            u.armL.rotation.z = 2.85;
+            u.armR.rotation.z = 2.85;
+            u.legL.rotation.z = swing * 0.45;
+            u.legR.rotation.z = -swing * 0.45;
+            u.head.rotation.z = -0.1;
         } else if (pose === 'fall' || pose === 'rise') {
-            u.armL.rotation.x = -1.6;
-            u.armR.rotation.x = -1.4;
-            u.legL.rotation.x = 0.5;
-            u.legR.rotation.x = -0.2;
-            u.head.rotation.x = 0.1;
+            // Arms up and trailing, legs tucked — reads at a glance as airborne.
+            u.armL.rotation.z = 1.9;
+            u.armR.rotation.z = 1.5;
+            u.legL.rotation.z = -0.55;
+            u.legR.rotation.z = 0.3;
+            u.head.rotation.z = pose === 'rise' ? -0.12 : 0.12;
         } else if (pose === 'swim') {
-            u.armL.rotation.x = -1.2 + Math.sin(t * 5) * 0.6;
-            u.armR.rotation.x = -1.2 - Math.sin(t * 5) * 0.6;
-            u.legL.rotation.x = Math.sin(t * 5) * 0.5;
-            u.legR.rotation.x = -Math.sin(t * 5) * 0.5;
-            u.head.rotation.x = -0.2;
+            u.armL.rotation.z = 1.2 + Math.sin(t * 5) * 0.7;
+            u.armR.rotation.z = 1.2 - Math.sin(t * 5) * 0.7;
+            u.legL.rotation.z = Math.sin(t * 5) * 0.5;
+            u.legR.rotation.z = -Math.sin(t * 5) * 0.5;
+            u.head.rotation.z = -0.15;
         } else {
-            u.armL.rotation.x = swing;
-            u.armR.rotation.x = -swing;
-            u.legL.rotation.x = -swing;
-            u.legR.rotation.x = swing;
-            u.head.rotation.x = 0;
+            u.armL.rotation.z = swing;
+            u.armR.rotation.z = -swing;
+            u.legL.rotation.z = -swing;
+            u.legR.rotation.z = swing;
+            u.head.rotation.z = 0;
         }
 
         /*
@@ -224,20 +276,24 @@
          * changing direction on a narrow plank the turn has to keep up with the
          * input, and the real `dt` is used so it does not vary with framerate.
          */
+        /*
+         * He stays in profile at all times, including on a ladder. The rig is
+         * authored facing +X, so this flips him between facing right and facing
+         * left rather than toward and away from the camera.
+         */
         const u2 = g.userData;
         if (u2.face === undefined) u2.face = 1;
-        // On a ladder he faces the rungs, so the target is always "toward the
-        // camera" — damped like any other turn rather than snapped, or stepping
-        // onto a ladder while running left jumps him round in one frame.
-        const wantFace = (pose === 'climb') ? 1 : (player.facing >= 0 ? 1 : -1);
-        u2.face = Util.damp(u2.face, wantFace, 30, dt || 1 / 60);
+        u2.face = Util.damp(u2.face, player.facing >= 0 ? 1 : -1, 30, dt || 1 / 60);
         g.rotation.y = (1 - u2.face) * 0.5 * Math.PI;
 
-        // A run leans into its direction; a stop straightens up.
-        const lean = pose === 'run' ? Util.clamp(player.vx / C.MOVE_MAX, -1, 1) * 0.13 : 0;
+        // A run leans into its direction; a stop straightens up. In profile
+        // that is a tilt about Z, and it is always forward because the whole
+        // rig has already been turned to face the way he is going.
+        const speedK = Util.clamp(Math.abs(player.vx) / C.MOVE_MAX, 0, 1);
+        const lean = pose === 'run' ? speedK * 0.16 : 0;
         u2.lean = Util.damp(u2.lean || 0, lean, 12, dt || 1 / 60);
-        u.body.rotation.x = -Math.abs(u2.lean) * 0.5;
-        u.head.position.x = u2.lean * 0.5;
+        u.body.rotation.z = -u2.lean;
+        u.head.rotation.z += -u2.lean * 0.4;
 
         // Invulnerability blink, at twelve a second — fast enough to read as a
         // state and slow enough not to be a strobe.
@@ -436,14 +492,23 @@
             b.cyl(0, 0.36, 0, 0.028, 0.16, 'y', R3D.col('#7a6038'), 6);
             b.cyl(0.06, 0.45, 0, 0.028, 0.12, 'x', R3D.col('#7a6038'), 6);
         },
-        /** A struck coin, standing on its edge. */
+        /**
+         * A struck coin, standing on its edge.
+         *
+         * Bigger than it was by half. These are the thing you cross a room for
+         * and there are only a handful per deck, so a small dull disc reads as
+         * litter — a collectible has to look worth the detour. Thick edge,
+         * bright rim, and a stamped face that catches the light as it turns.
+         */
         ore: function (b) {
-            const gold = R3D.col('#e8b62c');
-            const rim = R3D.col('#fce98a');
-            b.cyl(0, 0, 0, 0.19, 0.06, 'z', gold, 14, rim);
-            // Raised rim and a face mark, so it catches the light as it spins.
-            b.cyl(0, 0, 0.031, 0.135, 0.012, 'z', R3D.col('#a87615'), 14);
-            b.cyl(0, 0, -0.031, 0.135, 0.012, 'z', R3D.col('#a87615'), 14);
+            const gold = R3D.col('#f0bb26');
+            const rim = R3D.col('#fff0a0');
+            const cut = R3D.col('#9c6b0e');
+            b.cyl(0, 0, 0, 0.28, 0.085, 'z', gold, 16, rim);
+            for (const s of [1, -1]) {
+                b.cyl(0, 0, s * 0.044, 0.215, 0.014, 'z', cut, 16);
+                b.cyl(0, 0, s * 0.05, 0.115, 0.014, 'z', rim, 12);
+            }
         },
         /** A tin billy-can with a lid. */
         food: function (b) {
@@ -617,7 +682,9 @@
             if (p.taken) continue;
             const mesh = set.pools['pickup_' + p.kind].next();
             mesh.position.set(R3D.wx(p.x), R3D.wy(p.y) + 0.34, ACTOR_Z);
-            mesh.rotation.y = p.kind === 'ore' ? t * 1.6 + p.phase : Math.sin(t + p.phase) * 0.25;
+            // Coins spin edge-on so they flash as they turn; everything else
+            // just rocks a little.
+            mesh.rotation.y = p.kind === 'ore' ? t * 2.4 + p.phase : Math.sin(t + p.phase) * 0.25;
 
             if (p.spec.glow) {
                 // Tight and bright. A wide faint halo does not read as glow at

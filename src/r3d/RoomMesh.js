@@ -558,9 +558,18 @@
                       0.014, 0.42, 'y', metal, 5);
             }
 
-            // The wick, and the light it throws — round, not a panel.
-            g.cyl(x, y + 0.06, z, 0.06, 0.2, 'y', R3D.col('#fff3c8'), 8);
-            g.cyl(x, y + 0.06, z + 0.06, 0.4, 0.04, 'z', R3D.col(pal.lamp), 14);
+            /*
+             * The glow lives *inside the glass*, as a tall flame — not as a
+             * disc in front of the lamp.
+             *
+             * A flat bright circle facing the camera is a coin, whatever is
+             * behind it, and that is exactly what these turned into. The lamp
+             * has a point light doing the real work on the surrounding rock;
+             * all this needs to do is make the glass look lit from within.
+             */
+            g.cyl(x, y + 0.08, z, 0.075, 0.34, 'y', R3D.col('#fff3c8'), 8);
+            g.cyl(x, y + 0.08, z, 0.135, 0.30, 'y',
+                  R3D.mixCol(pal.lamp, '#000000', 0.45), 12);
 
             lights.push({ x: x, y: y + 0.1, colour: pal.lamp, energy: 1.25, range: 17, flicker: 0.2 });
             hung++;
