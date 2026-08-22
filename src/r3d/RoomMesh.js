@@ -65,12 +65,14 @@
         const glow = new R3D.Builder();
         /** Multiplied down onto the backdrop — contact shadows, not light. */
         const shade = new R3D.Builder();
+        /** Tinted and transparent: water, which darkens what shows through it. */
+        const liquid = new R3D.Builder();
         const lights = [];
         const rng = Util.rng(0x7A11 + room.index * 2654435761);
 
         backdrop(group, pal, rng);
         rockRuns(room, rock, glow, pal);
-        trim(room, wood, plain, glow, shade, pal, lights);
+        trim(room, wood, plain, glow, shade, liquid, pal, lights);
         decor(room, wood, rock, glow, pal, lights, rng);
 
         const add = function (builder, name, texture, order) {
@@ -103,10 +105,26 @@
             group.add(mesh);
         }
 
+        if (!liquid.isEmpty()) {
+            // Ordinary alpha, not additive: water has to take light *out* of
+            // what shows through it. Drawn after the solids so the rock behind
+            // is already there to be tinted, and before the glow so a surface
+            // highlight still reads on top of it.
+            const mesh = new THREE.Mesh(liquid.geometry(), new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.62,
+                depthWrite: false
+            }));
+            mesh.name = 'water';
+            mesh.renderOrder = 2;
+            group.add(mesh);
+        }
+
         if (!glow.isEmpty()) {
             const mesh = new THREE.Mesh(glow.geometry(), R3D.glowMaterial(0.85));
             mesh.name = 'terrain-glow';
-            mesh.renderOrder = 2;
+            mesh.renderOrder = 3;
             group.add(mesh);
         }
 
@@ -151,7 +169,7 @@
                     TRIM_Z + 0.4
                 );
                 mesh.name = 'heat';
-                mesh.renderOrder = 3;
+                mesh.renderOrder = 4;
                 group.add(mesh);
             }
         }
@@ -284,12 +302,11 @@
      * @param {R3D.Builder} g  the additive glow pass
      * @param {R3D.Builder} s  the multiply pass — contact shadows
      */
-    function trim(room, b, p, g, s, pal, lights) {
+    function trim(room, b, p, g, s, liquid, pal, lights) {
         const timber = R3D.col(pal.timber);
         const timberTop = R3D.col(pal.timberTop);
         const ladderCol = R3D.col(pal.ladder);
         const ropeCol = R3D.col(pal.rope);
-        const spikeCol = R3D.col(pal.spike);
         const beltCol = R3D.col('#2e2e33');
         const beltTread = R3D.col('#4a4a52');
         const lavaCol = R3D.col(pal.lava);
@@ -439,13 +456,64 @@
                     }
 
                     case T.SPIKE: {
-                        // Actual spikes: cones, alternating heights, on a rail.
-                        p.box(x, y + 0.44, TRIM_Z, 1, 0.14, TRIM_D * 0.7,
-                              R3D.mixCol(pal.spike, '#000000', 0.55), F.SLAB);
+                        /*
+                         * A spike bed has to read as a machine, not as a cave.
+                         *
+                         * These were pale grey cones on a dark rail, which is
+                         * also a fair description of the decorative stalactites
+                         * hanging off every ceiling in the game — so the only
+                         * way to tell a spike from scenery was to walk into it.
+                         *
+                         * Three things separate them now, and all three are
+                         * doing work. The amber banding on the mount is the
+                         * hazard signature and appears nowhere in the rock. The
+                         * spacing is *even* and the points are *identical*,
+                         * where a stalactite cluster is irregular by
+                         * construction. And the tips carry a glint on the
+                         * additive pass, so the row catches the eye across a
+                         * dark room instead of blending into the ceiling.
+                         */
+                        const H = R3D.HAZARD;
+                        const iron = R3D.col(H.metal);
+                        const ironLit = R3D.col(H.metalLit);
+                        const warn = R3D.col(H.warn);
+                        const rust = R3D.mixCol(H.rust, H.metal, 0.45);
+
+                        // Which way the points face: hanging from the rock above
+                        // if there is any, otherwise standing up out of the
+                        // floor. It used to always hang, so a spike bed on the
+                        // ground was drawn as a rail floating in mid-air.
+                        const hangs = Tiles.isSolid(room.get(tx, ty - 1));
+                        const railY = y + (hangs ? 0.44 : -0.44);
+                        const sign = hangs ? -1 : 1;
+                        const len = 0.5;
+
+                        // The mount, and an unbroken amber stripe along the front
+                        // of it. Broken into per-tile dashes it read as trim;
+                        // continuous along the whole bed it reads as tape.
+                        p.box(x, railY, TRIM_Z, 1, 0.16, TRIM_D * 0.7, iron, F.SLAB, ironLit);
+                        p.box(x, railY, TRIM_Z + TRIM_D * 0.36, 1, 0.1, 0.04, warn, F.FRONT);
+
+                        /*
+                         * Three points to the tile, not four. Four at this size
+                         * closed up into a dark comb — the triangles stopped
+                         * being triangles, which is the one thing about a spike
+                         * that has to survive being small.
+                         */
                         for (let i = 0; i < 3; i++) {
-                            const sx = x - 0.28 + i * 0.28;
-                            const h = i === 1 ? 0.62 : 0.5;
-                            p.cone(sx, y + 0.36 - h / 2, TRIM_Z, 0.1, h, spikeCol, true, 6);
+                            const sx = x - 0.3 + i * 0.3;
+                            const cy = railY + sign * (0.06 + len / 2);
+                            // `flip` puts the apex at the *top*, so a bed
+                            // standing up out of the floor wants it set and a
+                            // row hanging off a ceiling wants it clear.
+                            p.cone(sx, cy, TRIM_Z, 0.13, len, iron, !hangs, 6, ironLit);
+                            // Rust where the point meets its mount.
+                            p.cyl(sx, railY + sign * 0.09, TRIM_Z, 0.1, 0.07, 'y', rust, 6);
+                            // A sliver of light down the leading edge — a
+                            // highlight on the *edge*, where a blob at the tip
+                            // only made them look blunt.
+                            g.box(sx - 0.04, cy, TRIM_Z + TRIM_D * 0.4,
+                                  0.03, len * 0.5, 0.03, R3D.col(H.edge), F.FRONT);
                         }
                         break;
                     }
@@ -464,7 +532,11 @@
                     }
 
                     case T.VENT: {
-                        // A grated pipe mouth set into the floor.
+                        // A grated pipe mouth set into the floor, wearing the
+                        // same amber collar as the spike rails — a vent fires on
+                        // a timer, so it has to be legible while it is dormant.
+                        p.cyl(x, y + 0.28, TRIM_Z, 0.35, 0.07, 'y',
+                              R3D.col(R3D.HAZARD.warn), 10);
                         p.cyl(x, y + 0.36, TRIM_Z, 0.32, 0.22, 'y', R3D.col('#4a4a52'), 10,
                               R3D.col('#6b6b78'));
                         p.cyl(x, y + 0.46, TRIM_Z, 0.24, 0.05, 'y', R3D.col('#2a2a32'), 10);
@@ -603,23 +675,41 @@
 
                     case T.WATER: {
                         /*
-                         * Body, floor caustic and a bright meniscus at the top.
+                         * WATER DARKENS WHAT IS BEHIND IT.
                          *
-                         * The surface tiles are handled by `Actors3D`, which
-                         * moves them — still water is the one thing that
-                         * unmistakably reads as a flat coloured rectangle, and
-                         * a sump you are supposed to be nervous about should
-                         * not look like a swatch.
+                         * The body used to go on the additive pass, which is the
+                         * one thing water must never do: adding light to the
+                         * rock behind it made a sump look like a lit glass
+                         * brick standing in front of the wall rather than a
+                         * hole in the floor full of water. It is a tinted,
+                         * transparent pass now, so the rock reads *through* it,
+                         * darker and bluer, the way depth actually works.
+                         *
+                         * The bands are gone too. Every tile carried one bright
+                         * horizontal stripe at one of three hashed heights, and
+                         * neighbouring tiles that hashed alike joined theirs up
+                         * into long unbroken lines — a sump came out looking
+                         * like a rack of fluorescent tubes. Depth is carried by
+                         * the tint alone now, and the only bright thing is the
+                         * surface, which `Actors3D` moves.
                          */
-                        const deep = R3D.mixCol(pal.water, '#000000', 0.5);
-                        g.box(x, y, TRIM_Z + 0.34, 1, 1, 0.02, deep, F.FRONT);
-                        // Light banding down the column, brighter near the top.
-                        const depth = Util.tileHash(tx, ty) % 3;
-                        g.box(x, y + 0.2 - depth * 0.12, TRIM_Z + 0.35, 1, 0.1, 0.02,
-                              R3D.mixCol(pal.water, '#ffffff', 0.18), F.FRONT);
+                        /*
+                         * Darkened by how far down the column this tile sits,
+                         * not by a surface/not-surface flag. The flag put one
+                         * hard step across the whole body at exactly the same
+                         * height in every column, which is a band — the thing
+                         * the bands were removed for. Counting upward to the
+                         * surface and ramping over four steps reads as depth.
+                         */
+                        let below = 0;
+                        while (below < 4 && room.get(tx, ty - below - 1) === T.WATER) below++;
+                        const tint = R3D.mixCol(pal.water, '#000000', 0.24 + below * 0.07);
+                        liquid.box(x, y, TRIM_Z + 0.34, 1, 1, 0.02, tint, F.FRONT);
+
+                        // Where it meets the bed, a little bounced light.
                         if (Tiles.isFloor(room.get(tx, ty + 1))) {
-                            g.box(x, y - 0.42, TRIM_Z + 0.35, 1, 0.14, 0.02,
-                                  R3D.mixCol(pal.water, '#ffffff', 0.3), F.FRONT);
+                            g.box(x, y - 0.44, TRIM_Z + 0.35, 1, 0.1, 0.02,
+                                  R3D.mixCol(pal.water, '#ffffff', 0.16), F.FRONT);
                         }
                         break;
                     }
@@ -820,16 +910,26 @@
             const tx = rng.int(1, C.COLS - 2);
             const ty = rng.int(0, C.ROWS - 10);
             if (!isRock(room, tx, ty) || room.get(tx, ty + 1) !== T.EMPTY) continue;
-            // Cones, tip down, in a cluster — a stalactite is a spike of rock,
-            // and drawn as a box it is a stalagmite-shaped brick.
+            /*
+             * Cones, tip down, in a cluster — a stalactite is a spike of rock,
+             * and drawn as a box it is a stalagmite-shaped brick.
+             *
+             * Held back deliberately: darker than the wall they hang off and
+             * set further into it. These share a silhouette with a spike bed,
+             * and of the two it is the spike that has to win the eye, so the
+             * scenery gives way. Irregular lengths and offsets do the rest —
+             * a spike row is identical points at an even pitch, this never is.
+             */
             const len = rng.range(0.5, 1.4);
             const x = R3D.tileX(tx) + rng.range(-0.2, 0.2);
             const y = R3D.tileY(ty) - 0.5 - len / 2;
-            const z = R3D.BACK_Z + 1.3;
-            rock.cone(x, y, z, rng.range(0.14, 0.22), len, R3D.col(pal.rock[2]), false, 7);
+            const z = R3D.BACK_Z + 1.0;
+            const stone = R3D.mixCol(pal.rock[2], '#000000', 0.3);
+            rock.cone(x, y, z, rng.range(0.14, 0.22), len, stone, false, 7);
             if (rng.chance(0.6)) {
                 rock.cone(x + rng.range(-0.34, 0.34), y + 0.16, z - 0.2,
-                          rng.range(0.08, 0.14), len * 0.6, R3D.col(pal.rock[0]), false, 6);
+                          rng.range(0.08, 0.14), len * 0.6,
+                          R3D.mixCol(pal.rock[0], '#000000', 0.3), false, 6);
             }
             made++;
         }

@@ -444,19 +444,47 @@
             return;
         }
 
-        // Step off sideways, onto a rope if one crosses here, otherwise onto
-        // any floor beside the ladder. This is the only way onto a rope.
+        /*
+         * Step off sideways, onto a rope if one crosses here, otherwise onto a
+         * deck beside the ladder. This is also the only way onto a rope.
+         *
+         * The reach below the feet is what makes this usable. Matching only the
+         * feet row meant a deck could be stepped onto for the one tile of climb
+         * it occupied — about a sixth of a second at climbing speed, and only if
+         * you were holding the direction as you passed it. From the ladder that
+         * is indistinguishable from nothing happening, which is what "you have
+         * to go all the way to the top" describes: the mechanic was there, the
+         * window to use it was not.
+         *
+         * Searching a couple of rows down and dropping onto the first deck
+         * found turns that into a reach of roughly three tiles, and the snap is
+         * downward only — so it can never lift you to somewhere you had not
+         * already climbed to.
+         */
         const ax = input.axisX();
         if (ax !== 0) {
             if (this._tryBoardRope(room, input)) return;
             const sideX = this.x + ax * C.TILE;
-            const footTile = room.get(Math.floor(sideX / C.TILE), Math.floor((this.y + 2) / C.TILE));
-            const bodyTile = room.get(Math.floor(sideX / C.TILE), Math.floor(this.centreY() / C.TILE));
-            if (Tiles.isFloor(footTile) && !Tiles.isSolid(bodyTile)) {
+            const sideCol = Math.floor(sideX / C.TILE);
+            /*
+             * The extra reach is for a climber who has *stopped* to get off.
+             * While Up or Down is held the old one-row match applies, so
+             * climbing past a deck with a direction held still behaves the way
+             * it always did rather than yanking you sideways off the ladder.
+             */
+            const feetAt = Math.floor((this.y + 2) / C.TILE);
+            const reach = input.axisY() === 0 ? C.STEP_OFF_REACH : 0;
+            for (let row = feetAt; row <= feetAt + reach; row++) {
+                if (Tiles.isSolid(room.get(sideCol, row - 1))) break;   // blocked by wall
+                if (!Tiles.isFloor(room.get(sideCol, row))) continue;
+                if (Tiles.isSolid(room.get(sideCol, Math.floor(this.centreY() / C.TILE)))) break;
                 this.mode = 'walk';
                 this.x = sideX;
+                this.y = row * C.TILE;
                 this.vx = ax * C.MOVE_MAX * 0.5;
                 this.vy = 0;
+                this.fallSpeed = 0;
+                this.onGround = true;
                 return;
             }
         }

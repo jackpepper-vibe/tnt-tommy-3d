@@ -195,6 +195,9 @@
         bus.on(EV.MINE_STARTED, function () { self.play('start'); });
         bus.on(EV.PLAYER_MOUNT, function () { self.play('jump', 0.22); });
         bus.on(EV.CRUMBLE, function () { self.play('bounce', 0.35); });
+        // A stomp is a small explosion, not a bounce — it has to sound like a
+        // kill or it reads as having simply hopped off the thing.
+        bus.on(EV.ENEMY_STOMPED, function () { self.play('boom', 0.4); });
         bus.on(EV.STATE_CHANGED, function (e) {
             if (e.to === 'victory') self.play('win');
         });

@@ -289,11 +289,34 @@
         this.homeY = tileCentre(ty);
         this.x = this.homeX;
         this.y = this.homeY;
+        this.reformIn = 0;
         void room;
     }
 
+    /**
+     * Stomped: scattered, not destroyed.
+     *
+     * The guardian is the room's pressure — the reason not to stand still
+     * working out a route — so a stomp that removed it for good would turn the
+     * hardest rooms in the mine into empty ones. It reforms where it was first
+     * posted, which is both a reason to keep moving and a guarantee it never
+     * comes back on top of the player.
+     */
+    Guardian.prototype.onStomped = function () {
+        this.reformIn = C.GUARDIAN_REFORM;
+    };
+
     Guardian.prototype.update = function (dt, player) {
-        if (this.dead) return;
+        if (this.dead) {
+            if (this.reformIn <= 0) return;
+            this.reformIn -= dt;
+            if (this.reformIn <= 0) {
+                this.dead = false;
+                this.x = this.homeX;
+                this.y = this.homeY;
+            }
+            return;
+        }
         this.t += dt;
         if (!player || !player.active) return;
 
@@ -940,7 +963,7 @@
             e.dir = 1;
             if (e.kind === 'orb') e.y = e.minY;
             else if (e.kind === 'spider') { e.y = e.homeY; e.state = 'wait'; e.timer = SPIDER_WAIT; e.thread = 0; }
-            else if (e.kind === 'guardian') { e.x = e.homeX; e.y = e.homeY; }
+            else if (e.kind === 'guardian') { e.x = e.homeX; e.y = e.homeY; e.reformIn = 0; }
             else if (e.kind === 'dog') { e.x = e.minX; e.state = 'patrol'; e.timer = 0; }
             else e.x = e.minX;
         }

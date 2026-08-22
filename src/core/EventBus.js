@@ -71,6 +71,7 @@
         PLAYER_RESPAWN: 'player-respawn', // {x, y}
         BLAST_PLANTED: 'blast-planted',   // {x, y}
         BLAST: 'blast',                   // {x, y, broke, killed}
+        ENEMY_STOMPED: 'enemy-stomped',   // {x, y, kind}
         CRUMBLE: 'crumble',               // {x, y}
         VENT_FIRED: 'vent-fired',         // {x, y}
         CRUSH_SLAM: 'crush-slam',         // {x, y}

@@ -910,11 +910,19 @@
          * in a room that cannot survive being still. Offsetting each tile by
          * its own column gives a travelling wave for the cost of a sine.
          */
+        /*
+         * The phase step per column is small and the plates overlap their
+         * neighbours, so the surface stays one continuous line that undulates.
+         * A larger step made each tile crest independently and the surface
+         * broke into a row of separate bright dashes — which, sitting along
+         * the top of a sump, looked like exactly the banding the body of the
+         * water had just been rid of.
+         */
         for (const cell of ents.waterTops) {
             const wave = set.pools.wave.next();
-            const bob = Math.sin(t * 2.1 + cell.tx * 0.7) * 0.055;
+            const bob = Math.sin(t * 2.1 + cell.tx * 0.28) * 0.045;
             wave.position.set(cell.tx + 0.5, C.ROWS - cell.ty - 0.06 + bob, ACTOR_Z - 0.25);
-            wave.scale.set(1, 1 + Math.sin(t * 3.3 + cell.tx * 0.9) * 0.22, 1);
+            wave.scale.set(1.08, 1 + Math.sin(t * 3.3 + cell.tx * 0.28) * 0.14, 1);
         }
 
         /*

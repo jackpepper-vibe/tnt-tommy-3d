@@ -388,10 +388,31 @@
         for (const e of ents.enemies) {
             if (e.dead) continue;
             const b = e.box();
-            if (Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) {
-                this._hurt(e.spec.damage, e.kind, p.x < b.x ? -1 : 1);
-                return;
+            if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
+
+            /*
+             * Coming down on its head kills it instead of costing you.
+             *
+             * Both halves of the test matter. The fall speed stops a walk into
+             * an enemy counting as a stomp, and the feet-above-centre test stops
+             * one being killed by a body you happen to be dropping *past* —
+             * without it, brushing a bat on the way down reads as a kill and
+             * the mechanic becomes an accident rather than a move.
+             */
+            if (p.vy > C.STOMP_MIN_V && p.y <= b.y + b.h * C.STOMP_BAND) {
+                e.dead = true;
+                if (typeof e.onStomped === 'function') e.onStomped();
+                this.score += C.SCORE_STOMP;
+                p.vy = -C.STOMP_BOUNCE;
+                p.rising = true;
+                p.onGround = false;
+                p.fallSpeed = 0;
+                this.bus.emit(EV.ENEMY_STOMPED, { x: b.x, y: b.y, kind: e.kind });
+                continue;
             }
+
+            this._hurt(e.spec.damage, e.kind, p.x < b.x ? -1 : 1);
+            return;
         }
 
         for (const c of ents.crushers) {

@@ -128,6 +128,10 @@
         bus.on(EV.BLAST, function (e) {
             if (e.killed > 0) self.float('+' + (e.killed * C.SCORE_ENEMY), e.x, e.y, 'gold');
         });
+
+        bus.on(EV.ENEMY_STOMPED, function (e) {
+            self.float('+' + C.SCORE_STOMP, e.x, e.y - 10, 'gold');
+        });
     };
 
     /**

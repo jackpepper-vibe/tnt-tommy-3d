@@ -932,6 +932,34 @@
     };
 
     /**
+     * THE HAZARD SIGNATURE.
+     *
+     * One palette, worn by everything in the mine that can take energy off you
+     * and by nothing that cannot.
+     *
+     * It exists because spikes were `pal.spike` — a pale grey — and were drawn
+     * as downward cones on a rail, while decorative stalactites are rock-grey
+     * downward cones hanging off a ceiling. Same silhouette, near enough the
+     * same colour, so there was nothing for a player to read: you learned which
+     * was which by walking into one and losing a life. A hazard has to announce
+     * itself before it is touched, and it cannot do that by looking like the
+     * scenery.
+     *
+     * Amber banding on a dark iron mount is the part that does the work. It is
+     * deliberately a *manufactured* look — nothing in the rock is that colour or
+     * that regular — so the read is "someone put this here to hurt me" rather
+     * than "the cave has bumps".
+     */
+    R3D.HAZARD = {
+        metal:    '#3b3229',
+        metalLit: '#5c4e40',
+        warn:     '#e8a41c',   // the banding, and nothing decorative uses it
+        warnDim:  '#8a5c10',
+        edge:     '#fff2cf',   // the cutting edge catching the light
+        rust:     '#7d3a18'
+    };
+
+    /**
      * The heat coming off a lava channel: bright along the bottom edge, gone by
      * the top, and faded out at both ends.
      *

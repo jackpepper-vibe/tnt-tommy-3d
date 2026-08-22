@@ -287,6 +287,147 @@ check('a ladder can be remounted from above', () => {
 });
 
 /**
+ * A ladder passing a deck part-way up, and Left or Right stepping onto it.
+ *
+ * The two checks above cover the foot and the cap, which is why this went
+ * unnoticed: Left and Right were read only inside the jump branch, so while
+ * climbing they did nothing at all and the only ways off a ladder were its two
+ * ends. There are 79 landings like this in the mine, so "you have to go all the
+ * way to the top" was most of the climbing in the game.
+ */
+function midLadderLanding(mine) {
+    for (let ri = 0; ri < mine.rooms.length; ri++) {
+        const r = mine.rooms[ri];
+        for (let tx = 2; tx < C.COLS - 2; tx++) {
+            for (let ty = 4; ty < C.ROWS - 3; ty++) {
+                // Three rungs of headroom, so a climb test has somewhere to go.
+                if (!Tiles.isClimbable(r.get(tx, ty))) continue;
+                if (!Tiles.isClimbable(r.get(tx, ty + 1))) continue;
+                if (!Tiles.isClimbable(r.get(tx, ty - 1)) ||
+                    !Tiles.isClimbable(r.get(tx, ty - 2)) ||
+                    !Tiles.isClimbable(r.get(tx, ty - 3))) continue;
+                for (const dir of [1, -1]) {
+                    const d = tx + dir;
+                    if (Tiles.isFloor(r.get(d, ty + 1)) && !Tiles.isSolid(r.get(d, ty))) {
+                        return { tx: tx, ty: ty, dir: dir, room: ri, id: r.id };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+}
+
+check('a ladder can be stepped off at a deck part-way up', () => {
+    const h = harness();
+    const p = h.run.player;
+    const spot = midLadderLanding(h.run.mine);
+    assert(spot, 'no ladder in mine 1 runs past a deck');
+
+    h.run.roomIndex = spot.room;
+    p.placeAt(spot.tx * C.TILE + C.TILE / 2, (spot.ty + 1) * C.TILE);
+    p.mode = 'climb';
+    p.climbCol = spot.tx;
+
+    // Long enough for the step-off to fire, short enough not to walk off the
+    // far end of a two-tile deck and fail for the wrong reason.
+    h.seconds(0.1, [spot.dir > 0 ? 'right' : 'left']);
+    assert(p.mode !== 'climb', 'still on the ladder after a tenth of a second of ' +
+        (spot.dir > 0 ? 'Right' : 'Left'));
+    assert(Math.floor(p.x / C.TILE) !== spot.tx, 'let go but never left the column');
+    assert(p.onGround, 'stepped off into thin air rather than onto the deck');
+    return spot.id + ' col ' + spot.tx + ', stepped ' + (spot.dir > 0 ? 'right' : 'left');
+});
+
+/**
+ * Stomping. Both halves matter equally: landing on an enemy has to kill it,
+ * and walking into one has to still cost you — a stomp test that only proves
+ * the kill would pass just as happily if every touch killed.
+ */
+check('landing on an enemy kills it and bounces you', () => {
+    const h = harness();
+    const p = h.run.player;
+
+    // Whichever room the run starts in, find a room with an enemy in it.
+    let ents = h.run.ents();
+    for (let i = 0; i < h.run.mine.rooms.length && !ents.enemies.length; i++) {
+        h.run.roomIndex = i;
+        h.seconds(0.05, []);
+        ents = h.run.ents();
+    }
+    assert(ents && ents.enemies.length, 'no room in mine 1 has an enemy to land on');
+
+    const e = ents.enemies[0];
+    const b = e.box();
+    const score0 = h.run.score;
+
+    // Feet a quarter of its height above its centre — overlapping it, and
+    // clearly coming down on the top of it.
+    p.placeAt(b.x, b.y - b.h / 4);
+    p.mode = 'walk';
+    p.onGround = false;
+    p.invuln = 0;
+    p.vy = C.STOMP_MIN_V * 2;
+    h.step(1);
+
+    assert(e.dead, 'landed on a ' + e.kind + ' at full fall speed and it survived');
+    assert(p.vy < 0, 'killed it but did not bounce (vy ' + p.vy.toFixed(0) + ')');
+    assert(h.run.score > score0, 'a stomp scored nothing');
+    return 'stomped a ' + e.kind + ' for ' + (h.run.score - score0);
+});
+
+check('walking into an enemy still costs energy', () => {
+    const h = harness();
+    const p = h.run.player;
+
+    let ents = h.run.ents();
+    for (let i = 0; i < h.run.mine.rooms.length && !ents.enemies.length; i++) {
+        h.run.roomIndex = i;
+        h.seconds(0.05, []);
+        ents = h.run.ents();
+    }
+    assert(ents && ents.enemies.length, 'no enemy to walk into');
+
+    const e = ents.enemies[0];
+    const b = e.box();
+    const energy0 = h.run.energy;
+
+    // Level with it, moving sideways — not falling.
+    p.placeAt(b.x, b.y + b.h / 2);
+    p.mode = 'walk';
+    p.onGround = true;
+    p.invuln = 0;
+    p.vy = 0;
+    h.step(1);
+
+    assert(!e.dead, 'a level walk into a ' + e.kind + ' killed it');
+    assert(h.run.energy < energy0, 'walking into a ' + e.kind + ' cost nothing');
+    return 'took ' + (energy0 - h.run.energy).toFixed(0) + ' from a ' + e.kind;
+});
+
+/**
+ * The reach below the feet must not become a climb interrupter: holding Up
+ * alone has to carry you past a deck, not drop you onto it.
+ */
+check('climbing past a deck does not let go of the ladder', () => {
+    const h = harness();
+    const p = h.run.player;
+    const spot = midLadderLanding(h.run.mine);
+    assert(spot, 'no ladder in mine 1 runs past a deck');
+
+    h.run.roomIndex = spot.room;
+    p.placeAt(spot.tx * C.TILE + C.TILE / 2, (spot.ty + 1) * C.TILE);
+    p.mode = 'climb';
+    p.climbCol = spot.tx;
+    const y0 = p.y;
+
+    h.seconds(0.3, ['up']);
+    assert(p.mode === 'climb', 'let go of the ladder while climbing past a deck');
+    assert(p.y < y0 - 4, 'held Up on a ladder and did not climb');
+    return 'climbed ' + (y0 - p.y).toFixed(0) + 'px past the deck at row ' + (spot.ty + 1);
+});
+
+/**
  * Falling has to stay cheap. Punishing modest drops is what forced the wide
  * level grid that made the mine feel like ladders and empty air — so this
  * asserts the *generosity*, not the danger.

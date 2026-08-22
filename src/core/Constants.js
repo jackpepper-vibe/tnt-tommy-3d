@@ -159,6 +159,17 @@
     C.VINE_V = 88;             // hanging rope — deliberately slower than a ladder
 
     /**
+     * How far below the feet a step off a ladder will reach for a deck, in rows.
+     *
+     * Matching the feet row alone gave a window one tile tall — a sixth of a
+     * second at `CLIMB_V`, and only while holding the direction — which from the
+     * ladder is indistinguishable from the step-off not existing. Two rows of
+     * reach makes it about three tiles. Going wider starts to teleport you down
+     * past decks you meant to stop at.
+     */
+    C.STEP_OFF_REACH = 2;
+
+    /**
      * Falling *through* a ladder column is a controlled slide, not a drop.
      *
      * A ladder has to punch a hole through the deck it serves, or it would not
@@ -280,6 +291,33 @@
     C.DMG_CRUSH = 50;
     C.DMG_BOULDER = 36;
     C.DROWN_RATE = 30;         // energy per second underwater without the tank
+
+    /* ------------------------------------------------------------------ *
+     * Stomping
+     *
+     * Landing on something is the one answer the mine did not have. Every
+     * enemy could be blasted or avoided and nothing else, which left the
+     * guardian — slow, wall-ignoring, permanently on your heels — as pressure
+     * with no counter-play at all: the only reply to it was to keep walking.
+     *
+     * A stomp needs real downward speed so that brushing an enemy while
+     * walking, or clipping one at the top of a hop, is still a hit. Roughly a
+     * third of a full jump's terminal speed.
+     * ------------------------------------------------------------------ */
+    C.STOMP_MIN_V = 120;       // px/s of fall needed for a landing to count
+    C.STOMP_BAND = 0.35;       // how far below the enemy's centre the feet may be
+    C.STOMP_BOUNCE = 300;      // px/s up off the kill — below a full jump's 410
+    C.SCORE_STOMP = 150;
+
+    /**
+     * The guardian comes back.
+     *
+     * Stomping it has to be worth doing and must not remove the room's pressure
+     * for good, or a single hop turns the hardest rooms in the mine into empty
+     * ones. It reforms at the spot it was first posted, which also keeps it
+     * from reappearing on top of the player.
+     */
+    C.GUARDIAN_REFORM = 9;     // s
 
     /* ------------------------------------------------------------------ *
      * Rising lava, and the run out
