@@ -206,84 +206,169 @@
      * Rigs
      * ------------------------------------------------------------------ */
 
+    /**
+     * Every rig in here was a box, and against a room that has just been
+     * rebuilt out of round stock they were the last flat thing on screen.
+     *
+     * The rule each one follows: a **distinct silhouette at twenty pixels**.
+     * Not detail — silhouette. A player has to tell a walker from a dog from a
+     * spider by outline alone, in the half second before one of them reaches
+     * them, in a dark room. So each gets one exaggerated feature and a
+     * high-value accent, and none of them is symmetrical.
+     */
     const RIGS = {
+        /** A minecart bot: barrel body on wheels, with a stack. */
         walker: function (b) {
-            b.box(0, 0, 0, 0.72, 0.6, 0.5, R3D.col('#6a4a3a'), F.ALL, R3D.col('#8a6248'));
-            b.box(-0.3, -0.34, 0, 0.16, 0.16, 0.4, R3D.col('#2a2a30'));
-            b.box(0.3, -0.34, 0, 0.16, 0.16, 0.4, R3D.col('#2a2a30'));
-            b.box(0, 0.36, 0, 0.5, 0.14, 0.4, R3D.col('#3a3a44'));
+            const iron = R3D.col('#6d4b38');
+            const trim = R3D.col('#9a7050');
+            b.cyl(0, 0.02, 0, 0.30, 0.62, 'z', iron, 12, trim);
+            b.cyl(0, 0.02, 0.16, 0.20, 0.06, 'z', R3D.col('#3a2a20'), 12);
+            b.cyl(-0.26, -0.30, 0, 0.14, 0.44, 'z', R3D.col('#26262c'), 10, R3D.col('#44444e'));
+            b.cyl(0.26, -0.30, 0, 0.14, 0.44, 'z', R3D.col('#26262c'), 10, R3D.col('#44444e'));
+            b.cyl(0.1, 0.36, 0, 0.08, 0.26, 'y', R3D.col('#3a3a44'), 8);
+            // A single lamp eye, off centre, so it has a front.
+            b.sphere(0.16, 0.06, 0.2, 0.07, R3D.col('#ffd98a'), 8, 6);
         },
+        /** A hunched grub: segmented shell, low and wide. */
         crawler: function (b) {
-            b.box(0, 0, 0, 0.6, 0.4, 0.44, R3D.col('#3a2d44'), F.ALL, R3D.col('#54406a'));
+            const shell = R3D.col('#4a3556');
+            const shellLit = R3D.col('#6b4d7d');
+            for (let i = 0; i < 4; i++) {
+                const x = -0.24 + i * 0.16;
+                const r = 0.20 - Math.abs(i - 1.5) * 0.028;
+                b.sphere(x, 0, 0, r, i % 2 ? shell : shellLit, 9, 6);
+            }
+            b.sphere(0.30, 0.02, 0, 0.16, shellLit, 9, 6);
+            b.sphere(0.36, 0.06, 0.10, 0.045, R3D.col('#ffe066'), 6, 5);
+            b.sphere(0.36, 0.06, -0.10, 0.045, R3D.col('#ffe066'), 6, 5);
             for (let i = 0; i < 3; i++) {
-                const x = -0.34 + i * 0.34;
-                b.box(x, -0.24, 0.18, 0.08, 0.3, 0.08, R3D.col('#2a2030'));
-                b.box(x, -0.24, -0.18, 0.08, 0.3, 0.08, R3D.col('#2a2030'));
+                const x = -0.2 + i * 0.2;
+                b.cyl(x, -0.17, 0.14, 0.03, 0.2, 'y', R3D.col('#2a2030'), 5);
+                b.cyl(x, -0.17, -0.14, 0.03, 0.2, 'y', R3D.col('#2a2030'), 5);
             }
         },
+
+        /** Long, low and pointed — it says "this one comes at you". */
         dog: function (b) {
-            // Long and low, and pointed — the silhouette has to say "this one
-            // moves toward you" before it does.
-            b.box(0, 0, 0, 0.8, 0.4, 0.42, R3D.col('#5a3b2a'), F.ALL, R3D.col('#7a5238'));
-            b.box(0.42, 0.1, 0, 0.34, 0.3, 0.34, R3D.col('#6a4632'));
-            b.box(0.62, 0.04, 0, 0.16, 0.16, 0.2, R3D.col('#2a1c14'));
-            b.box(0.34, 0.3, 0.1, 0.1, 0.18, 0.06, R3D.col('#3d2a1e'));
-            b.box(0.34, 0.3, -0.1, 0.1, 0.18, 0.06, R3D.col('#3d2a1e'));
-            b.box(-0.44, 0.14, 0, 0.24, 0.1, 0.1, R3D.col('#4a3122'));
-            for (const x of [-0.26, 0.22]) {
-                b.box(x, -0.28, 0.16, 0.11, 0.24, 0.11, R3D.col('#3d2a1e'));
-                b.box(x, -0.28, -0.16, 0.11, 0.24, 0.11, R3D.col('#3d2a1e'));
+            const hide = R3D.col('#6b4530');
+            const hideLit = R3D.col('#8d5f3f');
+            b.cyl(0, 0, 0, 0.21, 0.66, 'x', hide, 10, hideLit);
+            b.sphere(0.40, 0.08, 0, 0.19, hideLit, 10, 7);
+            b.cyl(0.56, 0.02, 0, 0.09, 0.20, 'x', R3D.col('#33231a'), 8);
+            b.sphere(0.66, 0.02, 0, 0.06, R3D.col('#1a1210'), 6, 5);
+            b.sphere(0.44, 0.12, 0.10, 0.04, R3D.col('#ff8a5c'), 6, 5);
+            b.sphere(0.44, 0.12, -0.10, 0.04, R3D.col('#ff8a5c'), 6, 5);
+            b.cone(0.30, 0.26, 0.09, 0.07, 0.16, R3D.col('#40291d'), true, 6);
+            b.cone(0.30, 0.26, -0.09, 0.07, 0.16, R3D.col('#40291d'), true, 6);
+            b.cyl(-0.36, 0.20, 0, 0.045, 0.30, 'y', hide, 6);
+            for (const x of [-0.2, 0.18]) {
+                b.cyl(x, -0.24, 0.13, 0.05, 0.24, 'y', R3D.col('#40291d'), 6);
+                b.cyl(x, -0.24, -0.13, 0.05, 0.24, 'y', R3D.col('#40291d'), 6);
             }
         },
+
+        /** A bulb of a body with eight thin legs arching over it. */
         spider: function (b) {
-            b.box(0, 0, 0, 0.4, 0.34, 0.4, R3D.col('#241c2e'), F.ALL, R3D.col('#3a2c4a'));
-            b.box(0.06, 0.06, 0.2, 0.08, 0.08, 0.04, R3D.col('#ff5c4d'), F.FRONT);
-            b.box(-0.06, 0.06, 0.2, 0.08, 0.08, 0.04, R3D.col('#ff5c4d'), F.FRONT);
+            b.sphere(0, -0.02, 0, 0.19, R3D.col('#2a2038'), 10, 7);
+            b.sphere(0.14, 0.04, 0, 0.11, R3D.col('#3c2d50'), 8, 6);
+            b.sphere(0.19, 0.06, 0.06, 0.037, R3D.col('#ff5c4d'), 6, 5);
+            b.sphere(0.19, 0.06, -0.06, 0.037, R3D.col('#ff5c4d'), 6, 5);
+            b.sphere(0.21, 0.11, 0, 0.028, R3D.col('#ff8a72'), 6, 5);
             for (let i = 0; i < 4; i++) {
-                const a = -0.34 + i * 0.22;
-                b.box(a, 0.1, 0.26, 0.05, 0.34, 0.05, R3D.col('#1a1422'));
-                b.box(a, 0.1, -0.26, 0.05, 0.34, 0.05, R3D.col('#1a1422'));
+                const x = -0.16 + i * 0.11;
+                for (const s of [1, -1]) {
+                    b.cyl(x, 0.12, s * 0.14, 0.022, 0.26, 'z', R3D.col('#160f1e'), 5);
+                    b.cyl(x, -0.02, s * 0.26, 0.022, 0.28, 'y', R3D.col('#160f1e'), 5);
+                }
             }
         },
+
+        /** A hovering lantern-thing. No legs: it goes through walls. */
         guardian: function (b) {
-            // A floating lantern-thing. No legs on purpose: it goes through
-            // walls, and anything with legs reads as something that should not.
-            b.box(0, 0, 0, 0.44, 0.44, 0.44, R3D.col('#2c3a52'), F.ALL, R3D.col('#44587a'));
-            b.box(0, 0.3, 0, 0.2, 0.16, 0.2, R3D.col('#5a7098'));
-            b.box(0, 0, 0.24, 0.22, 0.22, 0.04, R3D.col('#9fd0ff'), F.FRONT);
-        },
-        thread: function (b) {
-            // One unit of spider silk, scaled to length by the sync pass.
-            b.box(0, -0.5, 0, 0.045, 1, 0.045, R3D.col('#8f8fa8'));
-        },
-        bat: function (b) {
-            b.box(0, 0, 0, 0.34, 0.34, 0.32, R3D.col('#42324a'));
-            b.box(-0.46, 0.06, 0, 0.6, 0.16, 0.22, R3D.col('#2e2436'));
-            b.box(0.46, 0.06, 0, 0.6, 0.16, 0.22, R3D.col('#2e2436'));
-        },
-        orb: function (b) {
-            b.box(0, 0, 0, 0.44, 0.44, 0.44, R3D.col('#ff7a3c'));
-        },
-        crusher: function (b) {
-            b.box(0, 0, 0, 1.8, 0.9, 0.8, R3D.col('#4a4a54'), F.ALL, R3D.col('#6a6a78'));
-            b.box(0, -0.48, 0, 1.9, 0.16, 0.9, R3D.col('#2a2a32'));
-            for (let i = 0; i < 4; i++) {
-                b.box(-0.66 + i * 0.44, -0.56, 0, 0.16, 0.16, 0.6, R3D.col('#8a8a96'));
+            b.sphere(0, 0, 0, 0.23, R3D.col('#33445f'), 12, 8);
+            b.cyl(0, 0.22, 0, 0.09, 0.14, 'y', R3D.col('#5a7098'), 8);
+            b.cyl(0, 0.30, 0, 0.05, 0.10, 'y', R3D.col('#8fb0d8'), 6);
+            b.sphere(0, 0, 0.17, 0.10, R3D.col('#bfe4ff'), 9, 6);
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2;
+                b.cyl(Math.cos(a) * 0.28, Math.sin(a) * 0.28, 0, 0.028, 0.09, 'z',
+                      R3D.col('#6d86ad'), 5);
             }
         },
-        boulder: function (b) {
-            b.box(0, 0, 0, 0.7, 0.7, 0.7, R3D.col('#4a3f34'), F.ALL, R3D.col('#5f5040'));
-            b.box(0.2, 0.2, 0.2, 0.3, 0.3, 0.3, R3D.col('#3d332a'));
+
+        /** One unit of spider silk, scaled to length by the sync pass. */
+        thread: function (b) {
+            b.cyl(0, -0.5, 0, 0.018, 1, 'y', R3D.col('#9a9ab4'), 4);
         },
+
+        /** Body, ears, and wings that are wide and thin. */
+        bat: function (b) {
+            const fur = R3D.col('#4a3856');
+            b.sphere(0, 0, 0, 0.17, fur, 9, 6);
+            b.cone(-0.09, 0.18, 0, 0.06, 0.16, R3D.col('#33253d'), true, 5);
+            b.cone(0.09, 0.18, 0, 0.06, 0.16, R3D.col('#33253d'), true, 5);
+            b.sphere(-0.06, 0.02, 0.13, 0.035, R3D.col('#ffd166'), 6, 5);
+            b.sphere(0.06, 0.02, 0.13, 0.035, R3D.col('#ffd166'), 6, 5);
+            for (const s of [-1, 1]) {
+                b.box(s * 0.34, 0.06, 0, 0.42, 0.10, 0.20, R3D.col('#33253d'));
+                b.box(s * 0.56, 0.00, 0, 0.22, 0.16, 0.16, R3D.col('#291d31'));
+            }
+        },
+
+        /** A ball of fire. Round, and layered so it has a hot core. */
+        orb: function (b) {
+            b.sphere(0, 0, 0, 0.22, R3D.col('#ff7a3c'), 12, 8);
+            b.sphere(0, 0.02, 0.05, 0.14, R3D.col('#ffc46a'), 10, 7);
+            b.sphere(0, 0.03, 0.09, 0.07, R3D.col('#fff3c8'), 8, 6);
+        },
+
+        /** A piston head on a ram, with teeth. */
+        crusher: function (b) {
+            const steel = R3D.col('#5a5a66');
+            const steelLit = R3D.col('#82828f');
+            b.cyl(0, 0.44, 0, 0.13, 0.5, 'y', R3D.col('#3a3a44'), 8);
+            b.box(0, 0.02, 0, 1.7, 0.62, 0.78, steel, F.ALL, steelLit);
+            b.box(0, 0.30, 0, 1.86, 0.14, 0.86, R3D.col('#43434e'), F.ALL, steelLit);
+            for (let i = 0; i < 5; i++) {
+                b.cone(-0.68 + i * 0.34, -0.40, 0, 0.13, 0.28, R3D.col('#9aa0ac'), false, 6);
+            }
+            for (const s of [-1, 1]) {
+                for (let i = 0; i < 3; i++) {
+                    b.sphere(s * 0.74, 0.14 - i * 0.16, 0.4, 0.045, steelLit, 6, 5);
+                }
+            }
+        },
+
+        /** A rock. Actually round, with lumps knocked off it. */
+        boulder: function (b) {
+            b.sphere(0, 0, 0, 0.34, R3D.col('#584a3c'), 10, 7);
+            b.sphere(0.16, 0.14, 0.12, 0.16, R3D.col('#6b5a48'), 8, 6);
+            b.sphere(-0.18, -0.10, 0.10, 0.13, R3D.col('#443a2f'), 8, 6);
+            b.sphere(0.04, -0.20, -0.14, 0.12, R3D.col('#493d31'), 8, 6);
+        },
+
+        /** The winding cage: a floor, four corner posts and a hanging rope. */
         lift: function (b) {
             const w = C.LIFT_W;
-            b.box(0, 0, 0, w, 0.34, 0.9, R3D.col('#4a4038'), F.ALL, R3D.col('#7a6650'));
-            b.box(-w / 2 + 0.12, 0.34, 0, 0.16, 0.4, 0.8, R3D.col('#2f2a24'));
-            b.box(w / 2 - 0.12, 0.34, 0, 0.16, 0.4, 0.8, R3D.col('#2f2a24'));
+            const frame = R3D.col('#5d4c3c');
+            const frameLit = R3D.col('#8a7256');
+            b.box(0, 0, 0, w, 0.22, 0.9, R3D.col('#4a4038'), F.ALL, frameLit);
+            b.box(0, 0.14, 0, w - 0.2, 0.08, 0.82, frameLit, F.ALL, frameLit);
+            for (const sx of [-1, 1]) {
+                for (const sz of [-1, 1]) {
+                    b.cyl(sx * (w / 2 - 0.14), 0.42, sz * 0.34, 0.055, 0.72, 'y', frame, 6);
+                }
+            }
+            b.box(0, 0.78, 0, w - 0.24, 0.10, 0.8, frame, F.ALL, frameLit);
+            b.cyl(0, 1.1, 0, 0.04, 0.55, 'y', R3D.col('#3a3a42'), 6);
         },
+        /** A planted stick, fuse burning. */
         bomb: function (b) {
-            b.box(0, 0, 0, 0.44, 0.5, 0.4, R3D.col('#b03a2e'), F.ALL, R3D.col('#d4503c'));
-            b.box(0, 0.32, 0, 0.08, 0.2, 0.08, R3D.col('#6a5030'));
+            for (const dx of [-0.11, 0.11]) {
+                b.cyl(dx, 0, 0, 0.105, 0.5, 'y', R3D.col('#cf3b2a'), 10, R3D.col('#f0604a'));
+            }
+            b.cyl(0, 0.02, 0, 0.2, 0.12, 'y', R3D.col('#f2e3bd'), 12);
+            b.cyl(0, 0.3, 0, 0.025, 0.16, 'y', R3D.col('#7a6038'), 6);
         }
     };
 
@@ -409,6 +494,29 @@
             const mat = (kind === 'orb') ? glow : solid;
             set.pools[kind] = new Pool(set.group, RIGS[kind], mat, 6);
         }
+        /**
+         * A rotten plank, drawn live rather than baked.
+         *
+         * Deliberately not the same shape as a sound board: grey, split into
+         * three loose pieces with gaps between them, and no bright deck cap.
+         * The player has to be able to tell at a glance which boards will hold,
+         * and the whole point of the warning shake is lost if you cannot see it
+         * coming *before* you step on.
+         */
+        set.pools.plank = new Pool(set.group, function (b) {
+            const rot = R3D.col('#6a5f52');
+            const rotLit = R3D.col('#8b7d6b');
+            const dark = R3D.col('#2a231c');
+            for (let i = 0; i < 3; i++) {
+                const x = -0.33 + i * 0.33;
+                b.box(x, 0.34, 0, 0.28, 0.16, 0.8, rot, F.ALL, rotLit);
+                b.box(x, 0.34, 0.42, 0.28, 0.05, 0.04, dark, F.FRONT);
+            }
+            // Split ends, so the gaps read as damage rather than as a grille.
+            b.box(-0.17, 0.34, 0.43, 0.03, 0.18, 0.04, dark, F.FRONT);
+            b.box(0.17, 0.34, 0.43, 0.03, 0.18, 0.04, dark, F.FRONT);
+        }, solid, 12);
+
         set.pools.warp = new Pool(set.group, function (b) {
             b.plate(0, 0, 0, 1, 1, R3D.col('#ffffff'));
         }, R3D.haloMaterial('#b78bff', 0.55), 6);
@@ -543,6 +651,41 @@
         for (const l of ents.lifts) {
             const mesh = set.pools.lift.next();
             mesh.position.set(R3D.wx(l.x) + C.LIFT_W / 2, R3D.wy(l.y) - 0.17, ACTOR_Z - 0.15);
+        }
+
+        /*
+         * Rotten planks, and their tell.
+         *
+         * The simulation has always had a warning phase — `C.CRUMBLE_SHAKE`,
+         * half a second between standing on a plank and it giving way — and it
+         * was never drawn. The board just disappeared, which is why falling
+         * through one had "no indication by looking at the platform". Here it
+         * shudders harder the closer it gets, then drops and fades.
+         */
+        for (const cell of ents.crumbleTiles) {
+            const state = ents.crumbleAt(cell.tx, cell.ty);
+            const mesh = set.pools.plank.next();
+            const bx = cell.tx + 0.5;
+            const by = C.ROWS - cell.ty - 0.5;
+            mesh.rotation.set(0, 0, 0);
+            mesh.scale.set(1, 1, 1);
+
+            if (!state) {
+                mesh.position.set(bx, by, ACTOR_Z - 0.3);
+            } else if (state.state === 'shake') {
+                // Amplitude ramps with the timer, so the last moments are loud.
+                const a = 0.04 + state.shake * 0.10;
+                mesh.position.set(bx + Math.sin(t * 46) * a, by + Math.sin(t * 61) * a * 0.6,
+                                  ACTOR_Z - 0.3);
+                mesh.rotation.z = Math.sin(t * 53) * state.shake * 0.09;
+            } else if (state.state === 'falling') {
+                const k = 1 - Math.max(0, state.timer) / C.CRUMBLE_FALL;
+                mesh.position.set(bx, by - k * k * 3.2, ACTOR_Z - 0.3);
+                mesh.rotation.z = k * 1.5;
+                mesh.scale.setScalar(1 - k * 0.4);
+            } else {
+                mesh.visible = false;   // gone, waiting to reform
+            }
         }
 
         // Warp pads pulse, and pulse *together* — a pair that breathes in step

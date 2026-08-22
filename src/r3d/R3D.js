@@ -103,14 +103,23 @@
      * sources that move.
      */
     R3D.PALETTES = {
+        /**
+         * Hue separation is the job here, not brightness.
+         *
+         * An earlier pass had rock and timber both mid-brown, and the room read
+         * as one material however much texture and lighting went on it — you
+         * could not tell a wall from a walkway at a glance. Stone is pulled
+         * cool and grey, timber stays warm orange, and anything metal goes
+         * bluer still. Three families, and every prop belongs to one of them.
+         */
         copper: {
-            rock:      ['#584634', '#63503a', '#4d3d2d'],
-            rockTop:   '#8a6d4f',
+            rock:      ['#4c4a4a', '#565252', '#403f41'],
+            rockTop:   '#7d7469',
             moss:      '#5c7040',
-            timber:    '#8a5f36',
-            timberTop: '#ab7a45',
-            ladder:    '#a8834c',
-            rope:      '#bd9756',
+            timber:    '#9a6330',
+            timberTop: '#c48541',
+            ladder:    '#b8874a',
+            rope:      '#c9a05a',
             /**
              * The cavern behind the playfield.
              *
@@ -133,11 +142,11 @@
             lava:      '#ff5a2a'
         },
         slate: {
-            rock:      ['#414a55', '#4b5561', '#39424c'],
-            rockTop:   '#77848f',
+            rock:      ['#3c4652', '#46515e', '#343d47'],
+            rockTop:   '#6f7d8b',
             moss:      '#4e6b5a',
-            timber:    '#6f5c48',
-            timberTop: '#8c7458',
+            timber:    '#8a6437',
+            timberTop: '#ab7f4b',
             ladder:    '#8794a1',
             rope:      '#a8a389',
             back:      '#232c38',
@@ -599,6 +608,75 @@
                 if (side > 0) this.index.push(centre, a, b);
                 else this.index.push(centre, b, a);
             }
+        }
+        return this;
+    };
+
+    /**
+     * A sphere. Anything the player reads as "a round thing" — boulders, orbs,
+     * eyes, berries — has to actually be one; a cube with a warm colour reads
+     * as a crate no matter what it is called.
+     */
+    Builder.prototype.sphere = function (cx, cy, cz, radius, colour, seg, rings) {
+        const n = seg || 10;
+        const m = rings || 7;
+        const start = this.count;
+
+        for (let j = 0; j <= m; j++) {
+            const phi = (j / m) * Math.PI;
+            const sy = Math.cos(phi), sr = Math.sin(phi);
+            for (let i = 0; i <= n; i++) {
+                const th = (i / n) * Math.PI * 2;
+                const nx = Math.cos(th) * sr, ny = sy, nz = Math.sin(th) * sr;
+                this.pos.push(cx + nx * radius, cy + ny * radius, cz + nz * radius);
+                this.norm.push(nx, ny, nz);
+                this.color.push(colour.r, colour.g, colour.b);
+                this.uv.push(i / n, 1 - j / m);
+                this.count++;
+            }
+        }
+        for (let j = 0; j < m; j++) {
+            for (let i = 0; i < n; i++) {
+                const a = start + j * (n + 1) + i;
+                const b = a + n + 1;
+                this.index.push(a, b, a + 1, a + 1, b, b + 1);
+            }
+        }
+        return this;
+    };
+
+    /**
+     * A cone along Y — `tipUp` false points it downward, which is what
+     * stalactites, spikes and drips all want.
+     */
+    Builder.prototype.cone = function (cx, cy, cz, radius, height, colour, tipUp, seg) {
+        const n = seg || 8;
+        const dir = tipUp === false ? -1 : 1;
+        const baseY = cy - dir * height / 2;
+        const tipY = cy + dir * height / 2;
+        for (let i = 0; i < n; i++) {
+            const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2;
+            const p0 = [Math.cos(a0) * radius, Math.sin(a0) * radius];
+            const p1 = [Math.cos(a1) * radius, Math.sin(a1) * radius];
+            const base = this.count;
+            const tri = [
+                [cx + p0[0], baseY, cz + p0[1]],
+                [cx + p1[0], baseY, cz + p1[1]],
+                [cx, tipY, cz]
+            ];
+            const ux = tri[1][0] - tri[0][0], uy = tri[1][1] - tri[0][1], uz = tri[1][2] - tri[0][2];
+            const vx = tri[2][0] - tri[0][0], vy = tri[2][1] - tri[0][1], vz = tri[2][2] - tri[0][2];
+            let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+            const len = Math.hypot(nx, ny, nz) || 1;
+            for (let k = 0; k < 3; k++) {
+                this.pos.push(tri[k][0], tri[k][1], tri[k][2]);
+                this.norm.push(nx / len, ny / len, nz / len);
+                this.color.push(colour.r, colour.g, colour.b);
+                this.uv.push(k === 1 ? 1 : 0, k === 2 ? 1 : 0);
+                this.count++;
+            }
+            if (dir > 0) this.index.push(base, base + 1, base + 2);
+            else this.index.push(base, base + 2, base + 1);
         }
         return this;
     };

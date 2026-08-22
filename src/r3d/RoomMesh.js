@@ -200,8 +200,15 @@
                 const y = R3D.tileY(ty);
 
                 switch (t) {
-                    case T.PLATFORM:
-                    case T.CRUMBLE: {
+                    // Rotten planks are *not* baked into the terrain. They have
+                    // to shake before they give way, and a merged buffer cannot
+                    // animate one tile — `Actors3D` draws them from the live
+                    // crumble state instead. Without this the plank simply
+                    // vanished under you with no tell at all.
+                    case T.CRUMBLE:
+                        break;
+
+                    case T.PLATFORM: {
                         /*
                          * A capped profile, not a slab.
                          *
@@ -216,38 +223,29 @@
                          * Boards sit at the top of their tile because that is
                          * the surface the physics lands you on.
                          */
-                        const c = t === T.CRUMBLE ? crumbleCol : timber;
-                        const capTop = t === T.CRUMBLE ? R3D.mixCol(pal.timberTop, '#000000', 0.35)
-                                                       : timberTop;
                         // Deck: proud of the body in Z and a touch wider.
                         b.box(x, y + 0.40, TRIM_Z + 0.12, 1, 0.18, TRIM_D + 0.22,
-                              capTop, F.SLAB, capTop);
+                              timberTop, F.SLAB, timberTop);
                         // Body: narrower, darker, hanging under the deck.
-                        b.box(x, y + 0.20, TRIM_Z, 1, 0.24, TRIM_D, c, F.SLAB);
+                        b.box(x, y + 0.20, TRIM_Z, 1, 0.24, TRIM_D, timber, F.SLAB);
                         // The shadow line where one meets the other.
                         b.box(x, y + 0.29, TRIM_Z + TRIM_D / 2 + 0.12, 1, 0.05, 0.04,
                               R3D.mixCol(pal.timber, '#000000', 0.6), F.FRONT);
-
-                        if (t === T.CRUMBLE) {
-                            // Split boards, so a rotten plank is obvious before
-                            // you stand on it rather than after.
-                            b.box(x - 0.2, y + 0.40, TRIM_Z + TRIM_D / 2 + 0.14, 0.06, 0.22, 0.04,
-                                  R3D.col('#1a1109'), F.FRONT);
-                            b.box(x + 0.24, y + 0.40, TRIM_Z + TRIM_D / 2 + 0.14, 0.05, 0.22, 0.04,
-                                  R3D.col('#1a1109'), F.FRONT);
-                        } else if (Util.tileHash(tx, ty) % 3 === 0) {
+                        if (Util.tileHash(tx, ty) % 3 === 0) {
                             // A bracket under the boards every few tiles.
-                            b.box(x, y - 0.02, TRIM_Z, 0.18, 0.30, 0.26, c, F.SLAB);
+                            b.box(x, y - 0.02, TRIM_Z, 0.18, 0.30, 0.26, timber, F.SLAB);
                         }
                         break;
                     }
 
                     case T.LADDER: {
-                        b.box(x - 0.30, y, TRIM_Z, 0.11, 1, 0.2, ladderCol, F.SLAB);
-                        b.box(x + 0.30, y, TRIM_Z, 0.11, 1, 0.2, ladderCol, F.SLAB);
+                        // Round stiles with round rungs, and the rungs proud of
+                        // the rails so the ladder has a front.
+                        b.cyl(x - 0.30, y, TRIM_Z, 0.055, 1, 'y', ladderCol, 6);
+                        b.cyl(x + 0.30, y, TRIM_Z, 0.055, 1, 'y', ladderCol, 6);
                         for (let r = 0; r < 3; r++) {
-                            b.box(x, y - 0.33 + r * 0.33, TRIM_Z, 0.56, 0.08, 0.16,
-                                  ladderCol, F.SLAB, timberTop);
+                            b.cyl(x, y - 0.33 + r * 0.33, TRIM_Z + 0.04, 0.045, 0.62, 'x',
+                                  timberTop, 6);
                         }
                         break;
                     }
@@ -256,38 +254,51 @@
                         // Hangs a little off-centre and knots, so a rope reads as
                         // a rope and not as a ladder that lost its rungs.
                         const wob = ((Util.tileHash(tx, ty) % 7) - 3) * 0.02;
-                        b.box(x + wob, y, TRIM_Z, 0.13, 1, 0.13, ropeCol, F.SLAB);
-                        b.box(x + wob, y - 0.3, TRIM_Z, 0.2, 0.13, 0.2, ropeCol, F.SLAB);
+                        b.cyl(x + wob, y, TRIM_Z, 0.06, 1, 'y', ropeCol, 6);
+                        b.sphere(x + wob, y - 0.3, TRIM_Z, 0.1, ropeCol, 7, 5);
                         break;
                     }
 
                     case T.ROPE: {
-                        b.box(x, y + 0.22, TRIM_Z, 1, 0.1, 0.1, ropeCol, F.SLAB);
+                        b.cyl(x, y + 0.22, TRIM_Z, 0.05, 1, 'x', ropeCol, 6);
                         break;
                     }
 
                     case T.SPIKE: {
+                        // Actual spikes: cones, alternating heights, on a rail.
+                        p.box(x, y + 0.44, TRIM_Z, 1, 0.14, TRIM_D * 0.7,
+                              R3D.mixCol(pal.spike, '#000000', 0.55), F.SLAB);
                         for (let i = 0; i < 3; i++) {
-                            const sx = x - 0.3 + i * 0.3;
-                            p.box(sx, y - 0.24, TRIM_Z, 0.16, 0.5, 0.16, spikeCol, F.SLAB);
-                            p.box(sx, y + 0.06, TRIM_Z, 0.06, 0.2, 0.06,
-                                  R3D.col('#cfd4dc'), F.SLAB);
+                            const sx = x - 0.28 + i * 0.28;
+                            const h = i === 1 ? 0.62 : 0.5;
+                            p.cone(sx, y + 0.36 - h / 2, TRIM_Z, 0.1, h, spikeCol, true, 6);
                         }
                         break;
                     }
 
                     case T.BELT_R:
                     case T.BELT_L: {
-                        p.box(x, y + 0.32, TRIM_Z, 1, 0.26, TRIM_D, beltCol, F.SLAB, beltTread);
-                        p.box(x, y + 0.45, TRIM_Z + TRIM_D / 2 + 0.01, 0.5, 0.06, 0.04,
-                              beltTread, F.FRONT);
+                        // Rollers under a band, with cleats across it.
+                        p.box(x, y + 0.34, TRIM_Z, 1, 0.16, TRIM_D, beltCol, F.SLAB, beltTread);
+                        p.cyl(x - 0.3, y + 0.20, TRIM_Z, 0.13, TRIM_D * 0.8, 'z',
+                              R3D.col('#54545e'), 8, R3D.col('#787885'));
+                        p.cyl(x + 0.3, y + 0.20, TRIM_Z, 0.13, TRIM_D * 0.8, 'z',
+                              R3D.col('#54545e'), 8, R3D.col('#787885'));
+                        p.box(x, y + 0.43, TRIM_Z + TRIM_D / 2 + 0.01, 0.28, 0.08, 0.05,
+                              beltTread, F.SLAB);
                         break;
                     }
 
                     case T.VENT: {
-                        p.box(x, y - 0.4, TRIM_Z, 0.8, 0.2, TRIM_D, R3D.col('#4a4a52'), F.SLAB);
-                        g.box(x, y - 0.34, TRIM_Z + 0.3, 0.5, 0.06, 0.04,
-                              R3D.col('#6fd3ff'), F.FRONT);
+                        // A grated pipe mouth set into the floor.
+                        p.cyl(x, y + 0.36, TRIM_Z, 0.32, 0.22, 'y', R3D.col('#4a4a52'), 10,
+                              R3D.col('#6b6b78'));
+                        p.cyl(x, y + 0.46, TRIM_Z, 0.24, 0.05, 'y', R3D.col('#2a2a32'), 10);
+                        for (let i = 0; i < 3; i++) {
+                            p.box(x - 0.16 + i * 0.16, y + 0.48, TRIM_Z, 0.05, 0.04, 0.42,
+                                  R3D.col('#8a8a96'), F.SLAB);
+                        }
+                        g.cyl(x, y + 0.47, TRIM_Z, 0.2, 0.03, 'y', R3D.col('#6fd3ff'), 10);
                         break;
                     }
 
@@ -328,32 +339,47 @@
                         // Sprung canvas on a frame. Sits at the top of its tile
                         // like a platform, because that is the surface the
                         // physics bounces you off.
-                        p.box(x, y + 0.30, TRIM_Z, 1, 0.14, TRIM_D, R3D.col('#2f6f8f'), F.SLAB,
-                              R3D.col('#4a9ec0'));
-                        b.box(x - 0.42, y + 0.12, TRIM_Z, 0.16, 0.4, 0.4, timber, F.SLAB);
-                        b.box(x + 0.42, y + 0.12, TRIM_Z, 0.16, 0.4, 0.4, timber, F.SLAB);
-                        g.box(x, y + 0.38, TRIM_Z + TRIM_D / 2 + 0.01, 0.9, 0.06, 0.04,
-                              R3D.col('#7fd4f0'), F.FRONT);
+                        // Sprung canvas between two coiled springs.
+                        p.box(x, y + 0.30, TRIM_Z, 1, 0.12, TRIM_D, R3D.col('#2f6f8f'), F.SLAB,
+                              R3D.col('#57b0d4'));
+                        for (const sx of [-0.38, 0.38]) {
+                            for (let k = 0; k < 3; k++) {
+                                p.cyl(x + sx, y + 0.04 + k * 0.09, TRIM_Z, 0.09, 0.05, 'y',
+                                      R3D.col('#9aa4b0'), 8);
+                            }
+                        }
+                        b.cyl(x, y - 0.16, TRIM_Z, 0.1, 0.9, 'x', timber, 6);
+                        g.box(x, y + 0.37, TRIM_Z + TRIM_D / 2 + 0.02, 0.94, 0.06, 0.04,
+                              R3D.col('#8fe0ff'), F.FRONT);
                         break;
                     }
 
                     case T.TELEPORT: {
                         // A ring set into the floor. Deliberately loud — a pad
                         // you do not notice is a route you never take.
-                        p.box(x, y + 0.42, TRIM_Z, 0.9, 0.12, 0.5, R3D.col('#3a2f52'), F.SLAB);
-                        g.box(x, y + 0.44, TRIM_Z + 0.3, 0.95, 0.1, 0.04,
-                              R3D.col('#b78bff'), F.FRONT);
-                        g.box(x, y + 0.1, TRIM_Z + 0.28, 0.55, 0.7, 0.02,
-                              R3D.col('#6f4fd0'), F.FRONT);
+                        // A ring set into the floor with a column of light in it.
+                        p.cyl(x, y + 0.42, TRIM_Z, 0.42, 0.12, 'y', R3D.col('#3a2f52'), 12,
+                              R3D.col('#5c4a7d'));
+                        p.cyl(x, y + 0.46, TRIM_Z, 0.3, 0.06, 'y', R3D.col('#241c33'), 12);
+                        g.cyl(x, y + 0.48, TRIM_Z, 0.34, 0.03, 'y', R3D.col('#c79bff'), 12);
+                        g.cyl(x, y + 0.1, TRIM_Z, 0.24, 0.75, 'y',
+                              R3D.col('#6f4fd0'), 10);
                         lights.push({ x: x, y: y + 0.3, colour: '#b78bff', energy: 0.8, range: 9, flicker: 0.25 });
                         break;
                     }
 
                     case T.DETONATOR: {
-                        b.box(x, y - 0.2, TRIM_Z, 0.7, 0.6, 0.5, R3D.col('#5a3a22'), F.SLAB);
-                        p.box(x, y + 0.16, TRIM_Z, 0.12, 0.4, 0.12, R3D.col('#8c8c94'), F.SLAB);
-                        p.box(x, y + 0.38, TRIM_Z, 0.5, 0.12, 0.2, R3D.col('#c0392b'), F.SLAB);
-                        g.box(x, y + 0.38, TRIM_Z + 0.2, 0.55, 0.16, 0.04, R3D.col('#ff6b4a'), F.FRONT);
+                        // A proper plunger: crate, brass shaft, T-handle.
+                        b.box(x, y - 0.22, TRIM_Z, 0.74, 0.56, 0.56, R3D.col('#5a3a22'),
+                              F.ALL, R3D.col('#7d5330'));
+                        b.box(x, y + 0.06, TRIM_Z, 0.8, 0.08, 0.62, R3D.col('#3d2617'), F.SLAB);
+                        p.cyl(x, y + 0.26, TRIM_Z, 0.06, 0.44, 'y', R3D.col('#c9a15e'), 8);
+                        p.cyl(x, y + 0.46, TRIM_Z, 0.05, 0.56, 'x', R3D.col('#c0392b'), 8,
+                              R3D.col('#e05a45'));
+                        for (const sx of [-0.26, 0.26]) {
+                            p.sphere(x + sx, y + 0.46, TRIM_Z, 0.07, R3D.col('#e05a45'), 7, 5);
+                        }
+                        g.cyl(x, y + 0.46, TRIM_Z, 0.09, 0.62, 'x', R3D.col('#ff6b4a'), 8);
                         lights.push({ x: x, y: y, colour: '#ff8a5c', energy: 1.3, range: 14, flicker: 0.12 });
                         break;
                     }
@@ -489,24 +515,50 @@
             made++;
         }
 
-        // Crystals in the back wall — the Godot build's signature, and the only
-        // thing in a room that is lit by nothing and still visible.
-        for (let i = 0; i < 16; i++) {
+        /*
+         * Crystal seams in the rock — the Godot build's signature.
+         *
+         * These are **scenery**, and they have to look like it. The first
+         * version scattered them through open air at the same brightness as a
+         * pickup, which asks the player a question the game then refuses to
+         * answer: anything that glows in the middle of a room, at eye level,
+         * reads as collectible. "What are the crystals for?" is the correct
+         * response to that, and the answer was "nothing".
+         *
+         * So they now grow *out of the rock*: found by scanning for a solid
+         * tile with air beside it, angled along the face, and pitched darker
+         * than any pickup in the game. A seam in the wall is obviously part of
+         * the wall.
+         */
+        const FACES_OUT = [[0, -1, 0, -0.5], [0, 1, 0, 0.5], [-1, 0, -0.5, 0], [1, 0, 0.5, 0]];
+        for (let attempt = 0, made = 0; attempt < 260 && made < 11; attempt++) {
             const tx = rng.int(1, C.COLS - 2);
             const ty = rng.int(1, C.ROWS - 2);
-            if (room.get(tx, ty) !== T.EMPTY) continue;
-            const colour = rng.pick(crystalCols);
-            const x = R3D.tileX(tx), y = R3D.tileY(ty);
-            const s = rng.range(0.16, 0.30);
-            /*
-             * A faceted gem with a tight halo. Facet normals mean each face
-             * catches the lamps differently, which is what makes it read as
-             * crystal — a box lit evenly on every side is a coloured brick, and
-             * a wide faint halo round it is a smudge on the lens.
-             */
-            g.gem(x, y, R3D.BACK_Z + 1.4, s, s * 2.6, colour, 6);
-            g.box(x, y, R3D.BACK_Z + 1.6, s * 1.8, s * 2.6, 0.02,
-                  colour.clone().multiplyScalar(0.4), F.FRONT);
+            if (!isRock(room, tx, ty)) continue;
+
+            // Which side of this block is exposed?
+            const open = FACES_OUT.filter(function (f) {
+                return room.get(tx + f[0], ty + f[1]) === T.EMPTY;
+            });
+            if (!open.length) continue;
+            const face = rng.pick(open);
+
+            const colour = rng.pick(crystalCols).clone().multiplyScalar(0.62);
+            const s = rng.range(0.12, 0.2);
+            const x = R3D.tileX(tx) + face[2] * 0.8 + rng.range(-0.2, 0.2);
+            const y = R3D.tileY(ty) - face[3] * 0.8 + rng.range(-0.2, 0.2);
+            const z = ROCK_Z + ROCK_D / 2 - 0.1;
+
+            // A little cluster, leaning out of the face.
+            for (let k = 0; k < 3; k++) {
+                const ox = rng.range(-0.22, 0.22);
+                const oy = rng.range(-0.18, 0.18);
+                g.gem(x + ox, y + oy, z + rng.range(0, 0.25),
+                      s * rng.range(0.6, 1), s * rng.range(1.6, 2.6), colour, 6);
+            }
+            g.box(x, y, z + 0.3, s * 3.2, s * 3.2, 0.02,
+                  colour.clone().multiplyScalar(0.22), F.FRONT);
+            made++;
         }
 
         /*
@@ -532,20 +584,38 @@
             made++;
         }
 
-        // Glowing mushrooms on ledges — small, and the only cool light down at
-        // floor level, which stops the lower half of a room going to mud.
-        for (let attempt = 0, made = 0; attempt < 150 && made < 8; attempt++) {
+        /*
+         * Glowing mushrooms on ledges — the only cool light down at floor
+         * level, which stops the lower half of a room going to mud.
+         *
+         * Built round, and *behind* the play plane. The first version was a
+         * pale box on a stalk with a flat glowing rectangle behind it, which
+         * from the front reads as a switch or a hammer mounted in a green
+         * panel — an interactive-looking thing that does nothing. Scenery has
+         * to be shaped like scenery; if it has a straight edge and a backlit
+         * panel, players will try to use it.
+         */
+        for (let attempt = 0, made = 0; attempt < 150 && made < 9; attempt++) {
             const tx = rng.int(2, C.COLS - 3);
             const ty = rng.int(3, C.ROWS - 2);
             if (room.get(tx, ty) !== T.EMPTY) continue;
             if (!Tiles.isFloor(room.get(tx, ty + 1))) continue;
-            const x = R3D.tileX(tx) + rng.range(-0.25, 0.25);
-            const y = R3D.tileY(ty) - 0.34;
-            const glowCol = R3D.col('#6fe0c0');
-            b.box(x, y, R3D.BACK_Z + 1.0, 0.09, 0.22, 0.09, R3D.col('#c9d8c0'), F.SLAB);
-            g.box(x, y + 0.16, R3D.BACK_Z + 1.02, 0.3, 0.16, 0.02, glowCol, F.FRONT);
-            g.box(x, y + 0.16, R3D.BACK_Z + 1.03, 0.9, 0.7, 0.02,
-                  glowCol.clone().multiplyScalar(0.16), F.FRONT);
+
+            const x = R3D.tileX(tx) + rng.range(-0.3, 0.3);
+            const y = R3D.tileY(ty) - 0.44;
+            const z = R3D.BACK_Z + 1.0;
+            const cap = R3D.col('#4fbf9c');
+
+            // Two or three of different heights, as they actually grow.
+            for (let k = 0; k < rng.int(2, 3); k++) {
+                const ox = rng.range(-0.26, 0.26);
+                const h = rng.range(0.14, 0.26);
+                const r = rng.range(0.07, 0.12);
+                b.cyl(x + ox, y + h / 2, z, r * 0.42, h, 'y', R3D.col('#cfd9c6'), 6);
+                b.cyl(x + ox, y + h, z, r, r * 0.8, 'y', cap, 8, cap);
+                g.cyl(x + ox, y + h + 0.02, z + 0.02, r * 0.8, r * 0.5, 'y',
+                      cap.clone().multiplyScalar(1.4), 8);
+            }
             made++;
         }
 

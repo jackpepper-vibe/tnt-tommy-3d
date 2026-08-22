@@ -693,6 +693,15 @@
         this.lifts = [];
         /** Tile index → {state, timer}. Only occupied planks are in here. */
         this.crumbles = new Map();
+        /**
+         * Every rotten plank in the room, as `{tx, ty}`.
+         *
+         * The renderer draws these itself rather than letting them be baked
+         * into the terrain mesh, because they have to shake before they give
+         * way and a merged buffer cannot animate one tile. Collected once here:
+         * their positions never change, only their state does.
+         */
+        this.crumbleTiles = [];
         this.detonator = null;
         this.warps = [];
         this.flood = null;
@@ -758,6 +767,8 @@
                     this.warps.push(new Warp(tx, ty));
                 } else if (t === T.DETONATOR) {
                     this.detonator = { x: tileCentre(tx), y: ty * C.TILE + C.TILE };
+                } else if (t === T.CRUMBLE) {
+                    this.crumbleTiles.push({ tx: tx, ty: ty });
                 } else if (t === T.LAVA) {
                     lavaLow = Math.max(lavaLow, ty);
                     lavaHigh = Math.min(lavaHigh, ty);
