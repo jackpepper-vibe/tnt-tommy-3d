@@ -200,37 +200,49 @@
             cell: [0, 1],
             exits: { right: true, down: true },
             /**
-             * A haulage drift with a lava channel cut through the bedrock. The
-             * tram runs flush with the floor over it — the room's answer to a
-             * gap that is far too wide to jump.
+             * A haulage drift cut in two by a lava channel, with the tram the
+             * only way across it.
+             *
+             * The channel was here from the start and did nothing, because
+             * every deck ran straight over the top of it — and row 20 is a
+             * *door row*, so you could enter on the right, walk the upper deck
+             * over the lava and leave on the left without ever going near the
+             * floor. Lava you can walk over is scenery.
+             *
+             * So nothing spans columns 11-22 at any level now. The banks are
+             * twelve tiles apart against a jump that carries about five, which
+             * leaves the tram, and the room's only stick sits on the far side
+             * of it. The one exception is the little deck at row 11 over the
+             * middle: the down shaft comes up through columns 20-21 and needs
+             * something to stand on, and it is joined to the right bank only.
              */
             build: function (g) {
                 g.lava(11, 23, 12, 1);
                 g.liftRunH(6, 26, 22);
 
-                g.deck(20, [2, 8], [13, 8], [26, 9]);
-                g.deck(17, [6, 9], [19, 8], [30, 8]);
-                g.deck(14, [2, 9], [15, 9], [28, 9]);
-                g.belt(6, 11, 12, 1);
+                g.deck(20, [2, 8], [26, 9]);
+                g.deck(17, [6, 5], [23, 5], [30, 8]);
+                g.deck(14, [2, 9], [23, 6], [31, 6]);
+                g.belt(6, 11, 5, 1);
                 g.belt(24, 11, 12, -1);
                 g.deck(11, [19, 4]);
-                g.deck(8, [4, 9], [17, 8], [29, 8]);
-                g.deck(5, [10, 10], [24, 9]);
+                g.deck(8, [4, 7], [23, 7], [31, 6]);
+                g.deck(5, [4, 7], [24, 9]);
 
                 g.food(4, 22);
                 g.ore(28, 22, 2, 2);
                 g.walker(33, 22);
 
                 g.ore(3, 19, 2, 2);
+                g.tnt(7, 19);
                 g.ore(28, 19, 2, 2);
-                g.tnt(23, 16);
                 g.ore(4, 13, 2, 2);
-                g.food(30, 13);
-                g.ore(19, 7, 2, 2);
+                g.food(32, 13);
+                g.ore(25, 7, 2, 2);
                 g.ore(31, 7, 2, 2);
 
-                g.crumble(15, 20, 5);
-                g.crumble(21, 14, 4);
+                g.crumble(27, 20, 4);
+                g.crumble(24, 14, 4);
                 g.bat(16, 12);
                 g.crawler(31, 16);
                 g.dog(24, 22);
