@@ -235,25 +235,38 @@
              * something to stand on, and it is joined to the right bank only.
              */
             build: function (g) {
-                g.lava(11, 23, 12, 1);
                 /*
-                 * Moored at each edge, not parked inland.
+                 * The channel stops short of the shaft columns.
                  *
-                 * The markers set the tram's outer edges, and at 6 and 26 with
-                 * a four tile body it came to rest at columns 6-9 and 23-26 —
-                 * clear of a channel running 11 to 22, so most of its run was
-                 * over solid rock and it read as a truck driving along the
-                 * floor. At 9 and 24 it straddles each bank instead: you step
-                 * aboard at the lip, and every tile it travels is over lava.
+                 * It used to run 11 to 22, and the down shaft is fixed at 20-21
+                 * for every room in the game so mirrored rooms line up. `World`
+                 * lays the shaft stub *after* the room is built and overwrites
+                 * whatever is there — so it replaced two tiles of lava with
+                 * ladder. That is three faults from one cause: a ladder rising
+                 * out of molten rock, a channel cut in half by it, and a
+                 * foothold in the middle of the lava you could jump to from the
+                 * right bank. Ending at 18 leaves the shaft on solid ground.
                  */
-                g.liftRunH(9, 24, 22);
+                g.lava(11, 23, 8, 1);
 
-                g.deck(20, [2, 8], [26, 9]);
+                /*
+                 * Moored flush, and never off the lava.
+                 *
+                 * The markers set the tram's outer edges, so it rests spanning
+                 * 11-14 and 15-18 — the full width of the channel and not one
+                 * tile past it. You board by stepping on from the bank it is
+                 * moored against. Earlier settings left it resting several
+                 * tiles inland, where it read as a truck parked on the floor.
+                 */
+                g.liftRunH(11, 18, 22);
+
+                // The middle deck gives the shaft ladder something to stop at,
+                // and joins the right bank only — the gap left of it is nine.
+                g.deck(20, [2, 8], [19, 4], [26, 9]);
                 g.deck(17, [6, 5], [23, 5], [30, 8]);
                 g.deck(14, [2, 9], [23, 6], [31, 6]);
                 g.belt(6, 11, 5, 1);
                 g.belt(24, 11, 12, -1);
-                g.deck(11, [19, 4]);
                 g.deck(8, [4, 7], [23, 7], [31, 6]);
                 g.deck(5, [4, 7], [24, 9]);
 
