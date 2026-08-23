@@ -340,6 +340,40 @@ check('a ladder can be stepped off at a deck part-way up', () => {
 });
 
 /**
+ * A stick underwater needs an air tank in the same mine.
+ *
+ * This exists because it broke silently. `ladder()` lays a rung one row above
+ * its own platform and, unlike `put()`, overwrites whatever is there without
+ * complaining — so an oxygen pickup placed on that tile simply vanished, and
+ * the room kept its submerged stick with no way to breathe. Every other check
+ * passed: the grid was well formed, and the reachability walk does not model
+ * the tank, so it called the mine completable.
+ */
+check('every submerged stick has an air tank in its mine', () => {
+    const notes = [];
+    for (let m = 0; m < 3; m++) {
+        const mine = new TNT.World.Mine(m);
+        let submerged = 0;
+        let tanks = 0;
+        for (const room of mine.rooms) {
+            for (const s of room.spawns) {
+                if (s.kind === 'oxygen') tanks++;
+                if (s.kind !== 'tnt') continue;
+                // Under water if there is water directly above the stick.
+                if (room.get(s.tx, s.ty - 1) === C.Tile.WATER) submerged++;
+            }
+        }
+        if (submerged > 0) {
+            assert(tanks > 0, 'mine ' + (m + 1) + ' has ' + submerged +
+                ' submerged stick(s) and no oxygen pickup anywhere in it');
+            notes.push('mine ' + (m + 1) + ': ' + submerged + ' submerged, ' + tanks + ' tank(s)');
+        }
+    }
+    assert(notes.length, 'no mine has a submerged stick to check');
+    return notes.join('; ');
+});
+
+/**
  * Stomping. Both halves matter equally: landing on an enemy has to kill it,
  * and walking into one has to still cost you — a stomp test that only proves
  * the kill would pass just as happily if every touch killed.

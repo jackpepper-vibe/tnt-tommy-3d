@@ -149,12 +149,27 @@
              * The sump. Drowns you without the tank, and the tank is on the
              * shelf above it — so the first visit is a look and the second is
              * the errand. The stick on the bottom is the reason to come back.
+             *
+             * The pool used to be four rows deep with open air on both sides:
+             * water that stopped in mid-air at the same height as the floor
+             * beside it, which is neither a tank to look at nor a swim to make.
+             * It is eight rows deep now and walled in rock — and the walls have
+             * to be real tiles rather than something the renderer draws, or
+             * they are a picture of a tank that Tommy walks straight through.
+             *
+             * The ladder reaches the waterline and stops. It used to run to the
+             * bottom, so the whole descent could be climbed and the swim never
+             * happened; now it is the way in and the way back out, and the six
+             * rows below it are swum.
              */
             build: function (g) {
-                g.water(26, 19, 14, 4);
-                g.deck(20, [2, 8], [12, 9], [24, 4]);
-                g.deck(17, [5, 8], [16, 8], [26, 12]);
-                g.deck(14, [2, 9], [14, 8], [27, 9]);
+                g.water(27, 15, 13, 8);
+                g.rock(25, 15, 2, 8);
+                g.rock(40, 15, 1, 8);
+
+                g.deck(20, [2, 8], [12, 9], [19, 6]);
+                g.deck(17, [5, 8], [16, 9]);
+                g.deck(14, [2, 9], [14, 8], [27, 5]);
                 g.deck(11, [6, 10], [20, 8], [31, 7]);
                 g.deck(8, [3, 9], [15, 10], [29, 8]);
                 g.deck(5, [9, 9], [23, 10]);
@@ -166,9 +181,12 @@
 
                 g.ore(3, 19, 2, 2);
                 g.ore(14, 19, 2, 2);
-                g.oxygen(30, 16);
+                g.ore(30, 18, 2, 3);
                 g.ore(4, 13, 2, 2);
-                g.tnt(29, 13);
+                // Clear of column 28: the ladder below carries a rung a row
+                // above its own platform, and it overwrites without complaint.
+                g.oxygen(31, 13);
+                g.tnt(30, 13);
                 g.food(22, 10);
                 g.ore(17, 7, 2, 2);
                 g.ore(31, 7, 2, 2);
@@ -179,13 +197,13 @@
                 g.crumble(16, 17, 5);
                 g.crumble(22, 11, 4);
                 g.bat(24, 12);
-                g.crawler(33, 16);
+                g.crawler(20, 16);
                 g.spider(17, 1);
                 g.orb(13, 10);
                 g.guardian(31, 6);
 
-                // Down into the water, and up to the shaft.
-                g.ladder(28, 17, 22);
+                // Down to the waterline, and no further.
+                g.ladder(28, 14, 16);
             }
         },
 
