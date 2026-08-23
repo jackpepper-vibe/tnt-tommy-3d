@@ -189,30 +189,42 @@
             cell: [0, 1],
             exits: { right: true, up: true, down: true },
             /**
-             * Flooded low workings. The tank is down here and so is a stick,
-             * and the warp pads either side of the water are the reward for
-             * finding out that the long way round is optional.
+             * A flooded shaft you go down through, not a puddle you wade across.
+             *
+             * The water used to be fifteen tiles wide and three deep, sitting in
+             * the corner on the floor row — so you walked through it sideways
+             * and the swim never happened. It is eleven rows deep now and walled
+             * on every side but the top: rock down its right flank, the room
+             * border down its left, the floor beneath. The only way in is the
+             * gap in the row 11 deck above it, and the only thing at the bottom
+             * is a stick.
+             *
+             * The air tank has moved *out* of the water and onto the deck you
+             * enter from. Underwater it was a catch: swimming needs it, and it
+             * was lying at the bottom of the swim.
              */
             build: function (g) {
-                g.water(3, 20, 15, 3);
+                g.water(1, 12, 14, 11);
+                g.rock(15, 12, 2, 11);
+
                 g.warp(24, 22);
-                g.warp(9, 16);
+                g.warp(8, 10);
 
                 g.deck(20, [19, 8], [29, 9]);
-                g.deck(17, [3, 9], [15, 8], [27, 10]);
-                g.deck(14, [7, 9], [20, 9], [33, 6]);
+                g.deck(17, [17, 6], [27, 10]);
+                g.deck(14, [20, 9], [33, 6]);
                 g.deck(11, [2, 8], [14, 10], [28, 9]);
                 g.deck(8, [8, 9], [22, 10]);
                 g.deck(5, [3, 9], [17, 8], [29, 8]);
 
-                g.oxygen(6, 22);
-                g.tnt(14, 22);
+                g.oxygen(4, 10);
+                g.tnt(13, 22);
                 g.food(28, 22);
                 g.ore(30, 22, 2, 2);
 
                 g.ore(20, 19, 2, 2);
                 g.ore(31, 19, 2, 2);
-                g.ore(8, 13, 2, 2);
+                g.ore(6, 16, 2, 2);
                 g.food(22, 13);
                 g.tnt(30, 10);
                 g.ore(10, 7, 2, 2);
@@ -226,7 +238,7 @@
                 g.guardian(26, 6);
                 g.orb(12, 10);
 
-                g.ladder(19, 8, 13);
+                g.ladder(23, 8, 13);
             }
         },
 
