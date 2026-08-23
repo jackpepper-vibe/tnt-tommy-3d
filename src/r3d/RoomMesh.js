@@ -72,6 +72,7 @@
 
         backdrop(group, pal, rng);
         rockRuns(room, rock, glow, pal);
+        tankShell(room, plain);
         trim(room, wood, plain, glow, shade, liquid, pal, lights);
         decor(room, wood, rock, glow, pal, lights, rng);
 
@@ -130,6 +131,104 @@
 
         return { group: group, lights: lights };
     };
+
+    /* ------------------------------------------------------------------ *
+     * The tank
+     * ------------------------------------------------------------------ */
+
+    /**
+     * The vessel the water is standing in.
+     *
+     * Water on its own is a tinted rectangle with nothing holding it, so
+     * however good the tint is it reads as a pane laid over the room rather
+     * than as a body of water in something. What sells a holding tank is the
+     * *container*: a riveted liner up the sides, a plate across the bottom, and
+     * a lip at the top where the wall stops and the air begins.
+     *
+     * Emitted from the water's own boundary rather than authored per room, so
+     * any sump anywhere gets its shell for free and the two can never disagree
+     * about where the edge is. It sits behind the water plate and in front of
+     * the rock, which — now that the water is transparent — means you see the
+     * far wall of the tank *through* the water. That is most of the depth.
+     */
+    function tankShell(room, p) {
+        const TANK_Z = ROCK_Z + ROCK_D / 2 - 0.06;      // just proud of the rock face
+        const TANK_D = 0.55;
+        const iron = R3D.col('#544a3c');
+        const ironLit = R3D.col('#7f6e58');
+        const rivet = R3D.col('#a8947a');
+        const rust = R3D.col('#7a4520');
+
+        const isWater = function (tx, ty) { return room.get(tx, ty) === T.WATER; };
+
+        for (let ty = 0; ty < C.ROWS; ty++) {
+            for (let tx = 0; tx < C.COLS; tx++) {
+                if (!isWater(tx, ty)) continue;
+                const x = R3D.tileX(tx);
+                const y = R3D.tileY(ty);
+                const top = !isWater(tx, ty - 1);
+
+                // Liner up each side that has something solid behind it.
+                for (const dir of [-1, 1]) {
+                    if (!Tiles.isSolid(room.get(tx + dir, ty))) continue;
+                    p.box(x + dir * 0.42, y, TANK_Z, 0.2, 1, TANK_D, iron, F.ALL, ironLit);
+
+                    // Strakes every third row, riveted — the horizontal banding
+                    // is what reads as plate at a distance.
+                    if (ty % 3 === 0) {
+                        p.box(x + dir * 0.4, y + 0.36, TANK_Z + 0.03, 0.26, 0.15, TANK_D,
+                              ironLit, F.ALL, rivet);
+                        for (let k = 0; k < 2; k++) {
+                            p.sphere(x + dir * 0.33, y + 0.36, -0.16 + k * 0.32, 0.045,
+                                     rivet, 6, 5);
+                        }
+                    }
+                    // A rust weep below the waterline.
+                    if (!top && ty % 4 === 2) {
+                        p.box(x + dir * 0.34, y, TANK_Z + 0.06, 0.06, 0.7, 0.05, rust, F.FRONT);
+                    }
+
+                    /*
+                     * FREEBOARD, AND THE RIM ON TOP OF IT.
+                     *
+                     * The single thing that turns a filled rectangle into a
+                     * vessel. The wall used to stop level with the surface, so
+                     * there was nothing holding the water — it met the air at a
+                     * bare edge. The shell now carries a row above the
+                     * waterline and caps it with a lip that overhangs inward,
+                     * which is the silhouette of every tank ever built.
+                     */
+                    if (top) {
+                        p.box(x + dir * 0.42, y + 1.0, TANK_Z, 0.2, 1, TANK_D, iron,
+                              F.ALL, ironLit);
+                        p.box(x + dir * 0.36, y + 1.46, TANK_Z + 0.06, 0.42, 0.2,
+                              TANK_D + 0.2, ironLit, F.ALL, rivet);
+                        for (let k = 0; k < 2; k++) {
+                            p.sphere(x + dir * 0.3, y + 1.14, -0.18 + k * 0.36, 0.045,
+                                     rivet, 6, 5);
+                        }
+                    }
+                }
+
+                /*
+                 * Cross-ties every fifth row, spanning the body behind the
+                 * water. A tank this wide would burst without them, and seeing
+                 * them *through* the water is most of what gives it depth.
+                 */
+                if (ty % 5 === 1 && isWater(tx - 1, ty) && isWater(tx + 1, ty)) {
+                    p.box(x, y + 0.2, TANK_Z - 0.05, 1, 0.1, 0.16, iron, F.ALL, ironLit);
+                }
+
+                // The plate across the bottom.
+                if (Tiles.isFloor(room.get(tx, ty + 1))) {
+                    p.box(x, y - 0.42, TANK_Z, 1, 0.17, TANK_D, iron, F.SLAB, ironLit);
+                    if (tx % 3 === 0) {
+                        p.sphere(x, y - 0.34, 0.0, 0.045, rivet, 6, 5);
+                    }
+                }
+            }
+        }
+    }
 
     /* ------------------------------------------------------------------ *
      * Heat
