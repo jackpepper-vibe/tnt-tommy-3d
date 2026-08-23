@@ -279,6 +279,7 @@
      */
     function Guardian(tx, ty, room, speedMul) {
         const spec = ENEMY_SPEC.guardian;
+        this.room = room;
         this.kind = 'guardian';
         this.spec = spec;
         this.speed = spec.speed * speedMul;
@@ -325,11 +326,32 @@
         const dx = tx - this.x;
         const dy = ty - this.y;
         const d = Math.hypot(dx, dy) || 1;
-        this.x += (dx / d) * this.speed * dt;
-        this.y += (dy / d) * this.speed * dt;
+
+        /*
+         * It goes through rock, but not through water.
+         *
+         * Passing through anything is the guardian's whole identity, so this is
+         * a deliberate exception rather than an oversight: the tank is the one
+         * place the player is obliged to go and cannot move at speed, and
+         * something that ignores walls following you into it has no answer at
+         * all. Each axis is tested on its own so it slides along the surface
+         * rather than sticking on it.
+         */
+        const stepX = (dx / d) * this.speed * dt;
+        const stepY = (dy / d) * this.speed * dt;
+        const dry = (function (self) {
+            return function (px, py) {
+                if (!self.room) return true;
+                return self.room.at(px, py) !== T.WATER;
+            };
+        })(this);
+
+        if (dry(this.x + stepX, this.y)) this.x += stepX;
+        if (dry(this.x, this.y + stepY)) this.y += stepY;
         this.dir = dx >= 0 ? 1 : -1;
         // A slight bob, so it reads as hovering rather than sliding.
-        this.y += Math.sin(this.t * 2.2) * 6 * dt;
+        const bob = Math.sin(this.t * 2.2) * 6 * dt;
+        if (dry(this.x, this.y + bob)) this.y += bob;
     };
 
     Guardian.prototype.box = function () {
@@ -681,17 +703,32 @@
     }
 
     /** The stretch of open air a flier can cross. */
+    /**
+     * Water bounds a patrol as surely as rock does.
+     *
+     * Neither span used to stop at it, because water is not solid and is not a
+     * floor — so a bat's run carried straight on through a tank and it went on
+     * weaving at full flying speed while the player, swimming, moved at a
+     * fraction of it. A hazard you cannot outpace in a place you are obliged to
+     * go is not a fight, and the tank is on the critical path.
+     */
+    function wet(room, tx, ty) {
+        return room.get(tx, ty) === T.WATER;
+    }
+
     function openSpanX(room, tx, ty) {
         let x0 = tx, x1 = tx;
-        while (x0 > 0 && !Tiles.isSolid(room.get(x0 - 1, ty))) x0--;
-        while (x1 < C.COLS - 1 && !Tiles.isSolid(room.get(x1 + 1, ty))) x1++;
+        while (x0 > 0 && !Tiles.isSolid(room.get(x0 - 1, ty)) && !wet(room, x0 - 1, ty)) x0--;
+        while (x1 < C.COLS - 1 && !Tiles.isSolid(room.get(x1 + 1, ty)) &&
+               !wet(room, x1 + 1, ty)) x1++;
         return { x0: x0, x1: x1 };
     }
 
     function openSpanY(room, tx, ty) {
         let y0 = ty, y1 = ty;
-        while (y0 > 0 && !Tiles.isFloor(room.get(tx, y0 - 1))) y0--;
-        while (y1 < C.ROWS - 1 && !Tiles.isFloor(room.get(tx, y1 + 1))) y1++;
+        while (y0 > 0 && !Tiles.isFloor(room.get(tx, y0 - 1)) && !wet(room, tx, y0 - 1)) y0--;
+        while (y1 < C.ROWS - 1 && !Tiles.isFloor(room.get(tx, y1 + 1)) &&
+               !wet(room, tx, y1 + 1)) y1++;
         return { y0: y0, y1: y1 };
     }
 

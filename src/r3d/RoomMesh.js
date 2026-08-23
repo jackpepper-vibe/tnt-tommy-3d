@@ -258,10 +258,13 @@
                 tx = start + run;
                 if (room.get(start, ty - 1) === T.LAVA) continue;
 
-                const width = run + 2.2;
-                const height = 3.4;
+                const width = run + 2.6;
+                const height = 3.2;
                 const geo = new THREE.PlaneGeometry(width, height);
-                const mesh = new THREE.Mesh(geo, R3D.hazeMaterial(tint, 0.5));
+                // Molten rock throws far more light than it did. The channel is
+                // meant to be the brightest thing in the room, and glow off the
+                // surface does more for that than any amount of surface detail.
+                const mesh = new THREE.Mesh(geo, R3D.hazeMaterial(tint, 0.85));
                 mesh.position.set(
                     start + run / 2,
                     R3D.tileY(ty) + 0.5 + height / 2,
@@ -679,7 +682,17 @@
                          */
                         const crust = R3D.col('#180804');
                         const crustLit = R3D.col('#22100a');
-                        const hot = R3D.mixCol(melt, '#fff2c8', 0.3);
+                        /*
+                         * The two ends of the gradient: deep red, white heat.
+                         *
+                         * The cool end is nowhere near black. Taken down to
+                         * near black the lower two thirds of the channel went
+                         * brown and the whole thing read as mud with a hot line
+                         * on top — molten rock is *lit from within*, so even its
+                         * coolest visible part is a strong red.
+                         */
+                        const deep = R3D.mixCol(melt, '#5a1200', 0.55);
+                        const hot = R3D.mixCol(melt, '#fff2cc', 0.78);
                         const covered = room.get(tx, ty - 1) === T.LAVA;
 
                         /*
@@ -698,63 +711,100 @@
                          * is what makes it read as liquid rather than as a
                          * painted block.
                          */
+                        /*
+                         * Small steps, deliberately.
+                         *
+                         * Deep ones (up to a fifth of a tile) laid dark bars
+                         * along the channel at every step down — flattening the
+                         * surface removed them completely, which is how the
+                         * cause was pinned down. Kept shallow the surface still
+                         * is not a drawn-on straight line, and whatever the
+                         * steps were revealing is now too small to see.
+                         */
                         const lip = [
-                            covered ? 0.5 : 0.5 - bit(0, 4) * 0.05,
-                            covered ? 0.5 : 0.5 - bit(5, 4) * 0.05
+                            covered ? 0.5 : 0.5 - bit(0, 3) * 0.022,
+                            covered ? 0.5 : 0.5 - bit(5, 3) * 0.022
                         ];
 
-                        // Channel wall, seen behind and below the melt.
-                        p.box(x, y - 0.15, TRIM_Z - 0.1, 1, 0.7, TRIM_D, crust, F.SLAB);
+                        /*
+                         * Channel wall, seen behind and below the melt — and
+                         * warm, not near black. The melt in front of it is
+                         * additive, so wherever the wall shows through a dip in
+                         * the surface it contributes its own colour; a near
+                         * black wall left dark bars lying along the channel
+                         * exactly where the fill height stepped down.
+                         */
+                        p.box(x, y - 0.15, TRIM_Z - 0.1, 1, 0.7, TRIM_D,
+                              R3D.mixCol(melt, '#2a0a02', 0.78), F.SLAB);
 
+                        /*
+                         * A GRADIENT, NOT A STACK OF PARTS.
+                         *
+                         * The last pass built the channel out of components — a
+                         * body band, a hot band, a white lip, and a raised plate
+                         * of crust on most tiles. Every one of those has a hard
+                         * horizontal edge, and the plates were the worst of it:
+                         * the melt is on the additive pass, so anything drawn
+                         * over it can only *brighten*, which means crust has to
+                         * be an opaque block standing in front. A row of small
+                         * opaque blocks with sharp corners along a strip of
+                         * orange reads as brickwork, and that is what it looked
+                         * like.
+                         *
+                         * So the crust is gone and the melt carries the whole
+                         * thing: five bands per half tile ramping from near
+                         * black at the bottom to near white at the surface,
+                         * squared so the heat piles up at the top. Bands that
+                         * close together read as one glowing mass rather than
+                         * as stripes, and with the fill height still hashed per
+                         * half tile the skyline stays broken.
+                         */
+                        const BANDS = 5;
                         for (let k = 0; k < 2; k++) {
                             const hx = x - 0.25 + k * 0.5;
                             const top = y + lip[k];
                             const depth = top - (y - 0.5);
+                            const h = depth / BANDS;
+                            for (let i = 0; i < BANDS; i++) {
+                                const f = (i + 0.5) / BANDS;          // 0 deep, 1 at the surface
+                                const col = R3D.mixCol(deep, hot, Math.pow(f, 1.35));
+                                g.box(hx, y - 0.5 + h * (i + 0.5), TRIM_Z + 0.3 + i * 0.004,
+                                      0.5, h * 1.04, 0.03, col, F.FRONT);
+                            }
 
-                            // Body, then a hotter zone near the surface, then a
-                            // near-white lip where it is thinnest.
-                            g.box(hx, top - depth / 2, TRIM_Z + 0.3, 0.5, depth, 0.03,
-                                  R3D.mixCol(melt, '#000000', 0.5), F.FRONT);
-                            if (!covered) {
-                                g.box(hx, top - 0.13, TRIM_Z + 0.31, 0.5, 0.26, 0.03,
-                                      R3D.mixCol(melt, '#000000', 0.14), F.FRONT);
-                                g.box(hx, top - 0.03, TRIM_Z + 0.32, 0.5, 0.07, 0.03, hot, F.FRONT);
+                            /*
+                             * Fill the freeboard above a low-filled half tile
+                             * with a dim warm glow.
+                             *
+                             * Where one half tile fills lower than its
+                             * neighbour, the gap left above it looked straight
+                             * through to whatever sat behind the channel, which
+                             * is unlit and reads black — so the hashed surface
+                             * that was supposed to break up the skyline instead
+                             * laid dark bars along it at every step down. The
+                             * melt pass is additive, so a dim band here cannot
+                             * darken anything; it can only stop the hole being
+                             * a hole.
+                             */
+                            const gap = 0.5 - lip[k];
+                            if (!covered && gap > 0.01) {
+                                g.box(hx, top + gap / 2, TRIM_Z + 0.28, 0.5, gap, 0.03,
+                                      R3D.mixCol(melt, '#000000', 0.74), F.FRONT);
                             }
                         }
-
                         /*
-                         * A plate of cooled crust on roughly half the tiles.
-                         * Skipping tiles matters as much as varying them: two
-                         * plates on every tile was a repeating dash however the
-                         * widths were hashed.
+                         * There is deliberately no crust here.
+                         *
+                         * Three passes tried it and all three failed the same
+                         * way. The melt is additive, so anything laid over it
+                         * can only brighten — crust has to be an *opaque* shape
+                         * standing in front of the glow. At the size a tile
+                         * occupies on screen, opaque dark shapes on a bright
+                         * strip do not read as cooled skin; they read as holes
+                         * punched in it, or as brickwork. The uneven fill height
+                         * and the glow above the surface carry it instead.
                          */
-                        if (!covered && bit(9, 4) > 0) {
-                            const side = bit(11, 2);
-                            const pw = 0.3 + bit(13, 3) * 0.09;
-                            const px = x - 0.22 + side * 0.44;
-                            const ph = 0.13 + bit(16, 3) * 0.045;
-                            const top = y + lip[side] + 0.04;
-                            /*
-                             * Shallow in z and unlightened on top. Deeper plates
-                             * showed a large top face, and a top face this close
-                             * to the channel light washes out to the same orange
-                             * as the melt — so the plates came out bright side
-                             * up and dark side on, the exact inverse of a cooled
-                             * raft floating on molten rock. In front of the melt
-                             * as well, so the surface bands cannot paint over
-                             * them.
-                             */
-                            p.box(px, top - ph / 2, TRIM_Z + 0.3, pw, ph, TRIM_D * 0.42,
-                                  crust, F.SLAB, crustLit);
-                            // Pulled apart along its underside.
-                            g.box(px, top - ph, TRIM_Z + 0.46, pw + 0.07, 0.04, 0.03, hot, F.FRONT);
-                        }
-
-                        // A crack running down into the body of it.
-                        if (bit(19, 3) === 0) {
-                            g.box(x + (bit(21, 5) - 2) * 0.16, y - 0.1, TRIM_Z + 0.34,
-                                  0.05, 0.5, 0.03, R3D.mixCol(melt, '#fff2c8', 0.3), F.FRONT);
-                        }
+                        void crust; void crustLit;
 
                         /*
                          * One light every few tiles, staggered off the hash and

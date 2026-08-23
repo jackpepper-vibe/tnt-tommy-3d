@@ -236,7 +236,17 @@
              */
             build: function (g) {
                 g.lava(11, 23, 12, 1);
-                g.liftRunH(6, 26, 22);
+                /*
+                 * Moored at each edge, not parked inland.
+                 *
+                 * The markers set the tram's outer edges, and at 6 and 26 with
+                 * a four tile body it came to rest at columns 6-9 and 23-26 —
+                 * clear of a channel running 11 to 22, so most of its run was
+                 * over solid rock and it read as a truck driving along the
+                 * floor. At 9 and 24 it straddles each bank instead: you step
+                 * aboard at the lip, and every tile it travels is over lava.
+                 */
+                g.liftRunH(9, 24, 22);
 
                 g.deck(20, [2, 8], [26, 9]);
                 g.deck(17, [6, 5], [23, 5], [30, 8]);
@@ -263,7 +273,7 @@
                 g.crumble(24, 14, 4);
                 g.bat(16, 12);
                 g.crawler(31, 16);
-                g.dog(24, 22);
+                g.dog(26, 22);
                 g.spider(30, 1);
                 g.guardian(12, 6);
 
