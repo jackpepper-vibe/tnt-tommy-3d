@@ -37,7 +37,10 @@
 
     /** Fixed for the life of the page. See the header. */
     const MAX_LIGHTS = 8;
-    const MAX_PARTICLES = 500;
+    const MAX_PARTICLES = 700;
+    /** How far, in tiles, the camera leans toward Tommy. See `draw`. */
+    const DRIFT_X = 0.9;
+    const DRIFT_Y = 0.5;
 
     function Scene3D(canvas, run) {
         this.canvas = canvas;
@@ -112,6 +115,7 @@
 
         this.shake = 0;
         this.shakeT = 0;
+        this.drift = new THREE.Vector2(0, 0);
         this.flash = 0;
         this.crt = false;
 
@@ -136,8 +140,15 @@
      */
     Scene3D.prototype._initLights = function () {
         const pal = this.palette;
-        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.78);
-        this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#241c16'), 0.58);
+        /*
+         * Low, and lower than they were. The mine used to be lit like a room
+         * with the lights on — ambient at 0.78 over a sky-blue backdrop — and
+         * that flatness was half of why it never felt underground. The fill is
+         * now just enough to keep a silhouette off black; everything warm in a
+         * room is a lamp, a furnace or Tommy's helmet.
+         */
+        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.5);
+        this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#120c08'), 0.36);
 
         /**
          * A key light, raked down from the front-left.
@@ -148,7 +159,7 @@
          * was on them. This is what makes the top of a platform brighter than
          * its face, and a beam brighter than the wall behind it.
          */
-        this.key = new THREE.DirectionalLight(new THREE.Color('#ffd7a8'), 0.55);
+        this.key = new THREE.DirectionalLight(new THREE.Color('#ffd7a8'), 0.42);
         this.key.position.set(-0.45, 1, 0.8);
 
         this.scene.add(this.ambient, this.hemi, this.key);
@@ -199,8 +210,8 @@
         const slots = this.lightPool;
         slots[0].position.set(px, py, 2.4);
         slots[0].color.set(this.palette.lamp);
-        slots[0].intensity = (run.state === 'title' ? 0.35 : 1.9) * flicker;
-        slots[0].distance = 24;
+        slots[0].intensity = (run.state === 'title' ? 0.35 : 2.1) * flicker;
+        slots[0].distance = 22;
 
         if (this.roomView) {
             for (const src of this.roomView.lights) {
@@ -288,7 +299,7 @@
             const s = (o.speed || 4) * (0.35 + Math.random() * 0.65);
             p.x = wx + (Math.random() - 0.5) * 0.3;
             p.y = wy + (Math.random() - 0.5) * 0.3;
-            p.z = 0.5 + (Math.random() - 0.5) * 0.4;
+            p.z = (o.z === undefined ? 0.5 : o.z) + (Math.random() - 0.5) * 0.4;
             p.vx = Math.cos(a) * s;
             p.vy = Math.sin(a) * s + (o.lift || 0);
             p.vz = (Math.random() - 0.5) * 0.6;
@@ -296,6 +307,38 @@
             p.r = colour.r; p.g = colour.g; p.b = colour.b;
             p.grav = o.grav === undefined ? -9 : o.grav;
             p.drag = o.drag === undefined ? 1.4 : o.drag;
+        }
+    };
+
+    /**
+     * Steam from the pipework, and dust hanging in the lamplight.
+     *
+     * Both are ambient rather than eventful, and both matter more than their
+     * cost suggests: a room in which nothing moves unless the player does
+     * reads as a diorama. A weeping flange and motes drifting through a lamp
+     * beam are what make the air in a works feel like air.
+     */
+    Scene3D.prototype._ambientParticles = function (dt) {
+        if (!this.roomView || this.slide) return;
+        const view = this.roomView;
+        view.steamT = (view.steamT || 0) + dt;
+        if (view.steamT > 0.09) {
+            view.steamT = 0;
+            for (const e of view.emitters) {
+                if (Math.random() > 0.35) continue;
+                const px = (e.x) * C.TILE;
+                const py = C.ROOM_H - e.y * C.TILE;
+                this.burst(px, py, { count: 1, colour: '#8c96a0', speed: 0.6, life: 1.6,
+                                     lift: 1.2, grav: 0.4, drag: 0.8, z: e.z });
+            }
+        }
+        this._dustT = (this._dustT || 0) + dt;
+        if (this._dustT > 0.12) {
+            this._dustT = 0;
+            const x = Math.random() * C.ROOM_W;
+            const y = Math.random() * C.ROOM_H;
+            this.burst(x, y, { count: 1, colour: '#6e5a44', speed: 0.15, life: 5, grav: -0.05,
+                               drag: 0.2, z: -0.6 - Math.random() * 1.6, size: 0.6 });
         }
     };
 
@@ -601,9 +644,10 @@
      */
     Scene3D.prototype._frameRoom = function () {
         const vFov = THREE.MathUtils.degToRad(this.camera.fov);
-        const needH = (C.ROWS / 2 + 0.4) / Math.tan(vFov / 2);
+        // Headroom covers the drift, so leaning never crops the room.
+        const needH = (C.ROWS / 2 + 0.25 + DRIFT_Y) / Math.tan(vFov / 2);
         const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
-        const needW = (C.COLS / 2 + 0.4) / Math.tan(hFov / 2);
+        const needW = (C.COLS / 2 + 0.25 + DRIFT_X) / Math.tan(hFov / 2);
         this.camDist = Math.max(needH, needW);
     };
 
@@ -612,7 +656,10 @@
         this.t += dt;
 
         this._updateSlide(dt);
+        this._ambientParticles(dt);
         this._updateParticles(dt);
+        if (this.roomView && this.roomView.update) this.roomView.update(this.t);
+        if (this.oldView && this.oldView.update) this.oldView.update(this.t);
 
         if (this.shakeT > 0) {
             this.shakeT -= dt;
@@ -621,11 +668,28 @@
         this.shake = Util.damp(this.shake, 0, 5, dt);
         this.flash = Util.damp(this.flash, 0, 4.5, dt);
 
-        // Camera: fixed on the room centre, nudged by shake only.
+        /*
+         * The camera drifts a little toward Tommy.
+         *
+         * Not a follow cam — the room stays whole on screen, which is what a
+         * flick-screen game is — but a slow lean of a tile or so. The point is
+         * parallax: the wall, the hall and the far dark sit at very different
+         * depths, and only a camera that moves makes them slide against one
+         * another. Held still, the deepest scene in the world is a painting.
+         */
+        const player = run.player;
+        const wantX = run.state === 'title' ? Math.sin(this.t * 0.2) * 0.6
+            : (Util.clamp(player.x / C.ROOM_W, 0, 1) - 0.5) * 2 * DRIFT_X;
+        const wantY = run.state === 'title' ? 0
+            : (0.5 - Util.clamp(player.centreY() / C.ROOM_H, 0, 1)) * 2 * DRIFT_Y;
+        this.drift.x = Util.damp(this.drift.x, wantX, 2.2, dt);
+        this.drift.y = Util.damp(this.drift.y, wantY, 2.2, dt);
+
         const jitterX = this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 1.4 : 0;
         const jitterY = this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 1.4 : 0;
-        this.camera.position.set(C.COLS / 2 + jitterX, C.ROWS / 2 + jitterY, this.camDist);
-        this.camera.lookAt(C.COLS / 2, C.ROWS / 2, 0);
+        const cx = C.COLS / 2 + this.drift.x, cy = C.ROWS / 2 + this.drift.y;
+        this.camera.position.set(cx + jitterX, cy + jitterY, this.camDist);
+        this.camera.lookAt(cx, cy, 0);
 
         Actors3D.sync(this.actors, run, dt);
         this._syncLights();

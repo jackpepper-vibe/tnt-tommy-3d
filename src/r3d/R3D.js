@@ -97,114 +97,129 @@
      * ------------------------------------------------------------------ */
 
     /**
-     * One palette per mine. These carry the look the Godot build had — a dark
-     * worked-out mine lit by a lamp, not a lit room — so the ambient terms are
-     * deliberately low and almost all the light in a scene comes from point
-     * sources that move.
+     * One palette per mine, and all three are **the works**: iron, brass and
+     * masonry sunk into dark rock and lit by lamps.
+     *
+     * The earlier palettes were a cave with daylight at the top — a sky ramp,
+     * light shafts, green moss on every ledge and vines off every deck — and
+     * that single choice is why the mine never read as underground. Nothing in
+     * here is green any more and nothing is lit from above. The ambient terms
+     * are low and cool, every warm value in a room comes from a lamp, a furnace
+     * or the melt, and the space behind the playfield is a machine hall seen
+     * through openings in a built wall rather than a sky.
+     *
+     * Three material families, and every prop belongs to one of them:
+     *
+     *   - **stone** — rock and masonry, the coolest and flattest values
+     *   - **iron** — girders, decks, plate; dark, with a lit edge
+     *   - **brass** — fittings, rails, rivets; the warm highlight on the metal
+     *
+     * Keeping the families apart in hue as well as value is what lets a deck be
+     * told from the wall behind it at a glance in a dark room.
      */
     R3D.PALETTES = {
-        /**
-         * Hue separation is the job here, not brightness.
-         *
-         * An earlier pass had rock and timber both mid-brown, and the room read
-         * as one material however much texture and lighting went on it — you
-         * could not tell a wall from a walkway at a glance. Stone is pulled
-         * cool and grey, timber stays warm orange, and anything metal goes
-         * bluer still. Three families, and every prop belongs to one of them.
-         */
+        /** Copperlode: a brass-and-oxide works, amber lamps, a furnace far off. */
         copper: {
-            rock:      ['#4c4a4a', '#565252', '#403f41'],
-            rockTop:   '#7d7469',
-            moss:      '#5c7040',
-            timber:    '#9a6330',
-            timberTop: '#c48541',
-            ladder:    '#b8874a',
-            rope:      '#c9a05a',
-            /**
-             * The cavern behind the playfield.
-             *
-             * These were near-black, and the result was a room that read as
-             * platforms floating in a void — the single biggest reason the mine
-             * looked empty. The backdrop is not scenery here: it is the only
-             * thing telling you that you are underground rather than in space.
-             */
-            back:      '#3a2d1e',
-            backFar:   '#2a2018',
-            /** The warm floor of the backdrop ramp — see `backdropCanvas`. */
-            backGlow:  '#6b4526',
-            /** Daylight through the opening at the roof. */
-            sky:       '#7fb8d8',
-            skyLow:    '#a8cfe0',
-            fog:       '#1c150e',
-            /**
-             * Ambient carries a real hue rather than a neutral grey-brown. A
-             * desaturated ambient makes every surface in the room tend toward
-             * the same mud regardless of its own colour; a tinted one lets the
-             * cool rock and the warm timber stay different from each other in
-             * the shadows as well as in the light.
-             */
-            ambient:   '#5d5a86',
-            hemi:      '#6f6b96',
-            lamp:      '#ffc07a',
-            grass:     '#5fbf46',
-            grassDark: '#3d8a2c',
-            crystal:   ['#5fd8ff', '#c48bff'],
-            spike:     '#9aa0ad',
-            water:     '#2f7cbd',
-            lava:      '#ff5a2a'
+            rock:        ['#3b3531', '#433c37', '#35302c'],
+            rockTop:     '#6e6254',
+            masonry:     '#5c4a3c',
+            masonryDark: '#3a2d24',
+            iron:        '#46423e',
+            ironLit:     '#7a726a',
+            ironDark:    '#24211e',
+            paint:       '#8a3a22',     // red oxide on the girders
+            paintLit:    '#b4583a',
+            brass:       '#b8893e',
+            brassLit:    '#f0c874',
+            pipe:        '#9a5a32',     // copper pipework
+            pipeLit:     '#d4905a',
+            timber:      '#6e4a2c',     // crates and sleepers only
+            timberTop:   '#94663c',
+            ladder:      '#5e5750',
+            rope:        '#8e8680',
+            /** The machine hall behind the wall, near to far. */
+            deep:        '#0e0907',
+            deepMid:     '#21160f',
+            deepGlow:    '#8c4516',
+            haze:        '#3a271a',
+            fog:         '#0b0705',
+            ambient:     '#524a68',
+            hemi:        '#5e5068',
+            lamp:        '#ffb366',
+            glass:       '#ffd9a0',
+            signal:      '#ff5a2e',     // indicator lamps on the machinery
+            crystal:     ['#5fd8ff', '#c48bff'],
+            spike:       '#9aa0ad',
+            water:       '#2f7cbd',
+            lava:        '#ff5a2a'
         },
+        /** Blackdamp: a wet gasworks — teal paint, nickel, cold blue lamps. */
         slate: {
-            rock:      ['#3c4652', '#46515e', '#343d47'],
-            rockTop:   '#6f7d8b',
-            moss:      '#4e6b5a',
-            timber:    '#8a6437',
-            timberTop: '#ab7f4b',
-            ladder:    '#8794a1',
-            rope:      '#a8a389',
-            back:      '#2a3648',
-            backFar:   '#1b232f',
-            backGlow:  '#4a5f7d',
-            sky:       '#6f9dc4',
-            skyLow:    '#93b8d2',
-            fog:       '#141a21',
-            ambient:   '#4e6590',
-            hemi:      '#5b74a0',
-            lamp:      '#9fd0ff',
-            grass:     '#4f9e6b',
-            grassDark: '#357049',
-            crystal:   ['#6ff0dc', '#8fb8ff'],
-            spike:     '#a6b0bd',
-            water:     '#2a6494',
-            lava:      '#ff5c3c'
+            rock:        ['#2d3237', '#353b41', '#282c31'],
+            rockTop:     '#5c6770',
+            masonry:     '#434c50',
+            masonryDark: '#283034',
+            iron:        '#3b4147',
+            ironLit:     '#6f7a84',
+            ironDark:    '#1e2226',
+            paint:       '#2c5c57',
+            paintLit:    '#4a8a80',
+            brass:       '#8c9ca2',
+            brassLit:    '#d0dce0',
+            pipe:        '#4b6a70',
+            pipeLit:     '#7ca2aa',
+            timber:      '#5a4a38',
+            timberTop:   '#7a6650',
+            ladder:      '#58626a',
+            rope:        '#8a949a',
+            deep:        '#05080b',
+            deepMid:     '#0e1820',
+            deepGlow:    '#1e5868',
+            haze:        '#182830',
+            fog:         '#04070a',
+            ambient:     '#40567a',
+            hemi:        '#4a6288',
+            lamp:        '#a8dcff',
+            glass:       '#d8f0ff',
+            signal:      '#5cffc8',
+            crystal:     ['#6ff0dc', '#8fb8ff'],
+            spike:       '#a6b0bd',
+            water:       '#2a6494',
+            lava:        '#ff5c3c'
         },
+        /** Cinderdeep: the foundry — black iron, hot brass, the melt below. */
         ember: {
-            rock:      ['#573429', '#633d2e', '#4a2c22'],
-            rockTop:   '#9c5c3b',
-            moss:      '#7a4d28',
-            timber:    '#7c4a2e',
-            timberTop: '#9c6038',
-            ladder:    '#b57748',
-            rope:      '#c98f54',
-            /**
-             * Cinderdeep is the lava-cave reference: a deep red ramp going
-             * almost black at the roof and molten at the floor, with the
-             * silhouettes reading against it rather than disappearing into it.
-             */
-            back:      '#4a1c14',
-            backFar:   '#2c110c',
-            backGlow:  '#9c3a19',
-            sky:       '#c05a2a',
-            skyLow:    '#e08a45',
-            fog:       '#23100b',
-            ambient:   '#7d4548',
-            hemi:      '#8e4f4c',
-            lamp:      '#ffa055',
-            grass:     '#8a7a2c',
-            grassDark: '#5c5119',
-            crystal:   ['#ffbe6e', '#ff7a62'],
-            spike:     '#b09a8e',
-            water:     '#3f6a88',
-            lava:      '#ff7326'
+            rock:        ['#382420', '#412a25', '#311f1b'],
+            rockTop:     '#7a4c3a',
+            masonry:     '#4c2e25',
+            masonryDark: '#2c1814',
+            iron:        '#3a302c',
+            ironLit:     '#6c574c',
+            ironDark:    '#1c1412',
+            paint:       '#5c2818',
+            paintLit:    '#8e4a2c',
+            brass:       '#b87a3e',
+            brassLit:    '#f0ac62',
+            pipe:        '#6c3a28',
+            pipeLit:     '#a8623c',
+            timber:      '#5a3a26',
+            timberTop:   '#7a5234',
+            ladder:      '#5a4a42',
+            rope:        '#8a766a',
+            deep:        '#100403',
+            deepMid:     '#2a0c06',
+            deepGlow:    '#c44c14',
+            haze:        '#4a1a0e',
+            fog:         '#0a0302',
+            ambient:     '#6a3a40',
+            hemi:        '#7a4446',
+            lamp:        '#ffa055',
+            glass:       '#ffd08a',
+            signal:      '#ffcc3a',
+            crystal:     ['#ffbe6e', '#ff7a62'],
+            spike:       '#b09a8e',
+            water:       '#3f6a88',
+            lava:        '#ff7326'
         }
     };
 
@@ -289,6 +304,70 @@
         return this;
     };
 
+    /**
+     * A box turned about Z by `ang` radians — gear teeth, spokes, knee braces,
+     * trusses. Everything the axis-aligned `box` cannot say, which in a works
+     * full of machinery is most of what makes it look engineered rather than
+     * stacked.
+     *
+     * Emits the front, back and four edge faces; the rotation is applied to the
+     * normals too, so a tooth on the far side of a gear is lit as one.
+     */
+    Builder.prototype.rbox = function (cx, cy, cz, w, h, d, ang, colour, edgeColour) {
+        const c = Math.cos(ang), s = Math.sin(ang);
+        const hw = w / 2, hh = h / 2, hd = d / 2;
+        const rot = function (x, y) { return [cx + x * c - y * s, cy + x * s + y * c]; };
+        const edge = edgeColour || colour;
+        const quad = (pts, n, col) => {
+            const base = this.count;
+            for (let i = 0; i < 4; i++) {
+                this.pos.push(pts[i][0], pts[i][1], pts[i][2]);
+                this.norm.push(n[0], n[1], n[2]);
+                this.color.push(col.r, col.g, col.b);
+                this.uv.push((i === 1 || i === 2) ? 1 : 0, i >= 2 ? 1 : 0);
+                this.count++;
+            }
+            this.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        };
+        const p = [rot(-hw, -hh), rot(hw, -hh), rot(hw, hh), rot(-hw, hh)];
+        const f = cz + hd, k = cz - hd;
+        quad([[p[0][0], p[0][1], f], [p[1][0], p[1][1], f], [p[2][0], p[2][1], f], [p[3][0], p[3][1], f]],
+             [0, 0, 1], colour);
+        quad([[p[1][0], p[1][1], k], [p[0][0], p[0][1], k], [p[3][0], p[3][1], k], [p[2][0], p[2][1], k]],
+             [0, 0, -1], colour);
+        // Edges: bottom, right, top, left — each with its rotated outward normal.
+        const edges = [[0, 1, 0, -1], [1, 2, 1, 0], [2, 3, 0, 1], [3, 0, -1, 0]];
+        for (const [a, b, nx, ny] of edges) {
+            const n = [nx * c - ny * s, nx * s + ny * c, 0];
+            quad([[p[a][0], p[a][1], k], [p[b][0], p[b][1], k], [p[b][0], p[b][1], f], [p[a][0], p[a][1], f]],
+                 n, ny > 0 ? edge : colour);
+        }
+        return this;
+    };
+
+    /**
+     * Recolour every vertex from a function of its position.
+     *
+     * The machine hall is unlit — it is too far back for the lamp pool to reach
+     * — so its depth and its furnace uplight are *graded in* here instead: one
+     * pass after building, pushing each vertex toward the air colour by its
+     * distance and toward the glow by its height. That is what makes forty
+     * boxes read as a hall receding into smoke rather than as cut-outs.
+     *
+     * @param {function(THREE.Color, number, number, number)} fn  mutates the colour
+     */
+    Builder.prototype.grade = function (fn) {
+        const c = new THREE.Color();
+        for (let i = 0; i < this.count; i++) {
+            c.setRGB(this.color[i * 3], this.color[i * 3 + 1], this.color[i * 3 + 2]);
+            fn(c, this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2]);
+            this.color[i * 3] = c.r;
+            this.color[i * 3 + 1] = c.g;
+            this.color[i * 3 + 2] = c.b;
+        }
+        return this;
+    };
+
     /** A flat quad facing +Z. Cheaper than a box for ropes, rungs and signage. */
     Builder.prototype.plate = function (cx, cy, cz, w, h, colour) {
         const base = this.count;
@@ -324,309 +403,205 @@
     R3D.Builder = Builder;
 
     /* ------------------------------------------------------------------ *
-     * Materials
-     * ------------------------------------------------------------------ */
-
-    /* ------------------------------------------------------------------ *
      * Surface detail
      * ------------------------------------------------------------------ */
 
     /**
-     * One tile of hewn rock, drawn rather than loaded.
+     * Every surface texture in the game, drawn rather than loaded.
      *
-     * Everything in this game is generated at load — there are no image files —
-     * which is a constraint worth keeping: the page works from `file://` with
-     * no network. It also means the texture can be authored against the palette
-     * instead of tinted to fit it.
+     * There are no image files, and that constraint is worth keeping: the page
+     * works from `file://` with no network. It also means each texture is
+     * authored *white* — it carries only the detail, and the vertex colour
+     * supplies the material — so one set serves all three palettes.
      *
-     * The look is the Godot build's: chisel marks, a few darker pits, a lit lip
-     * along the top edge. Drawn at 32px and left unfiltered, so it reads as
-     * worked stone rather than as a blurry gradient — `NearestFilter` is doing
-     * as much work here as the drawing is.
+     * Each is one tile at 32px and sampled unfiltered. At the distance the
+     * camera sits a tile is about thirty pixels on screen, so this is close to
+     * one texel per pixel; `NearestFilter` keeps a rivet a rivet rather than a
+     * smudge.
      */
-    function rockCanvas(seedShift) {
-        const S = 32;
+    function canvas32() {
         const cv = document.createElement('canvas');
-        cv.width = cv.height = S;
+        cv.width = cv.height = 32;
         const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 32, 32);
+        return { cv: cv, ctx: ctx, S: 32 };
+    }
+
+    /**
+     * The soft volume every tile gets: bright at the top, falling to a dark
+     * contact band at the bottom. Flat Lambert on a flat face is a flat fill,
+     * and no amount of detail makes that read as mass — a gradient across the
+     * face is the cheapest thing that does.
+     */
+    function volume(ctx, S, top, bottom) {
+        const grad = ctx.createLinearGradient(0, 0, 0, S);
+        grad.addColorStop(0.00, 'rgba(255,255,255,' + top + ')');
+        grad.addColorStop(0.30, 'rgba(255,255,255,0.04)');
+        grad.addColorStop(0.65, 'rgba(0,0,0,0.05)');
+        grad.addColorStop(1.00, 'rgba(0,0,0,' + bottom + ')');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, S, S);
+    }
+
+    /** Hewn rock: chisel strokes, pits, and a lit lip along the top. */
+    function rockCanvas(seedShift) {
+        const { cv, ctx, S } = canvas32();
         const rnd = TNT.Util.rng(0x9E3779B9 + seedShift * 7919);
 
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, S, S);
-
-        // Chisel strokes: short darker dashes on a slight diagonal.
-        for (let i = 0; i < 26; i++) {
+        // Broad blotches first, so the face is not one flat value.
+        for (let i = 0; i < 7; i++) {
+            ctx.fillStyle = 'rgba(0,0,0,' + rnd.range(0.05, 0.14).toFixed(3) + ')';
+            ctx.fillRect(rnd.int(-4, S), rnd.int(-4, S), rnd.int(6, 14), rnd.int(4, 10));
+        }
+        for (let i = 0; i < 30; i++) {
             const x = rnd.int(0, S), y = rnd.int(0, S);
             const len = rnd.int(3, 9);
-            const dark = rnd.range(0.62, 0.86);
-            ctx.strokeStyle = 'rgba(0,0,0,' + (1 - dark).toFixed(3) + ')';
+            ctx.strokeStyle = 'rgba(0,0,0,' + rnd.range(0.14, 0.4).toFixed(3) + ')';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(x, y);
             ctx.lineTo(x + len, y + rnd.int(-2, 2));
             ctx.stroke();
         }
-        // Pits.
-        for (let i = 0; i < 7; i++) {
-            ctx.fillStyle = 'rgba(0,0,0,0.30)';
+        for (let i = 0; i < 8; i++) {
+            ctx.fillStyle = 'rgba(0,0,0,0.34)';
             ctx.fillRect(rnd.int(0, S - 2), rnd.int(0, S - 2), rnd.int(1, 3), rnd.int(1, 3));
         }
-        // Highlights, so the surface has a direction.
         for (let i = 0; i < 9; i++) {
-            ctx.fillStyle = 'rgba(255,255,255,0.16)';
+            ctx.fillStyle = 'rgba(255,255,255,0.14)';
             ctx.fillRect(rnd.int(0, S - 3), rnd.int(0, S - 1), rnd.int(2, 5), 1);
         }
-        /*
-         * Soft volume across the tile: bright at the top, falling away to a
-         * dark contact band at the bottom.
-         *
-         * Flat Lambert on a flat face gives a flat fill, and no amount of
-         * chisel marks makes that read as a rounded mass — the reference art
-         * gets its softness from a gradient across every single surface, not
-         * from detail. This is the cheapest possible version of that, and it is
-         * doing most of the work.
-         */
-        const grad = ctx.createLinearGradient(0, 0, 0, S);
-        grad.addColorStop(0.00, 'rgba(255,255,255,0.30)');
-        grad.addColorStop(0.22, 'rgba(255,255,255,0.10)');
-        grad.addColorStop(0.62, 'rgba(0,0,0,0.06)');
-        grad.addColorStop(1.00, 'rgba(0,0,0,0.30)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, S, S);
-
+        volume(ctx, S, 0.22, 0.34);
         return cv;
     }
 
-    /** One tile of sawn timber: plank seams, grain, and end nails. */
-    function timberCanvas() {
-        const S = 32;
-        const cv = document.createElement('canvas');
-        cv.width = cv.height = S;
-        const ctx = cv.getContext('2d');
-        const rnd = TNT.Util.rng(0x5BF03635);
+    /**
+     * Riveted plate: a seam down one side and along the bottom, a rivet in
+     * each corner, brushed grain, and a rust weep under the rivets.
+     *
+     * The seam is what makes a run of it read as *plate* — a girder or a deck
+     * face tiling this is visibly built out of sheets bolted together, which is
+     * the whole difference between a machine and a coloured bar.
+     */
+    function plateCanvas() {
+        const { cv, ctx, S } = canvas32();
+        const rnd = TNT.Util.rng(0x51A7E);
 
-        ctx.fillStyle = '#ffffff';
+        // Brushed grain, horizontal.
+        for (let i = 0; i < 26; i++) {
+            const y = rnd.int(0, S);
+            ctx.fillStyle = 'rgba(0,0,0,' + rnd.range(0.03, 0.09).toFixed(3) + ')';
+            ctx.fillRect(rnd.int(-8, S), y, rnd.int(8, 24), 1);
+        }
+        // Mottling where the paint has worn.
+        for (let i = 0; i < 5; i++) {
+            ctx.fillStyle = 'rgba(0,0,0,' + rnd.range(0.05, 0.1).toFixed(3) + ')';
+            ctx.beginPath();
+            ctx.arc(rnd.int(0, S), rnd.int(0, S), rnd.range(2, 5), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Seams: the edge of this sheet and the lip of the next.
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, 1, S);
+        ctx.fillRect(0, S - 1, S, 1);
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+        ctx.fillRect(1, 0, 1, S - 1);
+        ctx.fillRect(1, 0, S - 1, 1);
+        // Rivets, with a highlight on the upper left and a shadow under.
+        for (const [x, y] of [[5, 5], [S - 6, 5], [5, S - 7], [S - 6, S - 7]]) {
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.fillRect(x - 1, y, 4, 3);
+            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.fillRect(x - 1, y - 1, 3, 2);
+            // A streak of rust below each one.
+            ctx.fillStyle = 'rgba(110,50,20,0.22)';
+            ctx.fillRect(x, y + 3, 1, rnd.int(2, 6));
+        }
+        volume(ctx, S, 0.18, 0.3);
+        return cv;
+    }
+
+    /**
+     * Diamond tread plate, for walking surfaces.
+     *
+     * Only ever on a *top* face, so it is the texture the player's eye runs
+     * along when it follows a deck — and a raised, regular pattern there reads
+     * instantly as "made to be walked on", which the rock beside it is not.
+     */
+    function treadCanvas() {
+        const { cv, ctx, S } = canvas32();
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
         ctx.fillRect(0, 0, S, S);
+        for (let row = 0; row < 4; row++) {
+            for (let col = 0; col < 4; col++) {
+                const x = col * 8 + (row % 2 ? 4 : 0);
+                const y = row * 8 + 2;
+                // Each lug is a short diagonal bar, lit on one side.
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillRect(x + 1, y, 4, 1);
+                ctx.fillRect(x + 2, y + 1, 3, 1);
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.fillRect(x + 2, y + 2, 4, 1);
+            }
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, 0, 1, S);
+        return cv;
+    }
 
-        // Grain along the length of the board.
+    /**
+     * Dressed masonry, for the built wall behind the playfield.
+     *
+     * Two courses to the tile, staggered, with deep mortar joints. The wall is
+     * the largest surface in the room and it sits behind everything, so it
+     * wants low contrast *inside* each block and strong contrast at the joints
+     * — the joints are what describe it at a distance.
+     */
+    function masonryCanvas() {
+        const { cv, ctx, S } = canvas32();
+        const rnd = TNT.Util.rng(0x3A50);
+        const H = S / 2;
+
+        for (let course = 0; course < 2; course++) {
+            const y = course * H;
+            const shift = course ? S / 2 : 0;
+            for (let k = -1; k < 2; k++) {
+                const x = shift + k * S;
+                // Each block takes its own value, so the wall is not one tone.
+                ctx.fillStyle = 'rgba(0,0,0,' + rnd.range(0.0, 0.16).toFixed(3) + ')';
+                ctx.fillRect(x + 1, y + 1, S - 2, H - 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.14)';
+                ctx.fillRect(x + 1, y + 1, S - 2, 1);
+                for (let c = 0; c < 4; c++) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    ctx.fillRect(x + rnd.int(3, S - 4), y + rnd.int(3, H - 3), rnd.int(1, 3), 1);
+                }
+            }
+            // The bed joint under this course, and the head joints either side.
+            ctx.fillStyle = 'rgba(0,0,0,0.62)';
+            ctx.fillRect(0, y + H - 1, S, 1);
+            ctx.fillRect(shift % S, y, 1, H);
+        }
+        volume(ctx, S, 0.1, 0.2);
+        return cv;
+    }
+
+    /** One tile of sawn timber, for the few crates and sleepers left. */
+    function timberCanvas() {
+        const { cv, ctx, S } = canvas32();
+        const rnd = TNT.Util.rng(0x5BF03635);
         for (let i = 0; i < 20; i++) {
             const y = rnd.int(0, S);
-            ctx.strokeStyle = 'rgba(0,0,0,' + rnd.range(0.06, 0.20).toFixed(3) + ')';
+            ctx.strokeStyle = 'rgba(0,0,0,' + rnd.range(0.06, 0.2).toFixed(3) + ')';
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.bezierCurveTo(S / 3, y + rnd.int(-2, 2), (2 * S) / 3, y + rnd.int(-2, 2), S, y);
             ctx.stroke();
         }
-        // The seam between one board and the next.
         ctx.fillStyle = 'rgba(0,0,0,0.42)';
         ctx.fillRect(0, 0, 1, S);
-        ctx.fillStyle = 'rgba(255,255,255,0.18)';
-        ctx.fillRect(1, 0, 1, S);
-        // Nail heads.
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(4, 5, 2, 2);
-        ctx.fillRect(4, S - 7, 2, 2);
-
-        // The same soft volume the rock gets — see `rockCanvas`.
-        const shade = ctx.createLinearGradient(0, 0, 0, S);
-        shade.addColorStop(0.00, 'rgba(255,255,255,0.26)');
-        shade.addColorStop(0.30, 'rgba(255,255,255,0.06)');
-        shade.addColorStop(1.00, 'rgba(0,0,0,0.34)');
-        ctx.fillStyle = shade;
-        ctx.fillRect(0, 0, S, S);
-
-        return cv;
-    }
-
-    /**
-     * The cavern behind the playfield, baked as one image.
-     *
-     * This replaces a field of flat silhouette boxes, and the difference is the
-     * single biggest lift in the whole render. What a 2D platformer background
-     * actually does is **grade**: a smooth vertical ramp, then three or four
-     * ridge lines in receding values with haze between them, so the eye reads
-     * enormous depth behind a shallow playfield. Boxes cannot do that — every
-     * one is a hard edge at the same value, which is why the rooms looked like
-     * platforms floating in front of a black wall.
-     *
-     * Drawn wide and shallow and stretched over the room; nobody is going to
-     * study the sampling on something eight units behind the action.
-     */
-    /**
-     * One backdrop layer.
-     *
-     * Layer 0 is the opaque ramp with the most distant ridges on it; layers 1
-     * and 2 are transparent sheets of nearer rock. They are separate canvases so
-     * they can be hung at **different depths** — which is the whole point. One
-     * flat plane, however well drawn, has no parallax: it slides with the camera
-     * as a unit and the eye reads it as wallpaper. Three sheets at increasing Z
-     * diverge under the perspective camera, so they shift against each other
-     * when the screen shakes and when a room flips, and the space behind the
-     * playfield becomes somewhere rather than something.
-     */
-    function backdropCanvas(pal, layer) {
-        const W = 512, H = 288;
-        const cv = document.createElement('canvas');
-        cv.width = W;
-        cv.height = H;
-        const ctx = cv.getContext('2d');
-        const rnd = TNT.Util.rng(0xB4CD40 + layer * 7919 + pal.back.length);
-
-        /** One ridge line of jagged rock, filled to the bottom of the canvas. */
-        const ridge = (baseY, amp, step, fill) => {
-            ctx.beginPath();
-            ctx.moveTo(0, H);
-            ctx.lineTo(0, baseY);
-            for (let x = 0; x <= W; x += step) {
-                ctx.lineTo(x, baseY - rnd.range(0, amp));
-                ctx.lineTo(x + step * 0.5, baseY - rnd.range(0, amp * 0.6));
-            }
-            ctx.lineTo(W, H);
-            ctx.closePath();
-            ctx.fillStyle = fill;
-            ctx.fill();
-        };
-
-        /**
-         * Atmospheric perspective.
-         *
-         * The thing the reference art does that this did not: distance makes a
-         * thing **paler and flatter**, not merely darker. Every layer here was
-         * a different shade of the same dark rock, so the sheets read as three
-         * cut-outs at three depths rather than as a cavern receding — depth
-         * comes from *losing contrast*, not from stacking silhouettes.
-         *
-         * `haze` is how far each layer is pushed toward the air colour. The far
-         * ridges are more than half air.
-         */
-        const air = pal.backHaze || pal.backGlow || pal.back;
-        const veil = function (colour, amount) { return mixHex(colour, air, amount); };
-
-        if (layer === 0) {
-            /*
-             * The far layer: an opening to the sky at the roof, the workings
-             * below it, and shafts of daylight coming down through the gap.
-             *
-             * The opening is what gives the mine a *top*. Without one the roof
-             * is just where the picture stops, and every room feels like the
-             * inside of a box however well the rest of it is drawn — the light
-             * has to be coming from somewhere.
-             */
-            const sky = ctx.createLinearGradient(0, 0, 0, H);
-            sky.addColorStop(0.00, pal.sky || pal.backFar);
-            sky.addColorStop(0.16, pal.skyLow || pal.backFar);
-            sky.addColorStop(0.52, pal.back);
-            sky.addColorStop(1.00, pal.backGlow || pal.back);
-            ctx.fillStyle = sky;
-            ctx.fillRect(0, 0, W, H);
-
-            // The mouth of the shaft, cut out of the rock at the top.
-            ctx.fillStyle = veil(pal.rock[0], 0.60);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(0, H * 0.30);
-            ctx.lineTo(W * 0.18, H * 0.22);
-            ctx.lineTo(W * 0.30, H * 0.06);
-            ctx.lineTo(W * 0.34, 0);
-            ctx.closePath();
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(W, 0);
-            ctx.lineTo(W, H * 0.30);
-            ctx.lineTo(W * 0.82, H * 0.20);
-            ctx.lineTo(W * 0.70, H * 0.05);
-            ctx.lineTo(W * 0.66, 0);
-            ctx.closePath();
-            ctx.fill();
-
-            // Light shafts falling through the opening.
-            for (let i = 0; i < 5; i++) {
-                const top = W * (0.38 + i * 0.055);
-                const spread = 26 + i * 9;
-                const drop = H * rnd.range(0.55, 0.95);
-                const shaft = ctx.createLinearGradient(top, 0, top + spread, drop);
-                shaft.addColorStop(0, 'rgba(255,235,190,0.30)');
-                shaft.addColorStop(1, 'rgba(255,235,190,0)');
-                ctx.fillStyle = shaft;
-                ctx.beginPath();
-                ctx.moveTo(top - 7, 0);
-                ctx.lineTo(top + 9, 0);
-                ctx.lineTo(top + spread + 22, drop);
-                ctx.lineTo(top + spread - 10, drop);
-                ctx.closePath();
-                ctx.fill();
-            }
-
-            ridge(H * 0.44, H * 0.18, 52, veil(pal.rock[0], 0.72));
-            ridge(H * 0.56, H * 0.16, 38, veil(pal.rock[0], 0.58));
-
-            // Distant lamps, deep in the workings.
-            for (let i = 0; i < 16; i++) {
-                const x = rnd.range(0, W);
-                const y = rnd.range(H * 0.5, H * 0.92);
-                const r = rnd.range(4, 12);
-                const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-                g.addColorStop(0, 'rgba(255,190,110,0.55)');
-                g.addColorStop(1, 'rgba(255,190,110,0)');
-                ctx.fillStyle = g;
-                ctx.fillRect(x - r, y - r, r * 2, r * 2);
-            }
-            return cv;
-        }
-
-        // Nearer sheets: rock only, over transparency, and a haze wash so each
-        // one sits in front of the last rather than merging with it.
-        ctx.clearRect(0, 0, W, H);
-        if (layer === 1) {
-            ridge(H * 0.66, H * 0.16, 30, veil(pal.rock[2], 0.40));
-
-            // Mid-ground pillars: columns of rock left standing between the
-            // workings, tapering as they rise. They give the middle distance
-            // something with a vertical edge, which ridges alone never do.
-            const pillar = veil(pal.rock[1], 0.30);
-            const pillarLit = veil(pal.rockTop, 0.34);
-            for (let i = 0; i < 5; i++) {
-                const x = rnd.range(W * 0.05, W * 0.95);
-                const wTop = rnd.range(16, 30);
-                const wBot = wTop + rnd.range(8, 20);
-                const top = rnd.range(H * 0.18, H * 0.42);
-                ctx.fillStyle = pillar;
-                ctx.beginPath();
-                ctx.moveTo(x - wTop / 2, top);
-                ctx.lineTo(x + wTop / 2, top);
-                ctx.lineTo(x + wBot / 2, H);
-                ctx.lineTo(x - wBot / 2, H);
-                ctx.closePath();
-                ctx.fill();
-                // A lit edge down the side the shafts fall on.
-                ctx.fillStyle = pillarLit;
-                ctx.fillRect(x + wTop / 2 - 5, top, 5, H - top);
-                // A capital where it meets the roof.
-                ctx.fillStyle = pillar;
-                ctx.fillRect(x - wTop / 2 - 7, top - 7, wTop + 14, 9);
-            }
-        } else {
-            ridge(H * 0.82, H * 0.12, 22, veil(pal.rock[2], 0.18));
-            // Pit props silhouetted against the workings behind them.
-            ctx.fillStyle = veil(mixHex(pal.rock[2], '#000000', 0.4), 0.12);
-            for (let i = 0; i < 7; i++) {
-                const x = rnd.range(10, W - 10);
-                const h = rnd.range(H * 0.16, H * 0.34);
-                ctx.fillRect(x, H - h, 5, h);
-                ctx.fillRect(x - 16, H - h, 37, 5);
-            }
-        }
-
-        // A wash of air over the whole sheet, heavier lower down where there
-        // is more of it between the eye and the rock. This is what turns three
-        // stacked silhouettes into distance.
-        ctx.globalCompositeOperation = 'source-atop';
-        const wash = ctx.createLinearGradient(0, H * 0.35, 0, H);
-        wash.addColorStop(0, 'rgba(255,255,255,0)');
-        wash.addColorStop(1, 'rgba(255,255,255,' + (layer === 1 ? 0.16 : 0.09) + ')');
-        ctx.fillStyle = wash;
-        ctx.fillRect(0, 0, W, H);
-        ctx.globalCompositeOperation = 'source-over';
+        volume(ctx, S, 0.2, 0.34);
         return cv;
     }
 
@@ -636,27 +611,7 @@
         ca.lerp(cb, t);
         return '#' + ca.getHexString();
     }
-
-    /** Depths the three backdrop sheets hang at, nearest last. */
-    R3D.BACKDROP_Z = [-19, -11, -5.5];
-
-    /** One baked backdrop layer per palette, made on demand. */
-    const _backdrops = new Map();
-    R3D.backdropTexture = function (pal, layer) {
-        const key = pal.back + ':' + layer;
-        let tex = _backdrops.get(key);
-        if (tex) return tex;
-        tex = new THREE.CanvasTexture(backdropCanvas(pal, layer));
-        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-        // A canvas holds sRGB values. Left unflagged, Three samples it as
-        // linear and every colour comes out lifted — the backdrop rendered as
-        // pale grey wallpaper rather than a dark cavern, which then blew out
-        // every additive glow drawn over it.
-        tex.encoding = THREE.sRGBEncoding;
-        tex.needsUpdate = true;
-        _backdrops.set(key, tex);
-        return tex;
-    };
+    R3D.mixHex = mixHex;
 
     /* ------------------------------------------------------------------ *
      * Round primitives
@@ -858,6 +813,9 @@
 
         let cv;
         if (name === 'timber') cv = timberCanvas();
+        else if (name === 'plate') cv = plateCanvas();
+        else if (name === 'tread') cv = treadCanvas();
+        else if (name === 'masonry') cv = masonryCanvas();
         else cv = rockCanvas(name === 'rock2' ? 2 : (name === 'rock1' ? 1 : 0));
 
         tex = new THREE.CanvasTexture(cv);
