@@ -36,7 +36,7 @@
     const EV = TNT.EV;
 
     /** Fixed for the life of the page. See the header. */
-    const MAX_LIGHTS = 8;
+    const MAX_LIGHTS = 12;
     const MAX_PARTICLES = 700;
     /** How far, in tiles, the camera leans toward Tommy. See `draw`. */
     const DRIFT_X = 0.9;
@@ -147,7 +147,7 @@
          * now just enough to keep a silhouette off black; everything warm in a
          * room is a lamp, a furnace or Tommy's helmet.
          */
-        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.5);
+        this.ambient = new THREE.AmbientLight(new THREE.Color(pal.ambient), 0.56);
         this.hemi = new THREE.HemisphereLight(new THREE.Color(pal.hemi), new THREE.Color('#120c08'), 0.36);
 
         /**
@@ -163,6 +163,21 @@
         this.key.position.set(-0.45, 1, 0.8);
 
         this.scene.add(this.ambient, this.hemi, this.key);
+
+        /**
+         * The helmet lamp, as a real spot.
+         *
+         * The point light in slot zero lights the space round Tommy; this
+         * throws a pool *ahead* of him, onto the wall and the next deck, in
+         * the direction he is facing. In a works this dark it is the most
+         * characterful light in the game — the one that moves with him and
+         * shows you where you are about to go.
+         *
+         * Created once, here, like every other light: the count never changes.
+         */
+        this.headlamp = new THREE.SpotLight(0xfff0d0, 0, 18, 0.42, 0.75, 1);
+        this.headlamp.target = new THREE.Object3D();
+        this.scene.add(this.headlamp, this.headlamp.target);
 
         this.lightPool = [];
         for (let i = 0; i < MAX_LIGHTS; i++) {
@@ -213,6 +228,13 @@
         slots[0].intensity = (run.state === 'title' ? 0.35 : 2.1) * flicker;
         slots[0].distance = 22;
 
+        const lamp = this.headlamp;
+        const face = player.facing >= 0 ? 1 : -1;
+        const climbing = player.mode === 'climb';
+        lamp.position.set(px + face * 0.35, py + 0.9, 1.2);
+        lamp.target.position.set(px + (climbing ? 0 : face * 7), py + (climbing ? 3 : -0.3), -3.4);
+        lamp.intensity = (run.state === 'playing' || run.state === 'transition') && player.alive ? 2.2 * flicker : 0;
+
         if (this.roomView) {
             for (const src of this.roomView.lights) {
                 const dx = src.x + this.offset.x - px;
@@ -226,7 +248,10 @@
         for (let i = 0; i < cands.length && slot < MAX_LIGHTS - 1; i++, slot++) {
             const s = cands[i].src;
             const l = slots[slot];
-            l.position.set(s.x + this.offset.x, s.y + this.offset.y, 1.0);
+            // Each source at its own depth: a lamp bolted to the wall has to
+            // be *at* the wall to pool on it. Everything used to sit in front
+            // of the play plane, which lit the decks flat and the wall barely.
+            l.position.set(s.x + this.offset.x, s.y + this.offset.y, s.z === undefined ? 1.0 : s.z);
             l.color.set(s.colour);
             const f = s.flicker ? 1 + Math.sin(this.t * (7 + slot * 3)) * s.flicker : 1;
             l.intensity = s.energy * f;
@@ -436,13 +461,10 @@
                     '  vec2 uv = vUv;',
                     '  vec2 c = uv - 0.5;',
                     '',
-                    '  // A touch of lens colour separation toward the edges. Subtle',
-                    '  // enough to read as glass rather than as a broken display.',
-                    '  float ca = 0.0016 * dot(c, c) * 4.0;',
-                    '  vec3 col;',
-                    '  col.r = texture2D(tDiffuse, uv + c * ca).r;',
-                    '  col.g = texture2D(tDiffuse, uv).g;',
-                    '  col.b = texture2D(tDiffuse, uv - c * ca).b;',
+                    '  // No lens colour separation. It was here, and at this scale it',
+                    '  // put a red and green fringe on every small bright edge — the',
+                    '  // character above all — which read as a broken display.',
+                    '  vec3 col = texture2D(tDiffuse, uv).rgb;',
                     '',
                     '  col += bloom(uv) * uBloom;',
                     '',

@@ -121,6 +121,7 @@
                 const spawn = findFooting(run.room());
                 run.player.reset(spawn.x, spawn.y, true);
                 run.player.active = true;
+                run.dog.placeAt(spawn.x, spawn.y, 1);
                 scene.setRoom(run.room(), null);
                 return run.room().name;
             },
@@ -129,6 +130,7 @@
             put: function (tx, ty) {
                 run.player.reset(tx * C.TILE + C.TILE / 2, (ty + 1) * C.TILE, true);
                 run.player.active = true;
+                run.dog.placeAt(run.player.x, run.player.y, 1);
             },
 
             /** Hold or release inputs, for driving movement from a harness. */

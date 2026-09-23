@@ -24,7 +24,7 @@
 (function (TNT) {
     'use strict';
 
-    const { C, Util, Tiles, World, Entities, Player, EventBus } = TNT;
+    const { C, Util, Tiles, World, Entities, Player, Companion, EventBus } = TNT;
     const T = C.Tile;
     const EV = TNT.EV;
 
@@ -34,6 +34,8 @@
         this.bus = new EventBus();
         this.mines = World.buildAll();
         this.player = new Player(this.bus);
+        /** Tommy's dog. Follows him, and points at secrets. */
+        this.dog = new Companion(this.bus);
 
         this.state = 'title';
         this.mineIndex = 0;
@@ -65,6 +67,7 @@
 
         this.checkpoint = { room: this.roomIndex, x: this.mine.spawnX, y: this.mine.spawnY };
         this.player.placeAt(this.mine.spawnX, this.mine.spawnY);
+        this.dog.placeAt(this.mine.spawnX, this.mine.spawnY, 1);
         this._checkpointDwell = 0;
         this._timer = 0;
         this._transition = null;
@@ -109,6 +112,7 @@
         this.roomIndex = this.mine.spawnRoom;
         this.checkpoint = { room: this.mine.spawnRoom, x: this.mine.spawnX, y: this.mine.spawnY };
         this.player.reset(this.mine.spawnX, this.mine.spawnY, false);
+        this.dog.placeAt(this.mine.spawnX, this.mine.spawnY, 1);
 
         this._setState('playing');
         this.ents().seen = true;
@@ -178,6 +182,7 @@
 
         this.player.update(dt, room, input, ents);
         this.player.carry();
+        this.dog.update(dt, this.player);
 
         if (this._checkWarp(input)) return;
         if (input.justPressed('plant')) this._plant();
@@ -346,6 +351,7 @@
             pad.partner.lock = C.TELEPORT_LOCK;
             p.placeAt(pad.partner.x, pad.partner.y);
             p.invuln = Math.max(p.invuln, 0.4);
+            this.dog.placeAt(p.x, p.y, p.facing);
             this.bus.emit(EV.TELEPORT, {
                 fromX: fromX, fromY: fromY, toX: p.x, toY: p.y
             });
@@ -645,6 +651,7 @@
         p.y = pos.y;
         p.ridingLift = null;
         p.fallSpeed = 0;
+        this.dog.placeAt(p.x, p.y, p.facing);
 
         p.active = false;
         this._transition = { t: 0, len: 0.34, dir: dir };
@@ -718,6 +725,7 @@
 
         this.player.reset(this.checkpoint.x, this.checkpoint.y, true);
         this.player.invuln = C.RESPAWN_INVULN;
+        this.dog.placeAt(this.player.x, this.player.y, 1);
         this.bombs.length = 0;
         this.danger = false;
 

@@ -442,7 +442,7 @@
             for (const dy of [-0.08, 0.08]) {
                 metal.box(cx, cy + dy, z + 0.3, 0.36, 0.035, 0.035, ironDk, F.SLAB);   // guard
             }
-            lights.push({ x: cx, y: cy, colour: pal.lamp, energy: 0.95, range: 12, flicker: 0.06 });
+            lights.push({ x: cx, y: cy, z: FRAME_Z + 0.9, colour: pal.lamp, energy: 1.1, range: 10, flicker: 0.06 });
         }
 
         let hung = 0;
@@ -464,7 +464,7 @@
             metal.cone(x, y, z, 0.5, 0.34, R3D.col(pal.iron), true, 14);              // shade
             metal.cyl(x, y + 0.2, z, 0.1, 0.14, 'y', brass, 8);                        // cap
             glow.sphere(x, y - 0.12, z, 0.13, glass, 10, 6);                           // bulb
-            lights.push({ x: x, y: y - 0.3, colour: pal.lamp, energy: 1.2, range: 15, flicker: 0.12,
+            lights.push({ x: x, y: y - 0.3, z: z + 0.4, colour: pal.lamp, energy: 1.35, range: 15, flicker: 0.12,
                           beam: { x: x, y: y - 0.2, z: z, len: Math.min(6, clear - drop) } });
             hung++;
         }

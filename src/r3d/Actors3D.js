@@ -21,15 +21,23 @@
     const F = R3D.FACE;
 
     const ACTOR_Z = 0.45;
-    /** Tommy is drawn a shade larger than his collision box. See `buildTommy`. */
-    const TOMMY_SCALE = 1.12;
+    /**
+     * Tommy is drawn larger than his collision box, deliberately.
+     *
+     * A room is forty-two tiles across a screen, so a character drawn at his
+     * true size is about thirty pixels tall — enough to see *where* he is, not
+     * enough to see *who* he is. The head and helmet are what grow past the
+     * box; the feet stay exactly on it, so standing and landing still read as
+     * true. Decks are three rows apart, which leaves room overhead for it.
+     */
+    const TOMMY_SCALE = 1.4;
 
     /**
      * How far below the rig's origin his boots actually are.
      *
-     * The rig is authored around the hips — the leg groups hang at y 0.14 and
-     * the boot sits 0.44 below that — so its lowest point is 0.30 *under* the
-     * origin. `player.y` is the sole of his foot, so placing the origin there
+     * The rig is authored around the hips — the legs hang from y 0.14 and the
+     * trainer's sole sits 0.45 below that — so its lowest point is 0.31
+     * *under* the origin. `player.y` is the sole of his foot, so placing the origin there
      * buried him nearly a third of a tile into whatever he was standing on,
      * which is why he looked like he was wading through the platform rather
      * than standing on it.
@@ -39,7 +47,7 @@
      * Scaled, because the group's scale applies to its children and not to its
      * own position.
      */
-    const TOMMY_FOOT = 0.30;
+    const TOMMY_FOOT = 0.31;
     const Actors3D = {};
 
     /** One merged mesh from a builder callback, with a shared material. */
@@ -55,313 +63,528 @@
      * ------------------------------------------------------------------ */
 
     /**
-     * The miner.
+     * Tommy, as he is in the portrait on the title card: a red-haired boy in a
+     * puffer jacket banded yellow, grey and charcoal, jeans, blue trainers —
+     * and a miner's helmet with a lamp on it, because he is down a mine.
      *
-     * Built as a small hierarchy so the walk cycle can swing the limbs, and
-     * scaled in world units where one tile is one unit — he is `C.PLAYER_H`
-     * pixels tall, which is a shade over a tile and a quarter.
-     */
-    /**
-     * The miner.
+     * The first two passes at him were a stack of boxes and read as exactly
+     * that: a blue-coated man with a moustache, twenty pixels tall, with no
+     * face to speak of. The things that make a small character legible are the
+     * same in every good platformer, and all of them are here:
      *
-     * Rebuilt with a much stronger silhouette, because the first attempt was a
-     * stack of same-sized boxes that vanished against a room full of boxes. The
-     * things doing the work here are the ones a 2D platformer character always
-     * relies on:
+     *   - **A big head.** A third of his height is head and helmet. At this size
+     *     realistic proportions are a smudge; a big head is a person.
+     *   - **A face you can see.** He is turned three-quarters to the camera, not
+     *     in flat profile, so both eyes show — big, with whites, irises and a
+     *     catch-light. Eyes are what the viewer looks at first on any figure.
+     *   - **Round forms.** Every part is an ellipsoid or a cylinder: a puffer
+     *     jacket in padded bands, round-toed trainers, a domed helmet. Soft
+     *     shapes read as a character; boxes read as a crate.
+     *   - **Jointed limbs.** Knees and elbows, so a run is a run — thigh, shin,
+     *     foot rolling through — rather than two posts swinging.
      *
-     *   - **A big head and a small body.** Roughly a third of his height is
-     *     helmet. That is what makes a 20-pixel character legible at all, and
-     *     realistic proportions at this size read as a smudge.
-     *   - **A hard colour break at the waist.** Bright coat over dark trousers,
-     *     so the silhouette splits into two blocks the eye can track while he
-     *     moves rather than one column.
-     *   - **A rim of high-value trim** — the helmet, the lamp housing, the belt
-     *     buckle — all near-white, so there is something on him brighter than
-     *     anything in the room behind him.
+     * AUTHORED FACING +X
+     * ------------------
+     *   X  the way he faces      Y  up      Z  toward the camera (his left)
+     *
+     * The rig's origin is the hips. `TOMMY_FOOT` is how far below that the
+     * soles sit.
      */
     function buildTommy(mat, glowMat) {
         const g = new THREE.Group();
-        const skin = R3D.col('#e8b487');
-        const coat = R3D.col('#3d8ec4');
-        const coatDark = R3D.col('#2a6b99');
-        const coatLight = R3D.col('#67b4e4');
-        const trouser = R3D.col('#33384a');
-        const boot = R3D.col('#1d1a17');
-        const helmet = R3D.col('#ffc233');
-        const helmetLight = R3D.col('#ffe08a');
-        const strap = R3D.col('#8a6a3a');
-        const hair = R3D.col('#c4441c');
-        const hairLit = R3D.col('#e86a2c');
+        const col = R3D.col;
+        const P = TOMMY_COLOURS;
+
+        /* ---- body ---- */
+        const body = new THREE.Group();
+        body.add(part(function (b) {
+            // The jacket in three padded bands: charcoal at the hem, a grey
+            // stripe, yellow across the chest and shoulders.
+            b.ellipsoid(0, 0.24, 0, 0.19, 0.12, 0.2, col(P.dark), 14, 8);
+            b.ellipsoid(0, 0.36, 0, 0.2, 0.08, 0.21, col(P.grey), 14, 6);
+            b.ellipsoid(0.0, 0.47, 0, 0.19, 0.1, 0.2, col(P.yellow), 14, 8);
+            // The quilting seams between the bands.
+            b.cyl(0, 0.31, 0, 0.195, 0.02, 'y', col(P.darkLit), 14);
+            b.cyl(0, 0.415, 0, 0.2, 0.02, 'y', col(P.greyLit), 14);
+            // Collar and hood, charcoal, sitting up round the neck.
+            b.cyl(-0.02, 0.56, 0, 0.13, 0.08, 'y', col(P.dark), 12, col(P.darkLit));
+            b.ellipsoid(-0.12, 0.54, 0, 0.1, 0.07, 0.15, col(P.dark), 10, 6);
+            // Zip down the front.
+            b.box(0.19, 0.37, 0, 0.02, 0.3, 0.03, col(P.greyLit));
+            // Jeans at the waist, and a belt.
+            b.ellipsoid(0, 0.12, 0, 0.16, 0.08, 0.17, col(P.jeans), 12, 6);
+            b.cyl(0, 0.16, 0, 0.17, 0.03, 'y', col('#3a2a1c'), 12);
+        }, mat));
 
         /*
-         * AUTHORED IN PROFILE, FACING +X.
-         *
-         * He used to face the camera, which meant you watched his front walking
-         * right and his back walking left — and a character who turns his back
-         * on you is a character you cannot read. Platformers are drawn in
-         * profile for the same reason they always have been: the direction of
-         * travel is the single most important thing on screen, and a silhouette
-         * facing along it says so without any animation at all.
-         *
-         *   X  the way he faces — chest at +X, back at -X. This is the axis the
-         *      camera sees, so the *profile* is the silhouette.
-         *   Y  up.
-         *   Z  shoulder width, into the screen. Barely seen; it only separates
-         *      the near limb from the far one.
-         *
-         * `rotation.y` still flips between 0 and PI, so the turn code is
-         * unchanged — it now flips him between facing right and facing left
-         * rather than toward and away.
+         * The satchel on his back, and the sticks he is carrying poking out of
+         * it. `sticks` are toggled by the sync pass from `run.tntHeld`, so what
+         * you are holding is on the character and not only in the HUD.
          */
-        const body = part(function (b) {
-            b.box(0.02, 0.36, 0, 0.38, 0.46, 0.44, coat, F.ALL, coatLight);
-            // Chest, slightly proud at the front, and a back that isn't flat.
-            b.box(0.14, 0.40, 0, 0.16, 0.30, 0.40, coatLight, F.ALL, coatLight);
-            b.box(-0.16, 0.34, 0, 0.10, 0.36, 0.38, coatDark, F.ALL);
-            // Shoulders.
-            b.box(0.02, 0.56, 0, 0.42, 0.13, 0.48, coatLight, F.ALL, coatLight);
-            // Belt, with the buckle on the near hip.
-            b.box(0.02, 0.16, 0, 0.42, 0.11, 0.46, strap, F.ALL);
-            b.box(0.20, 0.16, 0, 0.09, 0.12, 0.14, R3D.col('#ffe6a0'));
+        const satchel = part(function (b) {
+            b.box(-0.2, 0.3, -0.08, 0.1, 0.2, 0.22, col('#6b4524'), F.ALL, col('#8a5c30'));
+            b.box(-0.2, 0.39, -0.08, 0.12, 0.05, 0.24, col('#4a2e16'), F.ALL);
+            b.box(-0.02, 0.38, 0.19, 0.34, 0.03, 0.03, col('#4a2e16'));
         }, mat);
+        body.add(satchel);
+        const sticks = [];
+        for (let i = 0; i < 3; i++) {
+            const stick = part(function (b) {
+                b.cyl(0, 0, 0, 0.032, 0.2, 'y', col('#d0392a'), 8, col('#f06050'));
+                b.cyl(0, 0.12, 0, 0.008, 0.06, 'y', col('#7a6038'), 4);
+            }, mat);
+            stick.position.set(-0.21 + (i - 1) * 0.01, 0.46, -0.16 + i * 0.07);
+            stick.rotation.z = 0.25 + i * 0.08;
+            stick.visible = false;
+            body.add(stick);
+            sticks.push(stick);
+        }
         g.add(body);
 
+        /* ---- head ---- */
         const head = new THREE.Group();
-        head.position.y = 0.70;
+        head.position.y = HEAD_Y;
         head.add(part(function (b) {
-            b.box(0.01, 0.02, 0, 0.34, 0.36, 0.34, skin);
-            // Nose at the front — the profile's whole read — and a red
-            // moustache to match the hair below the helmet.
-            b.box(0.19, 0.00, 0, 0.10, 0.10, 0.11, skin);
-            b.box(0.17, -0.09, 0, 0.13, 0.06, 0.16, hair);
-            // Red hair: sideburns, a fringe under the brim, and a tuft at the
-            // nape. It has to sit *below* the helmet or none of it is seen.
-            b.box(-0.16, 0.04, 0, 0.09, 0.24, 0.33, hair);
-            b.box(-0.06, 0.12, 0, 0.30, 0.13, 0.36, hair);
-            b.box(0.13, 0.10, 0, 0.15, 0.10, 0.30, hairLit);
-            for (const sz of [1, -1]) {
-                b.box(0.02, 0.03, sz * 0.16, 0.22, 0.16, 0.05, hair);
+            const skin = col(P.skin), shade = col(P.skinShade);
+            // Head: a touch wider than tall, the jaw slightly forward.
+            b.ellipsoid(0.01, 0.2, 0, 0.23, 0.22, 0.22, skin, 16, 10);
+            b.ellipsoid(0.08, 0.1, 0, 0.14, 0.1, 0.16, skin, 12, 6);
+            // Nose, and cheeks with a bit of colour.
+            b.ellipsoid(0.235, 0.17, 0.02, 0.04, 0.035, 0.035, shade, 8, 5);
+            b.ellipsoid(0.17, 0.12, 0.13, 0.05, 0.03, 0.03, col(P.cheek), 8, 5);
+            b.ellipsoid(0.19, 0.12, -0.11, 0.04, 0.03, 0.03, col(P.cheek), 8, 5);
+            // Ears.
+            b.ellipsoid(-0.01, 0.17, 0.22, 0.05, 0.065, 0.03, shade, 8, 5);
+            b.ellipsoid(-0.01, 0.17, -0.22, 0.05, 0.065, 0.03, shade, 8, 5);
+            // Smile: a short curve of dark segments across the front of the jaw.
+            for (let k = -2; k <= 2; k++) {
+                const a = k * 0.28;
+                b.rbox(0.215 - Math.abs(k) * 0.008, 0.075 + k * k * 0.006, 0.02 + k * 0.035,
+                       0.03, 0.018, 0.03, 0, col('#7a2a20'));
             }
-            b.cone(-0.22, 0.02, 0, 0.08, 0.18, hairLit, false, 5);
-            // Helmet: dome, with the brim jutting forward over the face.
-            b.box(0.01, 0.26, 0, 0.40, 0.20, 0.42, helmet, F.ALL, helmetLight);
-            b.box(0.01, 0.36, 0, 0.28, 0.10, 0.32, helmetLight, F.ALL, helmetLight);
-            b.box(0.22, 0.19, 0, 0.20, 0.08, 0.40, helmet, F.ALL, helmetLight);
-            // Lamp on the front of the brim, pointing the way he walks.
-            b.box(0.26, 0.25, 0, 0.11, 0.13, 0.15, R3D.col('#4a4a52'), F.ALL);
-            // One eye, on the side we can see.
-            b.box(0.12, 0.05, 0.16, 0.06, 0.08, 0.03, R3D.col('#221a14'));
-            // Ear, on the near side.
-            b.box(-0.03, 0.01, 0.17, 0.08, 0.10, 0.03, skin);
+            // Hair: the fringe sweeping out from under the brim, sideburns,
+            // and tufts sticking out at the back.
+            const hair = col(P.hair), hairLit = col(P.hairLit), hairDk = col(P.hairDark);
+            b.ellipsoid(-0.05, 0.27, 0, 0.21, 0.13, 0.225, hairDk, 14, 8);
+            for (let k = 0; k < 5; k++) {
+                const z = -0.14 + k * 0.07;
+                b.ellipsoid(0.17, 0.32 - Math.abs(z) * 0.3, z, 0.06, 0.045, 0.045,
+                            k % 2 ? hair : hairLit, 8, 5);
+            }
+            for (const s of [1, -1]) b.ellipsoid(0.06, 0.2, s * 0.2, 0.05, 0.08, 0.03, hair, 8, 5);
+            for (let k = 0; k < 4; k++) {
+                b.cone(-0.22, 0.2 + k * 0.05, -0.12 + k * 0.08, 0.05, 0.12,
+                       k % 2 ? hair : hairLit, false, 5);
+            }
+        }, mat));
+
+        // Eyes are their own parts so they can blink.
+        const eyes = [];
+        for (const ez of [0.085, -0.085]) {
+            const eye = new THREE.Group();
+            eye.position.set(0.195, 0.2, ez);
+            eye.add(part(function (b) {
+                b.ellipsoid(0, 0, 0, 0.035, 0.05, 0.04, col('#ffffff'), 10, 6);
+                b.ellipsoid(0.02, -0.005, 0, 0.02, 0.034, 0.028, col(P.iris), 8, 5);
+                b.ellipsoid(0.03, -0.005, 0, 0.012, 0.02, 0.016, col('#101018'), 8, 5);
+                b.ellipsoid(0.035, 0.012, 0.01, 0.006, 0.008, 0.006, col('#ffffff'), 6, 4);
+                // Brow above, in the hair's darker red.
+                b.rbox(0.01, 0.07, 0, 0.03, 0.016, 0.075, ez > 0 ? -0.15 : 0.15, col(P.hairDark));
+            }, mat));
+            head.add(eye);
+            eyes.push(eye);
+        }
+
+        /*
+         * The helmet: a dome, a brim that juts forward over the eyes, a ridge
+         * down the crown, and the lamp on the front. Sitting well down on his
+         * head so the fringe shows under it — that red line between yellow
+         * helmet and pink face is most of what says "Tommy" at a distance.
+         */
+        head.add(part(function (b) {
+            const hel = col(P.helmet), lit = col(P.helmetLit), dk = col(P.helmetDark);
+            b.ellipsoid(-0.01, 0.3, 0, 0.26, 0.23, 0.25, hel, 18, 10, 0.5, dk);
+            b.ellipsoid(0.01, 0.3, 0, 0.3, 0.035, 0.29, dk, 18, 4);                   // band
+            b.ellipsoid(0.12, 0.3, 0, 0.2, 0.025, 0.2, hel, 16, 4);                    // front brim
+            b.box(-0.01, 0.46, 0, 0.36, 0.05, 0.05, lit, F.ALL);                      // crown ridge
+            // Lamp: a housing on the front of the dome, and a cable to the back.
+            b.cyl(0.22, 0.4, 0, 0.055, 0.1, 'x', col('#3a3a40'), 10, col('#5a5a62'));
+            b.cyl(0.26, 0.4, 0, 0.065, 0.03, 'x', col('#c8c8d0'), 12);
+            b.cyl(0.0, 0.34, -0.25, 0.012, 0.3, 'x', col('#222226'), 5);
         }, mat));
         head.add(part(function (b) {
-            b.box(0.33, 0.25, 0, 0.05, 0.11, 0.13, R3D.col('#fff6d0'), F.ALL);
+            b.cyl(0.28, 0.4, 0, 0.05, 0.02, 'x', col('#fff6d0'), 12);
         }, glowMat));
         g.add(head);
 
-        /*
-         * Limbs are separated in **Z**, not X — near leg and far leg — and they
-         * swing about **Z**, which in profile is the forward/back stride. The
-         * far pair is darkened so the two do not merge into one shape when they
-         * cross.
-         */
-        const legNear = new THREE.Group();
-        legNear.position.set(0.01, 0.14, 0.12);
-        legNear.add(part(function (b) {
-            b.box(0, -0.18, 0, 0.19, 0.34, 0.19, trouser);
-            b.box(0.05, -0.38, 0, 0.30, 0.12, 0.20, boot, F.ALL, R3D.col('#2e2823'));
-        }, mat));
-        const legFar = new THREE.Group();
-        legFar.position.set(0.01, 0.14, -0.12);
-        legFar.add(part(function (b) {
-            b.box(0, -0.18, 0, 0.19, 0.34, 0.19, R3D.mixCol('#33384a', '#000000', 0.3));
-            b.box(0.05, -0.38, 0, 0.30, 0.12, 0.20, R3D.mixCol('#1d1a17', '#000000', 0.3));
-        }, mat));
+        /* ---- legs: thigh, shin, trainer ---- */
+        const leg = function (near) {
+            const k = near ? 0 : 0.28;
+            const jeans = R3D.mixCol(P.jeans, '#000000', k);
+            const jeansLit = R3D.mixCol(P.jeansLit, '#000000', k);
+            const thigh = new THREE.Group();
+            thigh.position.set(0.0, HIP_Y, near ? 0.085 : -0.085);
+            thigh.add(part(function (b) {
+                b.cyl(0, -THIGH / 2, 0, 0.075, THIGH + 0.04, 'y', jeans, 10, jeansLit);
+            }, mat));
+            const shin = new THREE.Group();
+            shin.position.y = -THIGH;
+            shin.add(part(function (b) {
+                b.cyl(0, -SHIN / 2, 0, 0.068, SHIN + 0.02, 'y', jeans, 10, jeansLit);
+                b.cyl(0, -SHIN + 0.02, 0, 0.074, 0.04, 'y', jeansLit, 10);        // turn-up
+                // The trainer: a round toe, a white sole, a stripe.
+                const shoe = R3D.mixCol(P.shoe, '#000000', k);
+                b.ellipsoid(0.05, -SHIN - 0.03, 0, 0.12, 0.06, 0.075, shoe, 12, 6);
+                b.box(0.05, -SHIN - 0.075, 0, 0.24, 0.035, 0.15, R3D.mixCol(P.sole, '#000000', k), F.ALL);
+                b.box(0.07, -SHIN - 0.02, 0.07, 0.1, 0.02, 0.01, R3D.mixCol('#ffffff', '#000000', k));
+            }, mat));
+            thigh.add(shin);
+            thigh.userData.shin = shin;
+            return thigh;
+        };
+        const legNear = leg(true), legFar = leg(false);
         g.add(legNear, legFar);
 
-        const armNear = new THREE.Group();
-        armNear.position.set(0.02, 0.54, 0.22);
-        armNear.add(part(function (b) {
-            b.box(0, -0.16, 0, 0.15, 0.32, 0.16, coat, F.ALL, coatLight);
-            b.box(0, -0.36, 0, 0.16, 0.12, 0.17, skin);
-        }, mat));
-        const armFar = new THREE.Group();
-        armFar.position.set(0.02, 0.54, -0.22);
-        armFar.add(part(function (b) {
-            b.box(0, -0.16, 0, 0.15, 0.32, 0.16, R3D.mixCol('#3d8ec4', '#000000', 0.34));
-            b.box(0, -0.36, 0, 0.16, 0.12, 0.17, R3D.mixCol('#e8b487', '#000000', 0.34));
-        }, mat));
+        /* ---- arms: upper, forearm, hand ---- */
+        const arm = function (near) {
+            const k = near ? 0 : 0.3;
+            const sleeve = R3D.mixCol(P.dark, '#000000', k);
+            const cuff = R3D.mixCol(P.yellow, '#000000', k);
+            const upper = new THREE.Group();
+            upper.position.set(0.0, SHOULDER_Y, near ? 0.215 : -0.215);
+            upper.add(part(function (b) {
+                b.ellipsoid(0, -0.02, 0, 0.08, 0.08, 0.08, R3D.mixCol(P.yellow, '#000000', k), 10, 6);
+                b.cyl(0, -UPPER / 2, 0, 0.06, UPPER, 'y', sleeve, 10);
+            }, mat));
+            const fore = new THREE.Group();
+            fore.position.y = -UPPER;
+            fore.add(part(function (b) {
+                b.cyl(0, -FORE / 2, 0, 0.055, FORE, 'y', sleeve, 10);
+                b.cyl(0, -FORE + 0.01, 0, 0.06, 0.035, 'y', cuff, 10);
+                b.ellipsoid(0.01, -FORE - 0.045, 0, 0.05, 0.055, 0.045,
+                            R3D.mixCol(P.skin, '#000000', k), 10, 6);
+            }, mat));
+            upper.add(fore);
+            upper.userData.fore = fore;
+            return upper;
+        };
+        const armNear = arm(true), armFar = arm(false);
         g.add(armNear, armFar);
 
         g.userData = {
-            head: head, body: body,
+            head: head, body: body, eyes: eyes, sticks: sticks,
             legL: legNear, legR: legFar,
-            armL: armNear, armR: armFar
+            armL: armNear, armR: armFar,
+            blink: 2.4, stride: 0, face: 1, lean: 0, dead: 0
         };
-        // Slightly larger than life. He has to win against a room of boxes.
         g.scale.setScalar(TOMMY_SCALE);
         return g;
     }
 
+    const TOMMY_COLOURS = {
+        skin: '#f2c29c', skinShade: '#dfa07e', cheek: '#f2988a',
+        hair: '#d4581c', hairLit: '#f47c32', hairDark: '#9a3a12',
+        iris: '#3a7ad0',
+        yellow: '#ecab1e', grey: '#8c949e', greyLit: '#c0c8d0',
+        dark: '#2f3237', darkLit: '#4c5058',
+        jeans: '#3b62a8', jeansLit: '#5d88d0',
+        shoe: '#2d62c6', sole: '#eceef2',
+        helmet: '#f8c81e', helmetLit: '#ffe57a', helmetDark: '#c48a10'
+    };
+
+    /* Rig dimensions, in rig units before `TOMMY_SCALE`. */
+    const HIP_Y = 0.14;
+    const THIGH = 0.19;
+    const SHIN = 0.17;
+    const SHOULDER_Y = 0.5;
+    const UPPER = 0.15;
+    const FORE = 0.14;
+    const HEAD_Y = 0.58;
+
+    /**
+     * How far round toward the camera he is turned, in radians.
+     *
+     * Flat profile shows one eye and a nose; a three-quarter view shows a
+     * face. It costs nothing in readability of direction — the brim, the nose
+     * and the stride all still point the way he is going.
+     */
+    const THREE_QUARTER = 0.5;
+
     /**
      * Pose Tommy from his state.
      *
-     * The stances read very differently and have to: with no jump, "climbing"
-     * and "on a rope" are two of the four things you spend the game doing, and
-     * if they look like standing the player cannot tell what they are holding.
+     * Every stance has to read differently at a glance, because what he is
+     * *holding* — ladder, chain, cable, nothing — is what decides what the
+     * buttons do next.
+     *
+     * Limbs swing about Z, which in profile is forward (+) and back (−). Knees
+     * only ever bend back and elbows only forward, and both are driven off the
+     * same stride phase as the swing so the whole limb moves as one.
      */
-    function poseTommy(g, player, t, dt) {
+    function poseTommy(g, player, t, dt, held) {
         const u = g.userData;
         const pose = player.pose();
-        const speed = Math.abs(player.vx);
+        const step = dt || 1 / 60;
+        const speedK = Util.clamp(Math.abs(player.vx) / C.MOVE_MAX, 0, 1);
 
-        // Squash on landing, stretch while falling. Read from the simulation
-        // rather than invented here, so it is always in step with the impact.
-        // Multiplied over the rig's base scale, not assigned — assigning it
-        // silently reset the size the rig was built at.
+        // Squash on landing, stretch on take-off — read from the simulation,
+        // so it is always in step with the impact.
         const sq = player.squash;
         const k = TOMMY_SCALE;
-        g.scale.set(k * (1 + sq * 0.3), k * (1 - sq * 0.28), k * (1 + sq * 0.15));
+        g.scale.set(k * (1 + sq * 0.22), k * (1 - sq * 0.24), k * (1 + sq * 0.12));
 
-        /*
-         * The stride is driven by *distance covered*, not by wall time.
-         *
-         * Running the cycle off `t` means the legs move at a fixed rate however
-         * fast he is going, so he moonwalks when slow and skates when fast.
-         * Advancing the phase by `vx · dt` locks the feet to the ground, which
-         * is most of what makes a walk read as walking.
-         */
-        const step = dt || 1 / 60;
-        if (u.stride === undefined) u.stride = 0;
-        if (pose === 'run') u.stride += Math.abs(player.vx) * step * 0.085;
-        else if (pose === 'climb') u.stride += Math.abs(player.vy) * step * 0.10;
-        else if (pose === 'rope') u.stride += Math.abs(player.vx) * step * 0.08;
+        // The stride is driven by distance covered, not by time, so the feet
+        // stay planted at any speed.
+        if (pose === 'run') u.stride += Math.abs(player.vx) * step * 0.105;
+        else if (pose === 'climb') u.stride += Math.abs(player.vy) * step * 0.11;
+        else if (pose === 'rope') u.stride += Math.abs(player.vx) * step * 0.09;
+        else if (pose === 'swim') u.stride += step * 5;
 
-        let swing = 0;
-        if (pose === 'run') swing = Math.sin(u.stride) * Util.clamp(speed / C.MOVE_MAX, 0.35, 1) * 1.05;
-        else if (pose === 'climb') swing = Math.sin(u.stride) * 0.6;
-        else if (pose === 'rope') swing = Math.sin(u.stride) * 0.45;
+        // Reset the X axis, which only the climb uses.
+        for (const limb of [u.armL, u.armR, u.legL, u.legR, u.body, u.head]) limb.rotation.x = 0;
+        u.body.position.y = 0;
+        u.body.scale.set(1, 1, 1);
+        u.head.position.y = HEAD_Y;
 
-        // A stride bobs the body: twice a cycle, once per footfall.
-        const bob = pose === 'run' ? Math.abs(Math.sin(u.stride)) * 0.045 : 0;
-        u.body.position.y = bob;
-        u.head.position.y = 0.70 + bob;
+        const phase = u.stride;
+        const s = Math.sin(phase);
+        const set = function (limb, swing, bend) {
+            limb.rotation.z = swing;
+            (limb.userData.shin || limb.userData.fore).rotation.z = bend;
+        };
 
-        /*
-         * All swings are about **Z**. The rig is authored in profile facing +X,
-         * so Z is the axis that carries a stride forward and back; rotating
-         * about X — which is what this did when he faced the camera — now just
-         * splays the limbs sideways into the screen.
-         *
-         * Positive Z swings a limb *backward*, so the near and far pairs take
-         * opposite signs and cross at the middle of the cycle.
-         */
-        // Only the climb uses the X axis; everything else is a profile pose and
-        // must not inherit a lift left over from the last rung.
-        u.armL.rotation.x = u.armR.rotation.x = 0;
-        u.legL.rotation.x = u.legR.rotation.x = 0;
-        u.body.rotation.x = u.head.rotation.x = 0;
-
-        if (pose === 'climb') {
+        if (pose === 'run') {
+            const amp = Util.clamp(speedK, 0.35, 1);
+            // Knees bend hardest on the forward swing, the way a stride does.
+            const bendN = -(0.15 + Math.max(0, Math.cos(phase)) * 1.2) * amp;
+            const bendF = -(0.15 + Math.max(0, -Math.cos(phase)) * 1.2) * amp;
+            set(u.legL, s * 0.85 * amp, bendN);
+            set(u.legR, -s * 0.85 * amp, bendF);
+            set(u.armL, -s * 0.9 * amp, 1.1);
+            set(u.armR, s * 0.9 * amp, 1.1);
+            u.body.position.y = Math.abs(Math.cos(phase)) * 0.045 * amp;
+            u.head.position.y = HEAD_Y + u.body.position.y;
+            u.head.rotation.z = -0.05;
+        } else if (pose === 'climb') {
             /*
-             * SEEN FROM BEHIND, SO THE SWINGS MOVE TO X.
-             *
-             * A climber faces the ladder, so the profile that serves every other
-             * stance is the one view that makes no sense here — in profile he
-             * hangs off the rungs sideways. The turn is handled by the `face`
-             * scalar below; what changes here is the axis.
-             *
-             * Once he is turned a quarter turn, the rig's local Z points across
-             * the screen and its local X points into it. Limb swings about Z
-             * therefore go straight into the screen and vanish, and the whole
-             * climb reads as a man standing still. About X they swing across the
-             * screen, where they can be seen.
-             *
-             * The near/far split becomes left/right at the same time, which is
-             * what puts both hands on the ladder either side of his head.
+             * Seen from behind: the turn scalar below puts him back to camera,
+             * and in that view the rig's Z points across the screen — so the
+             * arm and leg swings move to X, where they can be seen.
+             * Hand over hand, and the opposite knee comes up with each reach.
              */
-            const liftN = Math.PI - 0.28 + swing * 0.2;
-            const liftF = Math.PI - 0.28 - swing * 0.2;
-            u.armL.rotation.x = liftN;         // near arm — screen right
-            u.armR.rotation.x = -liftF;        // far arm  — screen left
-            u.legL.rotation.x = -0.15 - swing * 0.22;
-            u.legR.rotation.x = 0.15 - swing * 0.22;
-            // Weight shifting from one foot to the other as he goes up.
-            u.body.rotation.x = swing * 0.07;
-            u.head.rotation.x = swing * 0.05;
+            const reachN = Math.PI - 0.35 + s * 0.28;
+            const reachF = Math.PI - 0.35 - s * 0.28;
+            u.armL.rotation.x = reachN;
+            u.armR.rotation.x = -reachF;
             u.armL.rotation.z = u.armR.rotation.z = 0;
-            u.legL.rotation.z = u.legR.rotation.z = 0;
-            u.head.rotation.z = 0;
+            u.armL.userData.fore.rotation.z = 0.4 - s * 0.3;
+            u.armR.userData.fore.rotation.z = 0.4 + s * 0.3;
+            set(u.legL, 0.5 + Math.max(0, s) * 0.8, -0.8 - Math.max(0, s) * 0.6);
+            set(u.legR, 0.5 + Math.max(0, -s) * 0.8, -0.8 - Math.max(0, -s) * 0.6);
+            u.body.rotation.x = s * 0.06;
+            u.head.rotation.z = 0.15;
         } else if (pose === 'rope') {
-            // Hanging by both hands, legs loose beneath.
-            u.armL.rotation.z = 2.85;
-            u.armR.rotation.z = 2.85;
-            u.legL.rotation.z = swing * 0.45;
-            u.legR.rotation.z = -swing * 0.45;
+            // Hanging by both hands, legs swinging under.
+            set(u.armL, Math.PI - 0.15 + s * 0.2, 0.2);
+            set(u.armR, Math.PI - 0.15 - s * 0.2, 0.2);
+            set(u.legL, s * 0.45, -0.3);
+            set(u.legR, -s * 0.45, -0.3);
+            u.head.rotation.z = 0.25;
+        } else if (pose === 'rise') {
+            // Tucked: knees up, arms thrown up and forward.
+            set(u.legL, 1.0, -1.5);
+            set(u.legR, 0.3, -0.7);
+            set(u.armL, 2.5, 0.4);
+            set(u.armR, -0.6, 0.8);
+            u.head.rotation.z = 0.12;
+        } else if (pose === 'fall') {
+            // Arms up and paddling, legs reaching for the ground.
+            const flail = Math.sin(t * 16) * 0.3;
+            set(u.legL, 0.35, -0.35);
+            set(u.legR, -0.2, -0.2);
+            set(u.armL, 2.3 + flail, 0.5);
+            set(u.armR, 2.0 - flail, 0.5);
             u.head.rotation.z = -0.1;
-        } else if (pose === 'fall' || pose === 'rise') {
-            // Arms up and trailing, legs tucked — reads at a glance as airborne.
-            u.armL.rotation.z = 1.9;
-            u.armR.rotation.z = 1.5;
-            u.legL.rotation.z = -0.55;
-            u.legR.rotation.z = 0.3;
-            u.head.rotation.z = pose === 'rise' ? -0.12 : 0.12;
         } else if (pose === 'swim') {
-            u.armL.rotation.z = 1.2 + Math.sin(t * 5) * 0.7;
-            u.armR.rotation.z = 1.2 - Math.sin(t * 5) * 0.7;
-            u.legL.rotation.z = Math.sin(t * 5) * 0.5;
-            u.legR.rotation.z = -Math.sin(t * 5) * 0.5;
-            u.head.rotation.z = -0.15;
+            set(u.armL, 1.4 + s * 1.1, 0.6 - s * 0.4);
+            set(u.armR, 1.4 + s * 1.1, 0.6 - s * 0.4);
+            set(u.legL, -0.3 - s * 0.5, -0.6 - Math.max(0, s) * 0.8);
+            set(u.legR, -0.3 + s * 0.5, -0.6 - Math.max(0, -s) * 0.8);
+            u.head.rotation.z = 0.35;
+        } else if (pose === 'dead') {
+            set(u.legL, 0.2, -0.3);
+            set(u.legR, -0.1, -0.2);
+            set(u.armL, 2.6, 0.2);
+            set(u.armR, 2.2, 0.3);
         } else {
-            u.armL.rotation.z = swing;
-            u.armR.rotation.z = -swing;
-            u.legL.rotation.z = -swing;
-            u.legR.rotation.z = swing;
-            u.head.rotation.z = 0;
+            // Idle: breathing, a slight weight shift, and a blink now and then.
+            const breathe = Math.sin(t * 2.2);
+            u.body.scale.set(1, 1 + breathe * 0.02, 1 + breathe * 0.015);
+            u.head.position.y = HEAD_Y + breathe * 0.008;
+            set(u.legL, 0.06, -0.04);
+            set(u.legR, -0.06, -0.04);
+            set(u.armL, 0.12 + breathe * 0.03, 0.35);
+            set(u.armR, -0.08 - breathe * 0.03, 0.3);
+            u.head.rotation.z = Math.sin(t * 0.7) * 0.05;
         }
 
+        // Blink: every few seconds, for a tenth of one.
+        u.blink -= step;
+        if (u.blink < -0.1) u.blink = 2 + Math.random() * 3;
+        const lid = u.blink < 0 ? 0.12 : 1;
+        for (const eye of u.eyes) eye.scale.y = lid;
+
+        // What he is carrying shows in the satchel.
+        for (let i = 0; i < u.sticks.length; i++) u.sticks[i].visible = held > i;
+
         /*
-         * Turning.
-         *
-         * Damped as a **scalar** from -1 to 1 and only then converted to an
-         * angle, rather than damping the angle itself. Damping the angle meant
-         * every turn interpolated between 0 and PI, so a flip while the
-         * previous one was still settling could resolve the long way round and
-         * spin him through his own back — which is what "he turns backwards
-         * sometimes" was. A scalar cannot wrap, so it cannot pick a direction.
-         *
-         * Fast, too: an eighth of a second, not a lazy swing. In a game about
-         * changing direction on a narrow plank the turn has to keep up with the
-         * input, and the real `dt` is used so it does not vary with framerate.
+         * Turning, damped as a scalar from -1 to 1 so a quick reversal can
+         * never resolve the long way round through his back. Zero is a quarter
+         * turn — back to the camera — which is exactly the climbing view, so
+         * the ladder turn takes the same path at the same rate.
          */
-        /*
-         * Profile everywhere except a ladder, where you see his back.
-         *
-         * The scalar already does this for free. It maps -1 and +1 to the two
-         * profiles, and the angle it feeds is `(1 - face) * PI/2` — so **zero**
-         * lands exactly on a quarter turn, which is his back to the camera.
-         * Damping toward 0 while climbing therefore turns him to the ladder
-         * through the same path, at the same rate, with no second scalar and no
-         * risk of a rotation resolving the long way round.
-         */
-        const u2 = g.userData;
-        if (u2.face === undefined) u2.face = 1;
         const facing = pose === 'climb' ? 0 : (player.facing >= 0 ? 1 : -1);
-        u2.face = Util.damp(u2.face, facing, 30, dt || 1 / 60);
-        g.rotation.y = (1 - u2.face) * 0.5 * Math.PI;
+        u.face = Util.damp(u.face, facing, 26, step);
+        g.rotation.y = (1 - u.face) * 0.5 * Math.PI - u.face * THREE_QUARTER;
 
-        // A run leans into its direction; a stop straightens up. In profile
-        // that is a tilt about Z, and it is always forward because the whole
-        // rig has already been turned to face the way he is going.
-        const speedK = Util.clamp(Math.abs(player.vx) / C.MOVE_MAX, 0, 1);
-        const lean = pose === 'run' ? speedK * 0.16 : 0;
-        u2.lean = Util.damp(u2.lean || 0, lean, 12, dt || 1 / 60);
-        u.body.rotation.z = -u2.lean;
-        u.head.rotation.z += -u2.lean * 0.4;
+        // A run leans into its direction.
+        const lean = pose === 'run' ? speedK * 0.2 : 0;
+        u.lean = Util.damp(u.lean, lean, 12, step);
+        u.body.rotation.z = -u.lean;
+        u.head.rotation.z -= u.lean * 0.5;
 
-        // Invulnerability blink, at twelve a second — fast enough to read as a
-        // state and slow enough not to be a strobe.
+        // Down: he topples, over a third of a second.
+        u.dead = pose === 'dead' ? Math.min(1, u.dead + step * 3) : 0;
+        g.rotation.z = u.dead * (Math.PI / 2) * (player.facing >= 0 ? 1 : -1);
+
+        // Invulnerability blink, at twelve a second.
         g.visible = !(player.invuln > 0 && Math.floor(player.invuln * 12) % 2 === 0);
+    }
+
+    /* ------------------------------------------------------------------ *
+     * The dog
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Tommy's Shih Tzu: a white-and-grey mop of a dog with grey ears, a black
+     * button nose and eyes, a topknot with a red bow, and a plumed tail curled
+     * over its back.
+     *
+     * Almost all of it is fur, and fur at this size is *outline*: a long, low
+     * body with a skirt that hides the legs, and a head as wide as the body.
+     * The legs are there for the trot, but it is the bob and the wagging tail
+     * that make it read as a small dog hurrying along.
+     *
+     * Authored facing +X with the paws on y = 0.
+     */
+    function buildDog(mat) {
+        const g = new THREE.Group();
+        const white = R3D.col('#f0eee8'), cream = R3D.col('#ddd6c8');
+        const grey = R3D.col('#7c7c84'), greyDk = R3D.col('#56565e');
+        const black = R3D.col('#141416');
+
+        const body = new THREE.Group();
+        body.add(part(function (b) {
+            b.ellipsoid(0, 0.2, 0, 0.23, 0.12, 0.14, white, 14, 8);
+            b.ellipsoid(-0.03, 0.26, 0, 0.17, 0.08, 0.12, grey, 12, 7);         // saddle
+            b.ellipsoid(0, 0.13, 0, 0.25, 0.09, 0.16, cream, 14, 7);            // skirt
+            b.ellipsoid(0.16, 0.2, 0, 0.1, 0.12, 0.13, white, 10, 7);           // chest
+        }, mat));
+        g.add(body);
+
+        const head = new THREE.Group();
+        head.position.set(0.22, 0.33, 0);
+        head.add(part(function (b) {
+            b.ellipsoid(0, 0.02, 0, 0.13, 0.12, 0.13, white, 14, 8);
+            b.ellipsoid(-0.03, 0.06, 0, 0.1, 0.08, 0.12, grey, 10, 6);          // crown
+            b.ellipsoid(0.1, -0.02, 0, 0.07, 0.06, 0.08, white, 10, 6);          // muzzle
+            b.ellipsoid(0.165, 0.0, 0, 0.025, 0.02, 0.025, black, 8, 5);         // nose
+            b.ellipsoid(0.09, 0.04, 0.06, 0.028, 0.03, 0.02, black, 8, 5);       // eyes
+            b.ellipsoid(0.09, 0.04, -0.06, 0.028, 0.03, 0.02, black, 8, 5);
+            b.ellipsoid(0.105, 0.05, 0.068, 0.007, 0.008, 0.005, R3D.col('#ffffff'), 5, 4);
+            // Long grey ears hanging either side.
+            for (const s of [1, -1]) b.ellipsoid(-0.02, -0.04, s * 0.13, 0.05, 0.11, 0.035, greyDk, 10, 6);
+            // Topknot and bow.
+            b.ellipsoid(-0.02, 0.15, 0, 0.04, 0.05, 0.04, white, 8, 5);
+            b.ellipsoid(-0.02, 0.2, 0.03, 0.035, 0.025, 0.03, R3D.col('#e0343a'), 8, 5);
+            b.ellipsoid(-0.02, 0.2, -0.03, 0.035, 0.025, 0.03, R3D.col('#e0343a'), 8, 5);
+        }, mat));
+        // The jaw, which opens to bark.
+        const jaw = part(function (b) {
+            b.ellipsoid(0.06, -0.02, 0, 0.06, 0.02, 0.05, R3D.col('#e8a0a0'), 8, 5);
+        }, mat);
+        jaw.position.set(0.04, -0.05, 0);
+        head.add(jaw);
+        g.add(head);
+
+        // The plume of a tail, curled forward over the back.
+        const tail = new THREE.Group();
+        tail.position.set(-0.2, 0.26, 0);
+        tail.add(part(function (b) {
+            for (let k = 0; k < 5; k++) {
+                const a = 0.3 + k * 0.42;
+                b.ellipsoid(-Math.cos(a) * 0.1 + 0.02, Math.sin(a) * 0.1 + 0.03, 0,
+                            0.06, 0.05, 0.06, k % 2 ? white : cream, 8, 5);
+            }
+        }, mat));
+        g.add(tail);
+
+        const legs = [];
+        for (const [x, z] of [[0.13, 0.07], [0.13, -0.07], [-0.13, 0.07], [-0.13, -0.07]]) {
+            const leg = new THREE.Group();
+            leg.position.set(x, 0.12, z);
+            leg.add(part(function (b) {
+                b.cyl(0, -0.06, 0, 0.035, 0.12, 'y', z > 0 ? white : cream, 6);
+                b.ellipsoid(0.01, -0.115, 0, 0.04, 0.02, 0.035, z > 0 ? white : cream, 6, 4);
+            }, mat));
+            g.add(leg);
+            legs.push(leg);
+        }
+
+        g.userData = { body: body, head: head, jaw: jaw, tail: tail, legs: legs, face: 1, gait: 0, sit: 0 };
+        g.scale.setScalar(1.25);
+        return g;
+    }
+
+    function poseDog(g, dog, t, dt) {
+        const u = g.userData;
+        const step = dt || 1 / 60;
+        const moving = dog.state === 'follow' && Math.abs(dog.vx) + Math.abs(dog.vy) > 15;
+        u.gait += (moving ? Math.min(Math.hypot(dog.vx, dog.vy), 260) * 0.12 : 0) * step;
+
+        // Sitting eases in and out, rather than snapping.
+        u.sit = Util.damp(u.sit, dog.state === 'sit' ? 1 : 0, 8, step);
+
+        const s = Math.sin(u.gait);
+        const bob = moving ? Math.abs(Math.cos(u.gait)) * 0.035 : 0;
+        u.body.position.y = bob - u.sit * 0.04;
+        u.body.rotation.z = u.sit * 0.45;
+        u.head.position.y = 0.33 + bob + u.sit * 0.06;
+        u.head.position.x = 0.22 - u.sit * 0.04;
+        u.tail.position.y = 0.26 + bob - u.sit * 0.12;
+
+        if (dog.airborne && moving) {
+            // A scrabbling hop: front legs reaching, back legs kicked out.
+            u.legs[0].rotation.z = u.legs[1].rotation.z = 0.9;
+            u.legs[2].rotation.z = u.legs[3].rotation.z = -0.9;
+        } else {
+            u.legs[0].rotation.z = s * 0.7;
+            u.legs[3].rotation.z = s * 0.7;
+            u.legs[1].rotation.z = -s * 0.7;
+            u.legs[2].rotation.z = -s * 0.7 - u.sit * 1.2;
+            if (u.sit > 0.1) u.legs[3].rotation.z = -u.sit * 1.2;
+        }
+
+        // The tail never stops, and goes faster when there is something to find.
+        const wagRate = dog.state === 'point' ? 26 : (moving ? 14 : 9);
+        u.tail.rotation.x = Math.sin(t * wagRate) * 0.45;
+        u.head.rotation.z = dog.state === 'point' ? 0.25 : Math.sin(t * 1.3) * 0.08;
+
+        // Bark: the jaw drops.
+        u.jaw.rotation.z = dog.bark > 0 ? -0.5 * Math.abs(Math.sin(dog.bark * 30)) : 0;
+
+        u.face = Util.damp(u.face, dog.facing >= 0 ? 1 : -1, 20, step);
+        g.rotation.y = (1 - u.face) * 0.5 * Math.PI - u.face * 0.45;
     }
 
     /* ------------------------------------------------------------------ *
@@ -379,101 +602,134 @@
      * high-value accent, and none of them is symmetrical.
      */
     const RIGS = {
-        /** A minecart bot: barrel body on wheels, with a stack. */
+        /** A minecart bot: a riveted tub on wheels, a stack, and one lamp eye. */
         walker: function (b) {
-            const iron = R3D.col('#6d4b38');
-            const trim = R3D.col('#9a7050');
-            b.cyl(0, 0.02, 0, 0.30, 0.62, 'z', iron, 12, trim);
-            b.cyl(0, 0.02, 0.16, 0.20, 0.06, 'z', R3D.col('#3a2a20'), 12);
-            b.cyl(-0.26, -0.30, 0, 0.14, 0.44, 'z', R3D.col('#26262c'), 10, R3D.col('#44444e'));
-            b.cyl(0.26, -0.30, 0, 0.14, 0.44, 'z', R3D.col('#26262c'), 10, R3D.col('#44444e'));
-            b.cyl(0.1, 0.36, 0, 0.08, 0.26, 'y', R3D.col('#3a3a44'), 8);
-            // A single lamp eye, off centre, so it has a front.
-            b.sphere(0.16, 0.06, 0.2, 0.07, R3D.col('#ffd98a'), 8, 6);
+            const iron = R3D.col('#4a3a30');
+            const lit = R3D.col('#7a604c');
+            b.cyl(0, 0.04, 0, 0.3, 0.62, 'z', iron, 14, lit);
+            b.cyl(0, 0.04, 0, 0.31, 0.06, 'z', lit, 14);
+            for (const s of [-1, 1]) b.cyl(0, 0.04, s * 0.26, 0.31, 0.04, 'z', lit, 14);
+            b.cyl(-0.24, -0.28, 0, 0.13, 0.5, 'z', R3D.col('#1e1e24'), 12, R3D.col('#5a5a66'));
+            b.cyl(0.24, -0.28, 0, 0.13, 0.5, 'z', R3D.col('#1e1e24'), 12, R3D.col('#5a5a66'));
+            b.cyl(-0.08, 0.4, 0, 0.07, 0.3, 'y', R3D.col('#2a2a30'), 8);
+            b.cyl(-0.08, 0.56, 0, 0.1, 0.05, 'y', R3D.col('#5a5a66'), 8);
+            // The eye: a hooded lamp on the front, amber — it has a front.
+            b.cyl(0.26, 0.1, 0.12, 0.09, 0.08, 'x', R3D.col('#2a2a30'), 10);
+            b.ellipsoid(0.31, 0.1, 0.12, 0.03, 0.07, 0.07, R3D.col('#ffb030'), 10, 6);
         },
-        /** A hunched grub: segmented shell, low and wide. */
+
+        /** A rust beetle: a riveted, segmented shell, low and wide, with a lamp eye. */
         crawler: function (b) {
-            const shell = R3D.col('#4a3556');
-            const shellLit = R3D.col('#6b4d7d');
-            for (let i = 0; i < 4; i++) {
-                const x = -0.24 + i * 0.16;
-                const r = 0.20 - Math.abs(i - 1.5) * 0.028;
-                b.sphere(x, 0, 0, r, i % 2 ? shell : shellLit, 9, 6);
+            const shell = R3D.col('#5a3a22');
+            const shellLit = R3D.col('#8a5a30');
+            const joint = R3D.col('#2a2420');
+            for (let i = 0; i < 3; i++) {
+                const x = -0.2 + i * 0.17;
+                b.ellipsoid(x, 0.02, 0, 0.13, 0.15 - Math.abs(i - 1) * 0.02, 0.2,
+                            i % 2 ? shell : shellLit, 12, 7, 0.55, joint);
+                b.sphere(x, 0.14, 0.12, 0.025, R3D.col('#c8a060'), 5, 4);
             }
-            b.sphere(0.30, 0.02, 0, 0.16, shellLit, 9, 6);
-            b.sphere(0.36, 0.06, 0.10, 0.045, R3D.col('#ffe066'), 6, 5);
-            b.sphere(0.36, 0.06, -0.10, 0.045, R3D.col('#ffe066'), 6, 5);
+            b.ellipsoid(0.28, -0.01, 0, 0.1, 0.09, 0.13, R3D.col('#3a2e28'), 10, 6);
+            b.ellipsoid(0.36, 0.02, 0.06, 0.03, 0.035, 0.035, R3D.col('#ff5a2a'), 6, 5);
+            b.ellipsoid(0.36, 0.02, -0.06, 0.03, 0.035, 0.035, R3D.col('#ff5a2a'), 6, 5);
+            // Mandibles.
+            b.rbox(0.4, -0.06, 0.05, 0.12, 0.025, 0.025, -0.4, R3D.col('#8a8a96'));
+            b.rbox(0.4, -0.06, -0.05, 0.12, 0.025, 0.025, -0.4, R3D.col('#8a8a96'));
+            // Legs: piston struts angled out.
             for (let i = 0; i < 3; i++) {
                 const x = -0.2 + i * 0.2;
-                b.cyl(x, -0.17, 0.14, 0.03, 0.2, 'y', R3D.col('#2a2030'), 5);
-                b.cyl(x, -0.17, -0.14, 0.03, 0.2, 'y', R3D.col('#2a2030'), 5);
-            }
-        },
-
-        /** Long, low and pointed — it says "this one comes at you". */
-        dog: function (b) {
-            const hide = R3D.col('#6b4530');
-            const hideLit = R3D.col('#8d5f3f');
-            b.cyl(0, 0, 0, 0.21, 0.66, 'x', hide, 10, hideLit);
-            b.sphere(0.40, 0.08, 0, 0.19, hideLit, 10, 7);
-            b.cyl(0.56, 0.02, 0, 0.09, 0.20, 'x', R3D.col('#33231a'), 8);
-            b.sphere(0.66, 0.02, 0, 0.06, R3D.col('#1a1210'), 6, 5);
-            b.sphere(0.44, 0.12, 0.10, 0.04, R3D.col('#ff8a5c'), 6, 5);
-            b.sphere(0.44, 0.12, -0.10, 0.04, R3D.col('#ff8a5c'), 6, 5);
-            b.cone(0.30, 0.26, 0.09, 0.07, 0.16, R3D.col('#40291d'), true, 6);
-            b.cone(0.30, 0.26, -0.09, 0.07, 0.16, R3D.col('#40291d'), true, 6);
-            b.cyl(-0.36, 0.20, 0, 0.045, 0.30, 'y', hide, 6);
-            for (const x of [-0.2, 0.18]) {
-                b.cyl(x, -0.24, 0.13, 0.05, 0.24, 'y', R3D.col('#40291d'), 6);
-                b.cyl(x, -0.24, -0.13, 0.05, 0.24, 'y', R3D.col('#40291d'), 6);
-            }
-        },
-
-        /** A bulb of a body with eight thin legs arching over it. */
-        spider: function (b) {
-            b.sphere(0, -0.02, 0, 0.19, R3D.col('#2a2038'), 10, 7);
-            b.sphere(0.14, 0.04, 0, 0.11, R3D.col('#3c2d50'), 8, 6);
-            b.sphere(0.19, 0.06, 0.06, 0.037, R3D.col('#ff5c4d'), 6, 5);
-            b.sphere(0.19, 0.06, -0.06, 0.037, R3D.col('#ff5c4d'), 6, 5);
-            b.sphere(0.21, 0.11, 0, 0.028, R3D.col('#ff8a72'), 6, 5);
-            for (let i = 0; i < 4; i++) {
-                const x = -0.16 + i * 0.11;
                 for (const s of [1, -1]) {
-                    b.cyl(x, 0.12, s * 0.14, 0.022, 0.26, 'z', R3D.col('#160f1e'), 5);
-                    b.cyl(x, -0.02, s * 0.26, 0.022, 0.28, 'y', R3D.col('#160f1e'), 5);
+                    b.rbox(x, -0.12, s * 0.2, 0.05, 0.2, 0.04, s * 0.2, joint);
                 }
             }
         },
 
-        /** A hovering lantern-thing. No legs: it goes through walls. */
-        guardian: function (b) {
-            b.sphere(0, 0, 0, 0.23, R3D.col('#33445f'), 12, 8);
-            b.cyl(0, 0.22, 0, 0.09, 0.14, 'y', R3D.col('#5a7098'), 8);
-            b.cyl(0, 0.30, 0, 0.05, 0.10, 'y', R3D.col('#8fb0d8'), 6);
-            b.sphere(0, 0, 0.17, 0.10, R3D.col('#bfe4ff'), 9, 6);
-            for (let i = 0; i < 8; i++) {
-                const a = (i / 8) * Math.PI * 2;
-                b.cyl(Math.cos(a) * 0.28, Math.sin(a) * 0.28, 0, 0.028, 0.09, 'z',
-                      R3D.col('#6d86ad'), 5);
+        /**
+         * A clockwork hound: long, low and pointed, iron plates over a brass
+         * frame, a red eye and a winding key in its back. It says "this one
+         * comes at you" — and it is nothing like Tommy's dog, which matters now
+         * that he has one.
+         */
+        dog: function (b) {
+            const iron = R3D.col('#3c3834');
+            const lit = R3D.col('#6a625a');
+            const brass = R3D.col('#b8893e');
+            b.ellipsoid(0, 0.02, 0, 0.32, 0.15, 0.15, iron, 12, 7);
+            for (let i = 0; i < 3; i++) b.cyl(-0.16 + i * 0.16, 0.03, 0, 0.155, 0.03, 'x', lit, 12);
+            b.ellipsoid(0.36, 0.1, 0, 0.14, 0.11, 0.11, lit, 10, 7);
+            b.ellipsoid(0.5, 0.05, 0, 0.1, 0.05, 0.07, iron, 8, 5);                 // snout
+            b.ellipsoid(0.44, 0.14, 0.08, 0.03, 0.03, 0.02, R3D.col('#ff3a2a'), 6, 5);
+            b.ellipsoid(0.44, 0.14, -0.08, 0.03, 0.03, 0.02, R3D.col('#ff3a2a'), 6, 5);
+            b.cone(0.3, 0.25, 0.07, 0.05, 0.14, iron, true, 5);                   // ears
+            b.cone(0.3, 0.25, -0.07, 0.05, 0.14, iron, true, 5);
+            // Winding key.
+            b.cyl(-0.08, 0.2, 0, 0.025, 0.1, 'y', brass, 6);
+            b.box(-0.08, 0.28, 0, 0.16, 0.08, 0.03, brass);
+            b.cyl(-0.34, 0.12, 0, 0.03, 0.22, 'x', lit, 6);                        // tail
+            for (const x of [-0.2, 0.2]) {
+                for (const s of [1, -1]) {
+                    b.cyl(x, -0.18, s * 0.1, 0.04, 0.24, 'y', iron, 6);
+                    b.sphere(x, -0.07, s * 0.1, 0.05, brass, 6, 4);
+                }
             }
         },
 
-        /** One unit of spider silk, scaled to length by the sync pass. */
-        thread: function (b) {
-            b.cyl(0, -0.5, 0, 0.018, 1, 'y', R3D.col('#9a9ab4'), 4);
+        /** A spider-bot: an iron bulb, a cluster of red eyes, eight black legs. */
+        spider: function (b) {
+            b.sphere(0, -0.02, 0, 0.19, R3D.col('#2e2a30'), 12, 8);
+            b.cyl(0, -0.02, 0, 0.195, 0.04, 'y', R3D.col('#8a7a60'), 12);
+            b.sphere(0.14, 0.02, 0, 0.1, R3D.col('#3e3842'), 10, 6);
+            b.sphere(0.2, 0.05, 0.05, 0.035, R3D.col('#ff3a2a'), 6, 5);
+            b.sphere(0.2, 0.05, -0.05, 0.035, R3D.col('#ff3a2a'), 6, 5);
+            b.sphere(0.22, 0.1, 0, 0.025, R3D.col('#ff8a5a'), 6, 5);
+            for (let i = 0; i < 4; i++) {
+                const x = -0.15 + i * 0.1;
+                for (const s of [1, -1]) {
+                    b.rbox(x, 0.1, s * 0.2, 0.03, 0.22, 0.03, s * 0.6, R3D.col('#141018'));
+                    b.rbox(x, -0.06, s * 0.3, 0.03, 0.26, 0.03, -s * 0.3, R3D.col('#141018'));
+                }
+            }
         },
 
-        /** Body, ears, and wings that are wide and thin. */
+        /**
+         * A sentinel: a brass drone with a rotor on top and one searchlight
+         * eye. Walls mean nothing to it, and it looks like the kind of machine
+         * that would not care.
+         */
+        guardian: function (b) {
+            const brass = R3D.col('#8a6a34');
+            const lit = R3D.col('#d8b060');
+            b.sphere(0, 0, 0, 0.22, brass, 14, 9);
+            b.cyl(0, 0, 0, 0.23, 0.05, 'y', lit, 14);
+            b.cyl(0, 0.24, 0, 0.04, 0.12, 'y', R3D.col('#3a3a40'), 6);
+            b.box(0, 0.31, 0, 0.7, 0.03, 0.08, R3D.col('#2a2a30'));                // rotor
+            b.box(0, 0.31, 0, 0.08, 0.03, 0.7, R3D.col('#2a2a30'));
+            b.cyl(0.0, 0, 0.18, 0.11, 0.08, 'z', R3D.col('#1a1a20'), 12);           // eye hood
+            b.cyl(0.0, 0, 0.22, 0.08, 0.02, 'z', R3D.col('#bfe4ff'), 12);           // lens
+            for (const s of [-1, 1]) b.cyl(s * 0.24, -0.08, 0, 0.03, 0.18, 'y', R3D.col('#3a3a40'), 6);
+        },
+
+        /** One unit of silk — a steel cable here — scaled to length by the sync pass. */
+        thread: function (b) {
+            b.cyl(0, -0.5, 0, 0.016, 1, 'y', R3D.col('#8a8aa0'), 4);
+        },
+
+        /** A cave bat: furred body, big ears, and wide membrane wings. */
         bat: function (b) {
-            const fur = R3D.col('#4a3856');
-            b.sphere(0, 0, 0, 0.17, fur, 9, 6);
-            b.cone(-0.09, 0.18, 0, 0.06, 0.16, R3D.col('#33253d'), true, 5);
-            b.cone(0.09, 0.18, 0, 0.06, 0.16, R3D.col('#33253d'), true, 5);
-            b.sphere(-0.06, 0.02, 0.13, 0.035, R3D.col('#ffd166'), 6, 5);
-            b.sphere(0.06, 0.02, 0.13, 0.035, R3D.col('#ffd166'), 6, 5);
+            const fur = R3D.col('#3e3046');
+            const wing = R3D.col('#2a1f30');
+            b.ellipsoid(0, 0, 0, 0.13, 0.15, 0.12, fur, 10, 7);
+            b.cone(-0.07, 0.17, 0, 0.05, 0.14, fur, true, 5);
+            b.cone(0.07, 0.17, 0, 0.05, 0.14, fur, true, 5);
+            b.sphere(-0.05, 0.04, 0.1, 0.03, R3D.col('#ffcc55'), 6, 5);
+            b.sphere(0.05, 0.04, 0.1, 0.03, R3D.col('#ffcc55'), 6, 5);
             for (const s of [-1, 1]) {
-                b.box(s * 0.34, 0.06, 0, 0.42, 0.10, 0.20, R3D.col('#33253d'));
-                b.box(s * 0.56, 0.00, 0, 0.22, 0.16, 0.16, R3D.col('#291d31'));
+                b.rbox(s * 0.25, 0.06, 0, 0.28, 0.06, 0.03, s * 0.25, wing);
+                b.rbox(s * 0.44, 0.0, 0, 0.2, 0.05, 0.03, -s * 0.35, wing);
+                // The membrane: fingers fanned from the wrist.
+                for (let k = 0; k < 3; k++) {
+                    b.rbox(s * (0.3 + k * 0.06), -0.06, 0, 0.03, 0.2 - k * 0.03, 0.02, s * (0.3 + k * 0.25), wing);
+                }
             }
         },
 
@@ -710,7 +966,7 @@
      * ------------------------------------------------------------------ */
 
     Actors3D.create = function (scene) {
-        const solid = R3D.solidMaterial();
+        const solid = R3D.actorMaterial();
         const glow = R3D.glowMaterial(0.9);
         solid.userData.shared = true;
         glow.userData.shared = true;
@@ -727,6 +983,8 @@
 
         set.tommy = buildTommy(solid, glow);
         set.group.add(set.tommy);
+        set.dog = buildDog(solid);
+        set.group.add(set.dog);
 
         for (const kind in RIGS) {
             const mat = (kind === 'orb') ? glow : solid;
@@ -819,8 +1077,13 @@
             R3D.wy(player.y) + TOMMY_FOOT * TOMMY_SCALE,
             ACTOR_Z
         );
-        poseTommy(set.tommy, player, t, dt);
+        poseTommy(set.tommy, player, t, dt, run.tntHeld);
         if (run.state === 'title') set.tommy.visible = false;
+
+        // The dog, a touch behind Tommy in depth so he always wins an overlap.
+        set.dog.position.set(R3D.wx(run.dog.x), R3D.wy(run.dog.y), ACTOR_Z - 0.15);
+        poseDog(set.dog, run.dog, t, dt);
+        set.dog.visible = run.state !== 'title';
 
         // Pickups.
         for (const p of ents.pickups) {
@@ -886,7 +1149,7 @@
                 mesh.rotation.y = 0;
                 mesh.scale.setScalar(e.state === 'hang' ? 1.1 : 1);
             } else if (e.kind === 'guardian') {
-                mesh.rotation.y = t * 0.7;
+                mesh.rotation.y = Math.sin(t * 0.9) * 0.5;
                 const halo = set.pools.glowSprite.next();
                 halo.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.1);
                 halo.scale.set(2.4, 2.4, 1);

@@ -731,6 +731,67 @@
     };
 
     /**
+     * An ellipsoid, optionally cut off below `phiMax` (a fraction of the way
+     * from the top pole to the bottom one — 0.5 is a dome).
+     *
+     * Characters are built out of these. A figure assembled from boxes and
+     * spheres reads as a figure assembled from boxes and spheres; squashed and
+     * stretched round forms — a puffy jacket, a cheek, a toe cap, a helmet —
+     * are what make one read as soft.
+     */
+    Builder.prototype.ellipsoid = function (cx, cy, cz, rx, ry, rz, colour, seg, rings, phiMax, capColour) {
+        const n = seg || 12;
+        const m = rings || 8;
+        const cut = phiMax === undefined ? 1 : phiMax;
+        const start = this.count;
+        for (let j = 0; j <= m; j++) {
+            const phi = (j / m) * Math.PI * cut;
+            const sy = Math.cos(phi), sr = Math.sin(phi);
+            for (let i = 0; i <= n; i++) {
+                const th = (i / n) * Math.PI * 2;
+                const ux = Math.cos(th) * sr, uy = sy, uz = Math.sin(th) * sr;
+                this.pos.push(cx + ux * rx, cy + uy * ry, cz + uz * rz);
+                // The normal of an ellipsoid is the unit direction scaled by
+                // the inverse radii — not the unit direction itself.
+                let nx = ux / rx, ny = uy / ry, nz = uz / rz;
+                const l = Math.hypot(nx, ny, nz) || 1;
+                this.norm.push(nx / l, ny / l, nz / l);
+                this.color.push(colour.r, colour.g, colour.b);
+                this.uv.push(i / n, 1 - j / m);
+                this.count++;
+            }
+        }
+        for (let j = 0; j < m; j++) {
+            for (let i = 0; i < n; i++) {
+                const a = start + j * (n + 1) + i;
+                const b = a + n + 1;
+                this.index.push(a, b, a + 1, a + 1, b, b + 1);
+            }
+        }
+        // Close a cut dome with a flat disc, so it has an underside.
+        if (cut < 1 && capColour) {
+            const phi = Math.PI * cut;
+            const y = cy + Math.cos(phi) * ry, sr = Math.sin(phi);
+            const centre = this.count;
+            this.pos.push(cx, y, cz);
+            this.norm.push(0, -1, 0);
+            this.color.push(capColour.r, capColour.g, capColour.b);
+            this.uv.push(0.5, 0.5);
+            this.count++;
+            for (let i = 0; i <= n; i++) {
+                const th = (i / n) * Math.PI * 2;
+                this.pos.push(cx + Math.cos(th) * sr * rx, y, cz + Math.sin(th) * sr * rz);
+                this.norm.push(0, -1, 0);
+                this.color.push(capColour.r, capColour.g, capColour.b);
+                this.uv.push(0, 0);
+                this.count++;
+            }
+            for (let i = 0; i < n; i++) this.index.push(centre, centre + 1 + i, centre + 2 + i);
+        }
+        return this;
+    };
+
+    /**
      * A cone along Y — `tipUp` false points it downward, which is what
      * stalactites, spikes and drips all want.
      */
@@ -833,22 +894,68 @@
     /**
      * The lit material every solid thing in the mine shares.
      *
-     * Lambert rather than Standard on purpose: this is a scene lit almost
-     * entirely by a handful of moving point lights, and Lambert costs a
-     * fraction of what a PBR pass does for a look that, at this art direction,
-     * is indistinguishable.
+     * **Phong, for per-pixel lighting — not Lambert.** Lambert in this build of
+     * Three lights per *vertex*, and the mine is made of long merged runs: a
+     * wall is one quad forty tiles wide. Lit per vertex, a lamp in the middle of
+     * it can only brighten the corners, so no light ever made a *pool* — the
+     * lamps painted faint gradients, and the helmet spot, aimed at a wall,
+     * showed nothing at all. Per-pixel lighting is what lets a lamp light the
+     * patch of wall it is hanging in front of, and a dark works lives or dies on
+     * its pools of light.
+     *
+     * Specular is kept low and broad: worn iron and damp stone, not chrome.
      *
      * The map multiplies the vertex colour, so one texture serves every palette
-     * and every material — rock, timber and metal differ by colour, and the
-     * texture only supplies the *detail*. That is what keeps a room at two draw
-     * calls while still having a surface.
+     * and every material — the texture only supplies the *detail*.
      */
     R3D.solidMaterial = function (textureName) {
-        return new THREE.MeshLambertMaterial({
+        return new THREE.MeshPhongMaterial({
             vertexColors: true,
             side: THREE.FrontSide,
-            map: textureName ? R3D.texture(textureName) : null
+            map: textureName ? R3D.texture(textureName) : null,
+            specular: new THREE.Color(0x1a1612),
+            shininess: 14
         });
+    };
+
+    /**
+     * The material every *actor* shares: Phong, plus a rim light.
+     *
+     * The works is dark on purpose, and a character lit only from the front by
+     * his own helmet lamp sinks straight into it — his charcoal sleeves and
+     * dark jeans were the same value as the masonry behind them. A fresnel rim
+     * (brightest where a surface turns away from the eye) draws a thin cool
+     * outline round every rounded form, which is the oldest trick there is for
+     * pulling a figure off its background, and it costs one varying.
+     *
+     * Only actors get it. On the scenery it would outline every girder and
+     * make the whole room glow at the edges.
+     */
+    R3D.actorMaterial = function (rimHex, rimStrength) {
+        const mat = new THREE.MeshPhongMaterial({
+            vertexColors: true,
+            specular: new THREE.Color(0x2a2622),
+            shininess: 28
+        });
+        const rim = new THREE.Color(rimHex || '#b8d0ff');
+        const strength = rimStrength === undefined ? 0.3 : rimStrength;
+        mat.onBeforeCompile = function (shader) {
+            shader.uniforms.uRim = { value: rim.clone().multiplyScalar(strength) };
+            shader.vertexShader = shader.vertexShader
+                .replace('#include <common>', '#include <common>\nvarying float vRim;')
+                .replace('#include <project_vertex>', [
+                    '#include <project_vertex>',
+                    'vRim = pow(1.0 - clamp(dot(normalize(transformedNormal), normalize(-mvPosition.xyz)), 0.0, 1.0), 3.0);'
+                ].join('\n'));
+            shader.fragmentShader = shader.fragmentShader
+                .replace('#include <common>', '#include <common>\nvarying float vRim;\nuniform vec3 uRim;')
+                .replace(
+                    'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
+                    'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance + uRim * vRim * (0.25 + diffuseColor.rgb);'
+                );
+        };
+        mat.customProgramCacheKey = function () { return 'actor-rim'; };
+        return mat;
     };
 
     /** Everything that emits: crystals, glows, the fuse, the blast. */

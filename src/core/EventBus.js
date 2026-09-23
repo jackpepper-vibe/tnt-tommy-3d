@@ -79,6 +79,7 @@
         DETONATOR_DENIED: 'det-denied',   // {x, y, needed}
         DETONATOR_FIRED: 'det-fired',     // {x, y}
         ALL_TNT: 'all-tnt',               // {x, y}
+        DOG_BARK: 'dog-bark',             // {x, y}
         SHAKE: 'shake',                   // {amount, seconds}
         FLOAT_TEXT: 'float-text',         // {text, x, y, colour, seconds}
         STATE_CHANGED: 'state-changed'    // {from, to}

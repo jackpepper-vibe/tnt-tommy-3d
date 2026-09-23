@@ -35,6 +35,12 @@ const POSES = {
     furnace:    { eval: ['TNT.game.begin(2)', 'bare', 'TNT.game.room("theFurnace")', 'TNT.game.step(140)'] },
     cinderdeep: { eval: ['TNT.game.begin(2)', 'bare', 'TNT.game.room("slagWorks")', 'TNT.game.step(120)'] },
     vault:      { eval: ['bare', 'TNT.game.room("vault")', 'TNT.game.step(140)'] },
+    /* Close-ups of Tommy, cropped round him at twice the resolution. */
+    hero:       { focus: true, eval: ['bare', 'TNT.game.put(9, 22)', 'TNT.game.step(30)'] },
+    heroRun:    { focus: true, eval: ['bare', 'TNT.game.put(6, 22)', 'TNT.game.hold(["right"])', 'TNT.game.step(40)'] },
+    heroJump:   { focus: true, eval: ['bare', 'TNT.game.put(6, 22)', 'TNT.game.hold(["jump"])', 'TNT.game.step(14)'] },
+    heroDog:    { focus: true, eval: ['bare', 'TNT.game.put(4, 22)', 'TNT.game.hold(["right"])', 'TNT.game.step(70)', 'TNT.game.hold([])', 'TNT.game.step(90)'] },
+    heroClimb:  { focus: true, eval: ['bare', 'TNT.game.put(5, 12)', 'TNT.game.hold(["up"])', 'TNT.game.step(30)'] },
     blast: {
         eval: [
             'bare', 'TNT.game.room("lampRoom")', 'TNT.game.put(7, 22)',
@@ -68,7 +74,10 @@ let failed = 0;
 
 for (const name of want) {
     const pose = POSES[name];
-    const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+    const page = await browser.newPage({
+        viewport: { width: 1280, height: 760 },
+        deviceScaleFactor: pose.focus ? 2 : 1
+    });
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -82,7 +91,25 @@ for (const name of want) {
     await page.waitForTimeout(pose.wait || 900);
 
     const file = path.join(outDir, name + '.png');
-    await page.screenshot({ path: file });
+    let clip;
+    if (pose.focus) {
+        // Project Tommy to the screen and crop round him.
+        const at = await page.evaluate(() => {
+            const scene = TNT.game.scene;
+            const v = new THREE.Vector3();
+            scene.actors.tommy.getWorldPosition(v);
+            v.y += 0.6;
+            v.project(scene.camera);
+            return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
+        });
+        const w = 220, h = 170;
+        clip = {
+            x: Math.max(0, Math.min(1280 - w, at.x - w / 2)),
+            y: Math.max(0, Math.min(760 - h, at.y - h / 2)),
+            width: w, height: h
+        };
+    }
+    await page.screenshot({ path: file, clip: clip });
     await page.close();
 
     if (errors.length) failed++;

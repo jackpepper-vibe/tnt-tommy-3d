@@ -32,6 +32,7 @@ export const SIM_FILES = [
     'src/world/World.js',
     'src/entities/Entities.js',
     'src/entities/Player.js',
+    'src/entities/Companion.js',
     'src/systems/Run.js'
 ];
 
