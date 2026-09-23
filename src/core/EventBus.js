@@ -83,6 +83,10 @@
         PLAYER_SKID: 'player-skid',       // {x, y, dir}
         PLAYER_STEP: 'player-step',       // {x, y}
         WALL_JUMP: 'wall-jump',           // {x, y, side}
+        ENEMY_AIM: 'enemy-aim',           // {x, y, kind}
+        ENEMY_FIRED: 'enemy-fired',       // {x, y, kind}
+        SHOT_HIT: 'shot-hit',             // {x, y}
+        ARMOUR_CLANG: 'armour-clang',     // {x, y}
         SHAKE: 'shake',                   // {amount, seconds}
         FLOAT_TEXT: 'float-text',         // {text, x, y, colour, seconds}
         STATE_CHANGED: 'state-changed'    // {from, to}

@@ -343,6 +343,7 @@
     C.DANGER_CLEAR = 42;       // and the energy it has to recover to before it lets go
 
     C.DMG_ENEMY = 34;
+    C.DMG_RIVET = 24;          // a minecart bot's shot
     C.DMG_SPIKE = 38;
     C.DMG_VENT = 26;
     C.DMG_CRUSH = 50;

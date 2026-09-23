@@ -422,7 +422,18 @@
              * the mechanic becomes an accident rather than a move.
              */
             if (p.vy > C.STOMP_MIN_V && p.y <= b.y + b.h * C.STOMP_BAND) {
+                // A curled beetle's shell turns a stomp into a bounce: no kill,
+                // no damage, and a clang to say why.
+                if (typeof e.armoured === 'function' && e.armoured()) {
+                    p.vy = -C.STOMP_BOUNCE;
+                    p.rising = true;
+                    p.onGround = false;
+                    p.fallSpeed = 0;
+                    this.bus.emit(EV.ARMOUR_CLANG, { x: b.x, y: b.y });
+                    continue;
+                }
                 e.dead = true;
+                e.deadT = 0;
                 if (typeof e.onStomped === 'function') e.onStomped();
                 /*
                  * Chains: every stomp before Tommy touches down again is worth
@@ -444,6 +455,16 @@
             }
 
             this._hurt(e.spec.damage, e.kind, p.x < b.x ? -1 : 1);
+            return;
+        }
+
+        for (let i = ents.shots.length - 1; i >= 0; i--) {
+            const s = ents.shots[i];
+            const b = s.box();
+            if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
+            ents.shots.splice(i, 1);
+            this.bus.emit(EV.SHOT_HIT, { x: s.x, y: s.y });
+            this._hurt(C.DMG_RIVET, 'rivet', s.vx > 0 ? 1 : -1);
             return;
         }
 

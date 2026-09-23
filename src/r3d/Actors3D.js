@@ -21,6 +21,8 @@
     const F = R3D.FACE;
 
     const ACTOR_Z = 0.45;
+    /** How long a kill stays on screen, flattening or falling, in seconds. */
+    const DEATH_T = 0.4;
     /**
      * Tommy is drawn larger than his collision box, deliberately.
      *
@@ -1001,26 +1003,32 @@
             set.pools[kind] = new Pool(set.group, RIGS[kind], mat, 6);
         }
         /**
-         * A rotten plank, drawn live rather than baked.
+         * Corroded grating, drawn live rather than baked, because it has to
+         * shake before it gives way.
          *
-         * Deliberately not the same shape as a sound board: grey, split into
-         * three loose pieces with gaps between them, and no bright deck cap.
-         * The player has to be able to tell at a glance which boards will hold,
-         * and the whole point of the warning shake is lost if you cannot see it
-         * coming *before* you step on.
+         * It must not look like a sound deck. A sound deck is dark iron with a
+         * bright nosing; this is rust-orange, holed, with no nosing at all and
+         * its bars visibly broken — so the player can tell which floor will
+         * hold *before* stepping on it, and the warning shake confirms rather
+         * than informs.
          */
         set.pools.plank = new Pool(set.group, function (b) {
-            const rot = R3D.col('#6a5f52');
-            const rotLit = R3D.col('#8b7d6b');
-            const dark = R3D.col('#2a231c');
-            for (let i = 0; i < 3; i++) {
-                const x = -0.33 + i * 0.33;
-                b.box(x, 0.34, 0, 0.28, 0.16, 0.8, rot, F.ALL, rotLit);
-                b.box(x, 0.34, 0.42, 0.28, 0.05, 0.04, dark, F.FRONT);
+            const rust = R3D.col('#7a3e1c');
+            const rustLit = R3D.col('#b0602a');
+            const dark = R3D.col('#1e120c');
+            // Frame, front and back.
+            b.box(0, 0.44, 0.36, 1, 0.08, 0.06, rust, F.ALL, rustLit);
+            b.box(0, 0.44, -0.36, 1, 0.08, 0.06, rust, F.ALL, rustLit);
+            // Bars across it, with two broken short.
+            for (let i = 0; i < 6; i++) {
+                const x = -0.42 + i * 0.168;
+                const broken = i === 2 || i === 4;
+                b.box(x, 0.44, broken ? 0.18 : 0, 0.06, 0.06, broken ? 0.36 : 0.72,
+                      i % 2 ? rust : rustLit, F.ALL);
             }
-            // Split ends, so the gaps read as damage rather than as a grille.
-            b.box(-0.17, 0.34, 0.43, 0.03, 0.18, 0.04, dark, F.FRONT);
-            b.box(0.17, 0.34, 0.43, 0.03, 0.18, 0.04, dark, F.FRONT);
+            // A sagging stringer under it, and rust weeping off the front.
+            b.box(0, 0.3, 0.3, 1, 0.14, 0.05, dark, F.ALL, rust);
+            for (const x of [-0.3, 0.1, 0.35]) b.box(x, 0.2, 0.33, 0.04, 0.14, 0.02, rustLit, F.FRONT);
         }, solid, 12);
 
         /** One tile of water surface, bobbed per tile by the sync pass. */
@@ -1047,6 +1055,10 @@
         set.pools.glowSprite = new Pool(set.group, function (b) {
             b.plate(0, 0, 0, 1, 1, R3D.col('#ffffff'));
         }, R3D.haloMaterial('#ffffff', 0.5), 24);
+        /** A hot rivet in flight. Emissive, so it reads in the dark. */
+        set.pools.rivet = new Pool(set.group, function (b) {
+            b.cyl(0, 0, 0, 0.09, 0.26, 'x', R3D.col('#ffb050'), 8, R3D.col('#fff0c0'));
+        }, glow, 6);
         set.pools.jet = new Pool(set.group, function (b) {
             b.box(0, 0.5, 0, 0.7, 1, 0.5, R3D.col('#cfefff'));
         }, glow, 4);
@@ -1138,26 +1150,72 @@
 
         // Patrols.
         for (const e of ents.enemies) {
-            if (e.dead) continue;
+            // The dead linger for a moment, so a kill is something you see.
+            let dying = 0;
+            if (e.dead) {
+                if (!(e.deadT < DEATH_T)) continue;
+                dying = e.deadT / DEATH_T;
+            }
             const mesh = set.pools[e.kind].next();
             const b = e.box();
             mesh.position.set(R3D.wx(b.x), R3D.wy(b.y), ACTOR_Z);
-            mesh.rotation.y = e.dir >= 0 ? 0 : Math.PI;
-            if (e.kind === 'bat') {
+            mesh.rotation.set(0, e.dir >= 0 ? 0 : Math.PI, 0);
+            mesh.scale.set(1, 1, 1);
+
+            if (e.kind === 'walker') {
+                if (e.state === 'aim') {
+                    // The tell: the lamp eye charges up, red, and swells.
+                    const k = 1 - Math.max(0, e.timer) / 0.55;
+                    const eye = set.pools.glowSprite.next();
+                    eye.position.set(mesh.position.x + e.dir * 0.36, mesh.position.y + 0.1, ACTOR_Z + 0.25);
+                    const s = 0.3 + k * 0.9 + Math.sin(t * 40) * 0.08 * k;
+                    eye.scale.set(s, s, 1);
+                    tint(eye, '#ff4a1a', 0.5 + k * 0.5);
+                } else if (e.state === 'recoil') {
+                    mesh.position.x -= e.dir * Math.max(0, e.timer) * 0.35;
+                    mesh.rotation.z = e.dir * Math.max(0, e.timer) * 0.5;
+                } else {
+                    mesh.position.y += Math.abs(Math.sin(t * 9 + e.x)) * 0.04;
+                }
+            } else if (e.kind === 'crawler') {
+                if (e.state === 'curl' || e.state === 'roll') {
+                    // Tucked into a ball and turning over as it goes.
+                    const k = e.state === 'curl' ? 1 - Math.max(0, e.timer) / 0.3 : 1;
+                    mesh.scale.set(1 - k * 0.3, 1 + k * 0.15, 1 - k * 0.1);
+                    mesh.rotation.y = 0;
+                    mesh.rotation.z = -e.spin / 7;
+                    mesh.position.y += k * 0.08;
+                } else if (e.state === 'dizzy') {
+                    mesh.rotation.z = Math.sin(t * 11) * 0.18;
+                    // Stars, circling.
+                    for (let i = 0; i < 3; i++) {
+                        const a = t * 5 + i * 2.1;
+                        const star = set.pools.glowSprite.next();
+                        star.position.set(mesh.position.x + Math.cos(a) * 0.35,
+                                          mesh.position.y + 0.42 + Math.sin(a * 2) * 0.05,
+                                          ACTOR_Z + Math.sin(a) * 0.3);
+                        star.scale.set(0.22, 0.22, 1);
+                        tint(star, '#ffe27a', 0.95);
+                    }
+                }
+            } else if (e.kind === 'bat') {
                 mesh.rotation.z = Math.sin(t * 12) * 0.35;
+                if (e.state === 'swoop') {
+                    const k = e.timer / 0.95;
+                    mesh.rotation.z = (k < 0.5 ? -0.6 : 0.5) * (e.dir >= 0 ? 1 : -1);
+                }
             } else if (e.kind === 'spider') {
                 // The silk, drawn from the ceiling anchor down to the body. It
                 // is what makes a spider read as *dropping* rather than as a
-                // thing that appeared: without it the drop looks like a bug.
-                if (e.thread > 1) {
+                // thing that appeared.
+                if (e.thread > 1 && !e.dead) {
                     const silk = set.pools.thread.next();
                     const top = R3D.wy(e.homeY);
-                    const len = e.thread / C.TILE;
                     silk.position.set(R3D.wx(e.x), top, ACTOR_Z - 0.05);
-                    silk.scale.set(1, len, 1);
+                    silk.scale.set(1, e.thread / C.TILE, 1);
                 }
                 mesh.rotation.y = 0;
-                mesh.scale.setScalar(e.state === 'hang' ? 1.1 : 1);
+                if (e.state === 'hang') mesh.scale.setScalar(1.1);
             } else if (e.kind === 'guardian') {
                 mesh.rotation.y = Math.sin(t * 0.9) * 0.5;
                 const halo = set.pools.glowSprite.next();
@@ -1166,8 +1224,18 @@
                 tint(halo, '#7fb0ff', 0.3);
             } else if (e.kind === 'dog') {
                 // Braced before a charge: dips, and holds.
-                mesh.position.y -= e.state === 'rouse' ? 0.06 : 0;
+                if (e.state === 'rouse') mesh.position.y -= 0.06;
                 if (e.state === 'charge') mesh.position.y += Math.abs(Math.sin(t * 18)) * 0.08;
+                if (e.state === 'winded') {
+                    // Run down: it sags and shudders while the spring rewinds.
+                    mesh.rotation.z = Math.sin(t * 16) * 0.07;
+                    mesh.position.y -= 0.05;
+                    const puff = set.pools.glowSprite.next();
+                    puff.position.set(mesh.position.x - e.dir * 0.1, mesh.position.y + 0.45 + (t % 0.6),
+                                      ACTOR_Z - 0.05);
+                    puff.scale.set(0.35, 0.35, 1);
+                    tint(puff, '#9aa6b4', 0.35);
+                }
             } else if (e.kind === 'orb') {
                 const s = 1 + Math.sin(t * 7) * 0.12;
                 mesh.scale.set(s, s, s);
@@ -1175,8 +1243,34 @@
                 halo.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.1);
                 halo.scale.set(2.2, 2.2, 1);
                 tint(halo, '#ff7a3c', 0.4);
-            } else {
-                mesh.position.y += Math.abs(Math.sin(t * 9)) * 0.05;
+            }
+
+            if (dying > 0) {
+                // Fliers fall out of the air; walkers are flattened where they stood.
+                const flier = e.kind === 'bat' || e.kind === 'spider' || e.kind === 'guardian' || e.kind === 'orb';
+                if (flier) {
+                    mesh.position.y -= dying * dying * 2.2;
+                    mesh.rotation.z += dying * 4;
+                    mesh.scale.multiplyScalar(1 - dying * 0.5);
+                } else {
+                    mesh.scale.set(mesh.scale.x * (1 + dying * 0.5), mesh.scale.y * (1 - dying * 0.8),
+                                   mesh.scale.z * (1 + dying * 0.3));
+                    mesh.position.y -= dying * 0.18;
+                }
+            }
+        }
+
+        // Shots: a hot rivet and a short trail of heat behind it.
+        for (const s of ents.shots) {
+            const mesh = set.pools.rivet.next();
+            mesh.position.set(R3D.wx(s.x), R3D.wy(s.y), ACTOR_Z + 0.05);
+            mesh.rotation.set(0, 0, t * 20);
+            for (let i = 0; i < 3; i++) {
+                const tr = set.pools.glowSprite.next();
+                tr.position.set(mesh.position.x - Math.sign(s.vx) * i * 0.22, mesh.position.y, ACTOR_Z);
+                const k = 1 - i * 0.28;
+                tr.scale.set(0.55 * k, 0.4 * k, 1);
+                tint(tr, i === 0 ? '#ffd27a' : '#ff6a2a', 0.8 * k);
             }
         }
 

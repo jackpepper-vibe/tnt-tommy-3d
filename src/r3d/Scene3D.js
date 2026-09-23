@@ -623,6 +623,17 @@
             self.burst(e.x + 6, e.y - 14, { count: 3, colour: '#fff2d0', speed: 1.4, life: 0.3, lift: 2, grav: 0 });
         });
 
+        bus.on(EV.ENEMY_FIRED, function (e) {
+            self.burst(e.x, e.y, { count: 8, colour: '#ffc060', speed: 3, life: 0.2, grav: -2 });
+        });
+        bus.on(EV.SHOT_HIT, function (e) {
+            self.burst(e.x, e.y, { count: 10, colour: '#ffb050', speed: 4, life: 0.3, grav: -9 });
+        });
+        bus.on(EV.ARMOUR_CLANG, function (e) {
+            self.burst(e.x, e.y - 6, { count: 12, colour: '#fff4d0', speed: 5, life: 0.22, grav: -10 });
+            self.addTrauma(0.15);
+        });
+
         bus.on(EV.PLAYER_HURT, function (e) {
             self.burst(e.x, e.y - 10, { count: 18, colour: '#ff6a5c', speed: 5, life: 0.5 });
         });

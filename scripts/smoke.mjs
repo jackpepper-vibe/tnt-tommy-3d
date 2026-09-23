@@ -583,6 +583,84 @@ check('stomps chain without touching the ground', () => {
     return first + ' then ' + second;
 });
 
+/** Find the first room in mine 1 holding a patrol of `kind`, and go there. */
+function roomWith(h, kind) {
+    for (let i = 0; i < h.run.mine.rooms.length; i++) {
+        const e = h.run.entities[i].enemies.find(x => x.kind === kind);
+        if (e) { h.run.roomIndex = i; return e; }
+    }
+    return null;
+}
+
+/**
+ * A minecart bot that sees Tommy on its level stops, winds up, and fires —
+ * and the rivet hurts. The wind-up is the whole fairness of it, so the test
+ * requires that nothing is in the air before the aim time has passed.
+ */
+check('a minecart bot winds up and fires along its deck', () => {
+    const h = harness();
+    const p = h.run.player;
+    const bot = roomWith(h, 'walker');
+    assert(bot, 'no minecart bot in mine 1');
+    const ents = h.run.ents();
+
+    // Stand Tommy a few tiles in front of it, on its deck.
+    const x = Math.max(bot.minX, Math.min(bot.maxX, bot.x + bot.dir * 48));
+    p.placeAt(x, bot.y);
+    p.onGround = true;
+    p.invuln = 0;
+    h.hold([]);
+    h.step(1);
+    assert(bot.state === 'aim', 'Tommy stood in front of it and it did not aim (state ' + bot.state + ')');
+    assert(ents.shots.length === 0, 'it fired with no wind-up');
+
+    let fired = false;
+    for (let i = 0; i < 120 && !fired; i++) {
+        p.placeAt(x, bot.y);
+        p.invuln = 5;                    // watch the shot, do not take it yet
+        h.step(1);
+        fired = ents.shots.length > 0;
+    }
+    assert(fired, 'it aimed and never fired');
+    const shot = ents.shots[0];
+    assert(Math.sign(shot.vx) === Math.sign(x - bot.x), 'the rivet flew away from Tommy');
+    return 'aimed, then fired at ' + Math.abs(shot.vx) + 'px/s';
+});
+
+/**
+ * The beetle's shell turns a stomp away while it rolls, and it is open to one
+ * while it sits dizzy afterwards.
+ */
+check('a rolling beetle shrugs off a stomp; a dizzy one does not', () => {
+    const h = harness();
+    const p = h.run.player;
+    const bug = roomWith(h, 'crawler');
+    assert(bug, 'no beetle in mine 1');
+
+    const land = function () {
+        const b = bug.box();
+        p.placeAt(b.x, b.y - b.h / 4);
+        p.mode = 'walk';
+        p.onGround = false;
+        p.invuln = 0;
+        p.vy = C.STOMP_MIN_V * 2;
+        h.run.hitstop = 0;
+        h.step(1);
+    };
+
+    bug.state = 'roll';
+    bug.timer = 1;
+    land();
+    assert(!bug.dead, 'a rolling beetle died to a stomp');
+    assert(p.vy < 0, 'the shell did not bounce Tommy off');
+
+    bug.state = 'dizzy';
+    bug.timer = 1;
+    land();
+    assert(bug.dead, 'a dizzy beetle survived a stomp');
+    return 'glanced off the shell, then landed the stomp';
+});
+
 console.log('\nrules');
 
 check('the fuse burns down and food puts it back', () => {

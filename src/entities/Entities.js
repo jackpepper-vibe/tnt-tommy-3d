@@ -148,21 +148,150 @@
         this.maxX = (span.x1 + 1) * C.TILE - spec.w / 2;
         this.x = Util.clamp(tileCentre(tx), this.minX, this.maxX);
         if (this.maxX <= this.minX) this.speed = 0;   // nowhere to go; stand still
+
+        this.room = room;
+        this.state = 'patrol';
+        this.timer = 0;
+        this.cooldown = 0;
+        /** Seconds since it died, for the renderer's death animation. */
+        this.deadT = 0;
+        /** Accumulated roll, for drawing a curled beetle turning over. */
+        this.spin = 0;
     }
 
-    Ground.prototype.update = function (dt) {
-        if (this.dead) return;
+    Ground.prototype.update = function (dt, player, set) {
+        if (this.dead) { this.deadT += dt; return; }
         this.t += dt;
-        if (this.kind === 'crawler') {
-            this._turnIn -= dt;
-            if (this._turnIn <= 0) {
-                this._turnIn = 1.8 + (this.x % 7) * 0.3;
-                this.dir = -this.dir;
-            }
+        if (this.kind === 'walker') { this._walker(dt, player, set); return; }
+        if (this.kind === 'crawler') { this._crawler(dt, player); return; }
+        this._patrol(dt, this.speed);
+    };
+
+    /** Walk the beat at `speed`, turning at either end. */
+    Ground.prototype._patrol = function (dt, speed) {
+        this.x += this.dir * speed * dt;
+        if (this.x <= this.minX) { this.x = this.minX; this.dir = 1; return true; }
+        if (this.x >= this.maxX) { this.x = this.maxX; this.dir = -1; return true; }
+        return false;
+    };
+
+    /**
+     * Is Tommy on this patrol's level, in front of it, and in plain sight?
+     *
+     * "Plain sight" is walked tile by tile along the row at chest height, so a
+     * bot behind a pillar does not shoot through it. A shot you could not have
+     * seen coming is not a hazard, it is a tax.
+     */
+    Ground.prototype._sees = function (player, range, room, anyDir) {
+        if (!player || !player.active || !player.alive) return false;
+        if (Math.abs(player.y - this.y) > C.TILE * 0.8) return false;
+        const dx = player.x - this.x;
+        if (Math.abs(dx) > range) return false;
+        if (!anyDir && Util.sign(dx) !== this.dir) return false;
+        const row = Math.floor((this.y - C.TILE * 0.6) / C.TILE);
+        const a = Math.floor(Math.min(this.x, player.x) / C.TILE);
+        const b = Math.floor(Math.max(this.x, player.x) / C.TILE);
+        for (let tx = a; tx <= b; tx++) if (Tiles.isSolid(room.get(tx, row))) return false;
+        return true;
+    };
+
+    /**
+     * The minecart bot: patrols, and shoots.
+     *
+     * When Tommy is on its level and in front of it, it stops, its lamp eye
+     * charges for half a second — the tell — and it fires a hot rivet along
+     * the deck. The rivet flies level and dies on the first wall, so the
+     * answer is always the same and always available: jump it. What changes
+     * room to room is where you are standing when you have to.
+     */
+    const BOT_SIGHT = C.TILE * 8;
+    const BOT_AIM = 0.55;
+    const BOT_RECOIL = 0.35;
+    const BOT_COOLDOWN = 1.6;
+    const RIVET_V = 175;
+
+    Ground.prototype._walker = function (dt, player, set) {
+        if (this.cooldown > 0) this.cooldown -= dt;
+        const room = set ? set.room : null;
+        switch (this.state) {
+            case 'aim':
+                this.timer -= dt;
+                if (this.timer <= 0) {
+                    this.state = 'recoil';
+                    this.timer = BOT_RECOIL;
+                    this.cooldown = BOT_COOLDOWN;
+                    if (set) set.fire('rivet', this.x + this.dir * 9, this.y - 7, this.dir * RIVET_V, 0);
+                }
+                return;
+            case 'recoil':
+                this.timer -= dt;
+                if (this.timer <= 0) this.state = 'patrol';
+                return;
+            default:
+                if (room && this.cooldown <= 0 && this._sees(player, BOT_SIGHT, room)) {
+                    this.state = 'aim';
+                    this.timer = BOT_AIM;
+                    if (set) set.bus.emit(TNT.EV.ENEMY_AIM, { x: this.x, y: this.y - 7, kind: this.kind });
+                    return;
+                }
+                this._patrol(dt, this.speed);
         }
-        this.x += this.dir * this.speed * dt;
-        if (this.x <= this.minX) { this.x = this.minX; this.dir = 1; }
-        if (this.x >= this.maxX) { this.x = this.maxX; this.dir = -1; }
+    };
+
+    /**
+     * The rust beetle: crawls, curls, rolls, and gets dizzy.
+     *
+     * Close to Tommy and on his level, it tucks into an armoured ball and
+     * rolls at him fast. While it is a ball a stomp glances off it — the shell
+     * is the point — and when the roll ends it sits dazed for a second, open.
+     * The fight is the timing: get out of the way of the roll, then land on it.
+     */
+    const BEETLE_WAKE = C.TILE * 5;
+    const BEETLE_CURL = 0.3;
+    const BEETLE_ROLL = 1.5;
+    const BEETLE_DIZZY = 1.2;
+
+    Ground.prototype._crawler = function (dt, player) {
+        const room = this.room;
+        switch (this.state) {
+            case 'curl':
+                this.timer -= dt;
+                if (this.timer <= 0) { this.state = 'roll'; this.timer = BEETLE_ROLL; }
+                return;
+            case 'roll':
+                this.timer -= dt;
+                this._patrol(dt, this.speed * 4.2);
+                this.spin += this.dir * this.speed * 4.2 * dt;
+                if (this.timer <= 0) { this.state = 'dizzy'; this.timer = BEETLE_DIZZY; }
+                return;
+            case 'dizzy':
+                this.timer -= dt;
+                if (this.timer <= 0) { this.state = 'patrol'; this.cooldown = 1.2; }
+                return;
+            default:
+                if (this.cooldown > 0) this.cooldown -= dt;
+                // Only a Tommy standing on its level wakes it. One coming down
+                // on it from above is the one thing it cannot see coming — or
+                // the shell would make it impossible ever to stomp.
+                if (room && this.cooldown <= 0 && player && player.onGround &&
+                    this._sees(player, BEETLE_WAKE, room, true)) {
+                    this.dir = Util.sign(player.x - this.x) || this.dir;
+                    this.state = 'curl';
+                    this.timer = BEETLE_CURL;
+                    return;
+                }
+                this._turnIn -= dt;
+                if (this._turnIn <= 0) {
+                    this._turnIn = 1.8 + (this.x % 7) * 0.3;
+                    this.dir = -this.dir;
+                }
+                this._patrol(dt, this.speed);
+        }
+    };
+
+    /** Whether a stomp kills it or glances off. */
+    Ground.prototype.armoured = function () {
+        return this.kind === 'crawler' && (this.state === 'curl' || this.state === 'roll');
     };
 
     Ground.prototype.box = function () {
@@ -181,6 +310,7 @@
     const DOG_ROUSE = 0.45;
     const DOG_SIGHT = 130;
     const DOG_CHARGE = 2.6;
+    const DOG_WINDED = 1.1;
 
     function Dog(tx, ty, room, speedMul) {
         Ground.call(this, 'dog', tx, ty, room, speedMul);
@@ -192,8 +322,19 @@
     Dog.prototype.constructor = Dog;
 
     Dog.prototype.update = function (dt, player) {
-        if (this.dead) return;
+        if (this.dead) { this.deadT += dt; return; }
         this.t += dt;
+
+        /*
+         * Winded: a clockwork hound runs itself down on a charge and has to
+         * stop while its spring rewinds. That second is the stomp window —
+         * the counter to a charge is to be above it when it ends.
+         */
+        if (this.state === 'winded') {
+            this.timer -= dt;
+            if (this.timer <= 0) this.state = 'patrol';
+            return;
+        }
 
         const sees = player && player.active &&
             Math.abs(player.y - this.y) < C.TILE * 1.5 &&
@@ -208,13 +349,15 @@
             return;                              // braced, not moving
         } else {
             this.timer -= dt;
-            if (this.timer <= 0) this.state = 'patrol';
+            if (this.timer <= 0) { this.state = 'winded'; this.timer = DOG_WINDED; return; }
         }
 
-        const speed = this.state === 'charge' ? this.speed * 3.1 : this.speed;
+        const charging = this.state === 'charge';
+        const speed = charging ? this.speed * 3.1 : this.speed;
         this.x += this.dir * speed * dt;
-        if (this.x <= this.minX) { this.x = this.minX; this.dir = 1; this.state = 'patrol'; }
-        if (this.x >= this.maxX) { this.x = this.maxX; this.dir = -1; this.state = 'patrol'; }
+        const end = charging ? 'winded' : 'patrol';
+        if (this.x <= this.minX) { this.x = this.minX; this.dir = 1; this.state = end; this.timer = DOG_WINDED; }
+        if (this.x >= this.maxX) { this.x = this.maxX; this.dir = -1; this.state = end; this.timer = DOG_WINDED; }
     };
 
     /**
@@ -253,7 +396,7 @@
     }
 
     Spider.prototype.update = function (dt, player) {
-        if (this.dead) return;
+        if (this.dead) { this.deadT = (this.deadT || 0) + dt; return; }
         this.t += dt;
 
         switch (this.state) {
@@ -326,6 +469,7 @@
 
     Guardian.prototype.update = function (dt, player) {
         if (this.dead) {
+            this.deadT = (this.deadT || 0) + dt;
             if (this.reformIn <= 0) return;
             this.reformIn -= dt;
             if (this.reformIn <= 0) {
@@ -393,15 +537,73 @@
         this.x = Util.clamp(tileCentre(tx), this.minX, this.maxX);
         this.y = this.baseY;
         if (this.maxX <= this.minX) this.speed = 0;
+        this.room = room;
+        this.state = 'weave';
+        this.timer = 0;
+        this.cooldown = 1;
+        this.deadT = 0;
     }
 
-    Bat.prototype.update = function (dt) {
-        if (this.dead) return;
+    /**
+     * A bat weaves its span, and swoops.
+     *
+     * When Tommy passes under it — below, close, and with nothing between
+     * them — it drops at him in an arc and climbs back to its beat. The swoop
+     * aims at where he *was*, so keeping moving is the dodge, and a player
+     * standing still under a bat learns why not to.
+     */
+    const BAT_SWOOP = 0.95;
+    const BAT_REST = 2.4;
+
+    Bat.prototype.update = function (dt, player) {
+        if (this.dead) { this.deadT = (this.deadT || 0) + dt; return; }
         this.t += dt;
+        if (this.cooldown > 0) this.cooldown -= dt;
+
+        if (this.state === 'swoop') {
+            this.timer += dt;
+            const k = Math.min(1, this.timer / BAT_SWOOP);
+            // Down and across, then back up: a sine for the dip, linear across.
+            this.x = Util.lerp(this.sx, this.tx, k);
+            this.y = this.sy + Math.sin(k * Math.PI) * (this.ty - this.sy);
+            if (k >= 1) {
+                this.state = 'weave';
+                this.cooldown = BAT_REST;
+                this.x = Util.clamp(this.x, this.minX, this.maxX);
+            }
+            return;
+        }
+
         this.x += this.dir * this.speed * dt;
         if (this.x <= this.minX) { this.x = this.minX; this.dir = 1; }
         if (this.x >= this.maxX) { this.x = this.maxX; this.dir = -1; }
         this.y = this.baseY + Math.sin(this.t * 3.1) * this.amp;
+
+        if (this.cooldown <= 0 && this._canSwoop(player)) {
+            this.state = 'swoop';
+            this.timer = 0;
+            this.sx = this.x;
+            this.sy = this.y;
+            this.ty = player.centreY();
+            // Carry on past him, so the arc is a pass and not a dive-bomb.
+            this.tx = Util.clamp(this.x + (player.x - this.x) * 1.6, this.minX, this.maxX);
+            this.dir = Util.sign(this.tx - this.x) || this.dir;
+        }
+    };
+
+    Bat.prototype._canSwoop = function (player) {
+        if (!player || !player.active || !player.alive) return false;
+        const dy = player.centreY() - this.y;
+        if (dy < C.TILE * 1.5 || dy > C.TILE * 6) return false;
+        if (Math.abs(player.x - this.x) > C.TILE * 3) return false;
+        // Clear air all the way down, sampled every half tile.
+        const steps = Math.ceil(dy / (C.TILE / 2));
+        for (let i = 1; i < steps; i++) {
+            const k = i / steps;
+            const t = this.room.at(Util.lerp(this.x, player.x, k), Util.lerp(this.y, player.centreY(), k));
+            if (Tiles.isFloor(t) || t === T.WATER) return false;
+        }
+        return true;
     };
 
     Bat.prototype.box = function () {
@@ -427,7 +629,7 @@
     }
 
     Orb.prototype.update = function (dt) {
-        if (this.dead) return;
+        if (this.dead) { this.deadT = (this.deadT || 0) + dt; return; }
         this.t += dt;
         this.y += this.dir * this.speed * dt;
         if (this.y <= this.minY) { this.y = this.minY; this.dir = 1; }
@@ -436,6 +638,45 @@
 
     Orb.prototype.box = function () {
         return box(this.x, this.y, this.spec.w, this.spec.h);
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Shots
+     * ------------------------------------------------------------------ */
+
+    /**
+     * A hot rivet, fired level along a deck.
+     *
+     * It flies straight and dies on the first solid tile, and a blast clears
+     * any in its radius. It does not pass through decks either — a shot that
+     * came up through the floor you are standing on would be unreadable.
+     */
+    function Shot(kind, x, y, vx, vy) {
+        this.kind = kind;
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.life = 4;
+        this.dead = false;
+        this.w = 7;
+        this.h = 5;
+    }
+
+    Shot.prototype.update = function (dt, room) {
+        this.life -= dt;
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        const t = room.at(this.x, this.y);
+        if (this.life <= 0 || Tiles.isSolid(t) || this.x < 0 || this.x > C.ROOM_W) {
+            this.dead = true;
+            return true;
+        }
+        return false;
+    };
+
+    Shot.prototype.box = function () {
+        return box(this.x, this.y, this.w, this.h);
     };
 
     /* ------------------------------------------------------------------ *
@@ -786,6 +1027,9 @@
         this.detonator = null;
         this.warps = [];
         this.flood = null;
+        /** Shots in flight. Transient: cleared on every rewind. */
+        this.shots = [];
+        this.bus = null;
         /** Set once every nugget in the room has been taken; the medal is once. */
         this.medal = false;
         /** Whether the player has ever been here. Drawn on the minimap. */
@@ -933,8 +1177,16 @@
      * @param {boolean} [occupied]
      */
     RoomEntities.prototype.update = function (dt, bus, player, occupied) {
+        this.bus = bus;
         for (const p of this.pickups) p.update(dt);
-        for (const e of this.enemies) e.update(dt, player);
+        for (const e of this.enemies) e.update(dt, player, this);
+        for (let i = this.shots.length - 1; i >= 0; i--) {
+            const s = this.shots[i];
+            if (s.update(dt, this.room)) {
+                bus.emit(TNT.EV.SHOT_HIT, { x: s.x, y: s.y });
+                this.shots.splice(i, 1);
+            }
+        }
         for (const w of this.warps) w.update(dt);
         if (this.flood) this.flood.update(dt, !!occupied);
         for (const c of this.crushers) {
@@ -1011,10 +1263,18 @@
         }
         this.crumbles.clear();
 
+        this.shots.length = 0;
+        for (const p of this.pickups) { p.pullX = p.pullY = 0; }
         for (const e of this.enemies) {
             e.dead = false;
+            e.deadT = 0;
             e.t = 0;
             e.dir = 1;
+            if (e.state !== undefined && e.kind !== 'spider' && e.kind !== 'dog') {
+                e.state = e.kind === 'bat' ? 'weave' : 'patrol';
+                e.timer = 0;
+                e.cooldown = e.kind === 'bat' ? 1 : 0;
+            }
             if (e.kind === 'orb') e.y = e.minY;
             else if (e.kind === 'spider') { e.y = e.homeY; e.state = 'wait'; e.timer = SPIDER_WAIT; e.thread = 0; }
             else if (e.kind === 'guardian') { e.x = e.homeX; e.y = e.homeY; e.reformIn = 0; }
@@ -1029,14 +1289,22 @@
         for (const l of this.lifts) { l.t = 0; l.dir = 1; l.pause = 0; l.x = l.aX; l.y = l.aY; l.prevX = l.x; l.prevY = l.y; }
     };
 
+    /** Put a shot in the air. Called by the patrols that shoot. */
+    RoomEntities.prototype.fire = function (kind, x, y, vx, vy) {
+        this.shots.push(new Shot(kind, x, y, vx, vy));
+        if (this.bus) this.bus.emit(TNT.EV.ENEMY_FIRED, { x: x, y: y, kind: kind });
+    };
+
     /** Enemies within a blast. Returns how many were destroyed. */
     RoomEntities.prototype.killNear = function (x, y, radius) {
+        this.shots = this.shots.filter(function (s) { return Math.hypot(s.x - x, s.y - y) > radius; });
         let n = 0;
         for (const e of this.enemies) {
             if (e.dead) continue;
             const b = e.box();
             if (Math.hypot(b.x - x, b.y - y) <= radius) {
                 e.dead = true;
+                e.deadT = 0;
                 n++;
             }
         }
@@ -1055,6 +1323,7 @@
         Spider: Spider,
         Guardian: Guardian,
         Dog: Dog,
+        Shot: Shot,
         PICKUP_SPEC: PICKUP_SPEC,
         ENEMY_SPEC: ENEMY_SPEC,
 

@@ -41,6 +41,29 @@ const POSES = {
     heroJump:   { focus: true, eval: ['bare', 'TNT.game.put(6, 22)', 'TNT.game.hold(["jump"])', 'TNT.game.step(14)'] },
     heroDog:    { focus: true, eval: ['bare', 'TNT.game.put(4, 22)', 'TNT.game.hold(["right"])', 'TNT.game.step(70)', 'TNT.game.hold([])', 'TNT.game.step(90)'] },
     heroClimb:  { focus: true, eval: ['bare', 'TNT.game.put(5, 12)', 'TNT.game.hold(["up"])', 'TNT.game.step(30)'] },
+    /* A minecart bot winding up on Tommy, a rivet already in the air. */
+    fight: {
+        eval: [
+            'bare',
+            `(function () {
+                const run = TNT.game.run;
+                for (let i = 0; i < run.mine.rooms.length; i++) {
+                    const bot = run.entities[i].enemies.find(e => e.kind === 'walker');
+                    if (!bot) continue;
+                    TNT.game.room(run.mine.rooms[i].id);
+                    const x = bot.x + bot.dir * 90;
+                    run.player.reset(x, bot.y, true);
+                    run.player.active = true;
+                    run.player.facing = -bot.dir;
+                    run.player.invuln = 0;
+                    run.energy = 1e6;
+                    run.dog.placeAt(x, bot.y, -bot.dir);
+                    return;
+                }
+            })()`,
+            'TNT.game.step(128)'
+        ]
+    },
     blast: {
         eval: [
             'bare', 'TNT.game.room("lampRoom")', 'TNT.game.put(7, 22)',
