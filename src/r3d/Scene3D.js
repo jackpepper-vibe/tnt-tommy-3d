@@ -113,8 +113,8 @@
         this.slide = null;
         this.offset = new THREE.Vector2(0, 0);
 
-        this.shake = 0;
-        this.shakeT = 0;
+        /** 0..1; decays linearly, and the shake scales with its square. */
+        this.trauma = 0;
         this.drift = new THREE.Vector2(0, 0);
         this.flash = 0;
         this.crt = false;
@@ -310,6 +310,10 @@
         this._pcursor = 0;
     };
 
+    Scene3D.prototype.addTrauma = function (amount) {
+        this.trauma = Math.min(1, this.trauma + amount);
+    };
+
     Scene3D.prototype.burst = function (x, y, opts) {
         const o = opts || {};
         const n = o.count || 14;
@@ -326,7 +330,9 @@
             p.y = wy + (Math.random() - 0.5) * 0.3;
             p.z = (o.z === undefined ? 0.5 : o.z) + (Math.random() - 0.5) * 0.4;
             p.vx = Math.cos(a) * s;
-            p.vy = Math.sin(a) * s + (o.lift || 0);
+            // A bias sideways, for dust thrown off one side of a foot.
+            if (o.spreadX) p.vx = Math.abs(p.vx) * o.spreadX;
+            p.vy = o.spreadX ? Math.abs(Math.sin(a) * s) * 0.6 + (o.lift || 0) : Math.sin(a) * s + (o.lift || 0);
             p.vz = (Math.random() - 0.5) * 0.6;
             p.max = p.life = (o.life || 0.6) * (0.6 + Math.random() * 0.6);
             p.r = colour.r; p.g = colour.g; p.b = colour.b;
@@ -569,8 +575,7 @@
         });
 
         bus.on(EV.SHAKE, function (e) {
-            self.shake = Math.max(self.shake, e.amount);
-            self.shakeT = Math.max(self.shakeT, e.seconds);
+            self.addTrauma(e.amount * 0.75);
         });
 
         bus.on(EV.PICKUP, function (e) {
@@ -581,15 +586,41 @@
             self.burst(e.x, e.y, { count: 14, colour: colour, speed: 3.4, life: 0.5, lift: 1.5 });
         });
 
-        bus.on(EV.PLAYER_LANDED, function (e) {
-            self.burst(e.x, e.y, {
-                count: e.hard ? 16 : 7,
-                colour: '#8b93b5',
-                speed: e.hard ? 4 : 2,
-                life: 0.35,
-                grav: -6
+        /*
+         * Dust. Every contact Tommy makes with the works kicks some up — a
+         * landing, a take-off, a skid, a footfall, a wall kick — and it is dim
+         * and brown and falls back, so it reads as grit rather than as sparks.
+         * Movement with no trace of contact is movement on ice.
+         */
+        const DUST = '#5a4a3a';
+        const dust = function (x, y, n, speed, dir) {
+            self.burst(x, y, {
+                count: n, colour: DUST, speed: speed, life: 0.45, lift: 0.8,
+                grav: -4, drag: 3.2, spreadX: dir || 0
             });
-            if (e.hard) { self.shake = Math.max(self.shake, 0.45); self.shakeT = Math.max(self.shakeT, 0.18); }
+        };
+
+        bus.on(EV.PLAYER_LANDED, function (e) {
+            dust(e.x - 5, e.y, e.hard ? 12 : 5, e.hard ? 4 : 2.2, -1);
+            dust(e.x + 5, e.y, e.hard ? 12 : 5, e.hard ? 4 : 2.2, 1);
+            if (e.hard) self.addTrauma(0.45);
+        });
+
+        bus.on(EV.PLAYER_JUMPED, function (e) { dust(e.x, e.y, 5, 1.8); });
+        bus.on(EV.PLAYER_SKID, function (e) { dust(e.x - e.dir * 4, e.y, 7, 2.6, -e.dir); });
+        bus.on(EV.PLAYER_STEP, function (e) { dust(e.x, e.y, 1, 0.9); });
+        bus.on(EV.WALL_JUMP, function (e) {
+            dust(e.x, e.y - 10, 8, 3, -e.side);
+            self.addTrauma(0.18);
+        });
+
+        bus.on(EV.ENEMY_STOMPED, function (e) {
+            self.burst(e.x, e.y, { count: 12 + e.chain * 3, colour: '#ffe7a0', speed: 4.5, life: 0.4, grav: -5 });
+            self.burst(e.x, e.y, { count: 8, colour: '#9a8a78', speed: 2.5, life: 0.5, grav: -6 });
+        });
+
+        bus.on(EV.DOG_BARK, function (e) {
+            self.burst(e.x + 6, e.y - 14, { count: 3, colour: '#fff2d0', speed: 1.4, life: 0.3, lift: 2, grav: 0 });
         });
 
         bus.on(EV.PLAYER_HURT, function (e) {
@@ -614,13 +645,12 @@
 
         bus.on(EV.BOULDER_SMASH, function (e) {
             self.burst(e.x, e.y, { count: 16, colour: '#7a6a58', speed: 4, life: 0.5 });
-            self.shake = Math.max(self.shake, 0.4);
-            self.shakeT = Math.max(self.shakeT, 0.15);
+            self.addTrauma(0.3);
         });
 
         bus.on(EV.CRUSH_SLAM, function (e) {
-            self.shake = Math.max(self.shake, 0.3);
-            self.shakeT = Math.max(self.shakeT, 0.12);
+            self.burst(e.x, e.y + 60, { count: 10, colour: '#ffcf8a', speed: 5, life: 0.25, grav: -8 });
+            self.addTrauma(0.22);
         });
 
         bus.on(EV.VENT_FIRED, function (e) {
@@ -679,15 +709,21 @@
 
         this._updateSlide(dt);
         this._ambientParticles(dt);
+        // Grit off the wall while Tommy slides down it.
+        const pl = run.player;
+        if (pl.wallSlide !== 0 && run.state === 'playing') {
+            this._slideDust = (this._slideDust || 0) + dt;
+            if (this._slideDust > 0.05) {
+                this._slideDust = 0;
+                this.burst(pl.x + pl.wallSlide * 6, pl.y - 14, {
+                    count: 1, colour: '#6a5a48', speed: 0.8, life: 0.35, grav: -3, drag: 2 });
+            }
+        }
         this._updateParticles(dt);
         if (this.roomView && this.roomView.update) this.roomView.update(this.t);
         if (this.oldView && this.oldView.update) this.oldView.update(this.t);
 
-        if (this.shakeT > 0) {
-            this.shakeT -= dt;
-            if (this.shakeT <= 0) this.shake = 0;
-        }
-        this.shake = Util.damp(this.shake, 0, 5, dt);
+        this.trauma = Math.max(0, this.trauma - dt * 1.6);
         this.flash = Util.damp(this.flash, 0, 4.5, dt);
 
         /*
@@ -707,11 +743,24 @@
         this.drift.x = Util.damp(this.drift.x, wantX, 2.2, dt);
         this.drift.y = Util.damp(this.drift.y, wantY, 2.2, dt);
 
-        const jitterX = this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 1.4 : 0;
-        const jitterY = this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 1.4 : 0;
+        /*
+         * Shake is *trauma*, squared, driven by smooth noise.
+         *
+         * It used to be a fresh random offset every frame, which at sixty
+         * frames a second is not a shake but a buzz — the picture blurs rather
+         * than jolts. Summed sines at unrelated rates move the camera through a
+         * continuous path instead, and squaring the trauma means small knocks
+         * barely register while a blast really throws the frame about.
+         */
+        const k = this.trauma * this.trauma;
+        const st = this.t * 38;
+        const jitterX = k * 0.9 * (Math.sin(st * 1.0) * 0.6 + Math.sin(st * 2.3 + 1.7) * 0.4);
+        const jitterY = k * 0.9 * (Math.sin(st * 1.3 + 0.5) * 0.6 + Math.sin(st * 2.9 + 3.1) * 0.4);
+        const roll = k * 0.02 * Math.sin(st * 1.7 + 2.2);
         const cx = C.COLS / 2 + this.drift.x, cy = C.ROWS / 2 + this.drift.y;
         this.camera.position.set(cx + jitterX, cy + jitterY, this.camDist);
-        this.camera.lookAt(cx, cy, 0);
+        this.camera.lookAt(cx + jitterX * 0.6, cy + jitterY * 0.6, 0);
+        this.camera.rotation.z += roll;
 
         Actors3D.sync(this.actors, run, dt);
         this._syncLights();

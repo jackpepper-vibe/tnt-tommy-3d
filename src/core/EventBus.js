@@ -80,6 +80,9 @@
         DETONATOR_FIRED: 'det-fired',     // {x, y}
         ALL_TNT: 'all-tnt',               // {x, y}
         DOG_BARK: 'dog-bark',             // {x, y}
+        PLAYER_SKID: 'player-skid',       // {x, y, dir}
+        PLAYER_STEP: 'player-step',       // {x, y}
+        WALL_JUMP: 'wall-jump',           // {x, y, side}
         SHAKE: 'shake',                   // {amount, seconds}
         FLOAT_TEXT: 'float-text',         // {text, x, y, colour, seconds}
         STATE_CHANGED: 'state-changed'    // {from, to}

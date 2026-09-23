@@ -84,6 +84,17 @@
         this.ropeRow = 0;
         this.inWater = false;
         this.blastCooldown = 0;
+
+        /** -1 or +1 while pressed against a wall and sliding down it, else 0. */
+        this.wallSlide = 0;
+        /** The side last kicked off; locked until grounded. See `C.WALL_JUMP_V`. */
+        this.lastWall = 0;
+        this._wallCoyote = 0;
+        this._wallSide = 0;
+        this._kickLock = 0;
+        /** Seconds left of the current skid, for the renderer's dust. */
+        this.skid = 0;
+        this._stepDist = 0;
     }
 
     /* ------------------------------------------------------------------ *
@@ -100,6 +111,9 @@
         this.fallSpeed = 0;
         this.dropping = 0;
         this.ridingLift = null;
+        this.wallSlide = 0;
+        this.lastWall = 0;
+        this._kickLock = 0;
     };
 
     Player.prototype.reset = function (x, y, keepKit) {
@@ -186,15 +200,36 @@
         const ax = input.axisX();
         const grounded = this.onGround;
 
+        if (this._kickLock > 0) this._kickLock -= dt;
+        if (this.skid > 0) this.skid -= dt;
+
         if (grounded) {
             const target = ax * C.MOVE_MAX;
+            // Turning round snaps; see `C.TURN_ACC_MUL`.
+            const turning = ax !== 0 && this.vx * ax < 0;
+            if (turning && Math.abs(this.vx) > C.MOVE_MAX * 0.5 && this.skid <= 0) {
+                this.skid = 0.18;
+                this.bus.emit(TNT.EV.PLAYER_SKID, { x: this.x, y: this.y, dir: ax });
+            }
+            const acc = C.MOVE_ACC * (turning ? C.TURN_ACC_MUL : 1);
             this.vx = ax !== 0
-                ? Util.approach(this.vx, target, C.MOVE_ACC * dt)
+                ? Util.approach(this.vx, target, acc * dt)
                 : Util.approach(this.vx, 0, C.MOVE_FRICTION * dt);
+
+            // Footfalls, for dust and sound: one per stride's worth of ground.
+            this._stepDist += Math.abs(this.vx) * dt;
+            if (this._stepDist > 26) {
+                this._stepDist = 0;
+                this.bus.emit(TNT.EV.PLAYER_STEP, { x: this.x, y: this.y });
+            }
+            this.lastWall = 0;
         } else {
-            if (ax !== 0) {
+            // Straight after a wall kick, pushing back toward the wall does
+            // nothing — or the kick is cancelled before it has carried you off.
+            const locked = this._kickLock > 0 && ax !== 0 && ax === this._wallSide;
+            if (ax !== 0 && !locked) {
                 this.vx = Util.approach(this.vx, ax * C.AIR_MAX, C.AIR_ACC * dt);
-            } else {
+            } else if (ax === 0) {
                 this.vx = Util.approach(this.vx, 0, C.AIR_DRAG * dt);
             }
         }
@@ -209,6 +244,34 @@
 
         this.coyote = grounded ? C.COYOTE_TIME : Math.max(0, this.coyote - dt);
         this.buffer = this._wantsJump(room, input) ? C.JUMP_BUFFER : Math.max(0, this.buffer - dt);
+
+        /* ---- walls ---- */
+
+        const wall = grounded ? 0 : this._wallBeside(room);
+        if (wall !== 0) {
+            this._wallCoyote = C.WALL_COYOTE;
+            this._wallSide = wall;
+        } else if (this._wallCoyote > 0) {
+            this._wallCoyote -= dt;
+        }
+
+        if (!grounded && this.buffer > 0 && this.coyote <= 0 && this._wallCoyote > 0 &&
+            this._wallSide !== this.lastWall) {
+            const side = this._wallSide;
+            this.vy = -C.WALL_JUMP_V;
+            this.vx = -side * C.WALL_KICK;
+            this.facing = -side;
+            this.lastWall = side;
+            this.buffer = 0;
+            this._wallCoyote = 0;
+            this._kickLock = C.WALL_JUMP_LOCK;
+            this.rising = true;
+            this.boosted = false;
+            this.fallSpeed = 0;
+            this.squash = -0.45;
+            this.bus.emit(TNT.EV.WALL_JUMP, { x: this.x + side * C.PLAYER_W / 2, y: this.y, side: side });
+            this.bus.emit(TNT.EV.PLAYER_JUMPED, { x: this.x, y: this.y });
+        }
 
         if (this.buffer > 0 && this.coyote > 0) {
             this.vy = -C.JUMP_V;
@@ -225,12 +288,13 @@
         /* ---- gravity, with the two multipliers that shape the arc ---- */
 
         let g = C.GRAVITY;
+        const held = this._holdingJump(input);
         if (this.vy < 0) {
             // Cutting the jump short is the variable-height mechanic. A bounce
             // is exempt: a trampoline is the level's decision about how high
             // you go, not the player's, and letting go mid-flight should not
             // strand you under the ledge it was aimed at.
-            if (this.rising && !this.boosted && !this._holdingJump(input)) {
+            if (this.rising && !this.boosted && !held) {
                 g *= C.CUT_GRAV_MUL;
             }
         } else {
@@ -238,7 +302,16 @@
             this.boosted = false;
             g *= C.FALL_GRAV_MUL;
         }
+        if (held && !grounded && Math.abs(this.vy) < C.APEX_HANG_V) g *= C.APEX_HANG_MUL;
         this.vy = Math.min(this.vy + g * dt, C.MAX_FALL);
+
+        // Pressed against a wall on the way down: slide, don't drop.
+        this.wallSlide = 0;
+        if (wall !== 0 && this.vy > 0 && ax === wall) {
+            this.vy = Math.min(this.vy, C.WALL_SLIDE_V);
+            this.fallSpeed = Math.min(this.fallSpeed, C.WALL_SLIDE_V);
+            this.wallSlide = wall;
+        }
 
         // Sliding down a ladder shaft rather than falling down it. See
         // `C.SLIDE_V` — this is what stops every ladder hole in the game from
@@ -272,6 +345,28 @@
             this.vx *= 0.86;
             this.vy = Math.min(this.vy, 90);
         }
+    };
+
+    /**
+     * Which side, if any, has a wall right against the body.
+     *
+     * Rock only — decks are one-way and have no side to push on — and the wall
+     * has to cover the body from the knee to the shoulder, so a lip of rock at
+     * foot height is a step, not a wall.
+     */
+    Player.prototype._wallBeside = function (room) {
+        const top = this.y - C.PLAYER_H + 3;
+        const bottom = this.y - 4;
+        for (const side of [1, -1]) {
+            const tx = Math.floor((this.x + side * (HALF_W + 1.5)) / C.TILE);
+            if (tx < 0 || tx >= C.COLS) continue;
+            let covered = true;
+            for (let py = top; py <= bottom; py += 6) {
+                if (!Tiles.isSolid(room.get(tx, Math.floor(py / C.TILE)))) { covered = false; break; }
+            }
+            if (covered && Tiles.isSolid(room.get(tx, Math.floor(bottom / C.TILE)))) return side;
+        }
+        return 0;
     };
 
     /** Launch off a trampoline. Higher than a jump, and not cuttable. */
@@ -350,6 +445,8 @@
 
     Player.prototype._startClimb = function (tx) {
         this.mode = 'climb';
+        this.lastWall = 0;
+        this.wallSlide = 0;
         this.climbCol = tx;
         this.vx = 0;
         this.vy = 0;
@@ -506,6 +603,8 @@
         if (room.get(tx, ty) !== T.ROPE) return false;
 
         this.mode = 'rope';
+        this.lastWall = 0;
+        this.wallSlide = 0;
         this.ropeRow = ty;
         this.vy = 0;
         this.fallSpeed = 0;
@@ -802,6 +901,7 @@
         if (this.mode === 'climb') return 'climb';
         if (this.mode === 'rope') return 'rope';
         if (this.mode === 'swim') return 'swim';
+        if (!this.onGround && this.wallSlide !== 0) return 'wall';
         if (!this.onGround) return this.vy < 0 ? 'rise' : 'fall';
         if (Math.abs(this.vx) > 22) return 'run';
         return 'idle';

@@ -390,6 +390,16 @@
             set(u.legL, s * 0.45, -0.3);
             set(u.legR, -s * 0.45, -0.3);
             u.head.rotation.z = 0.25;
+        } else if (pose === 'wall') {
+            // Pressed to the wall he is sliding down: palms flat on it, one
+            // knee braced against it, looking back over his shoulder for the
+            // kick.
+            set(u.armL, 2.2, 0.9);
+            set(u.armR, 1.4, 1.1);
+            set(u.legL, 0.9, -1.3);
+            set(u.legR, 0.1, -0.3);
+            u.body.rotation.x = 0;
+            u.head.rotation.z = 0.2;
         } else if (pose === 'rise') {
             // Tucked: knees up, arms thrown up and forward.
             set(u.legL, 1.0, -1.5);

@@ -497,6 +497,92 @@ check('a trampoline goes higher than a jump can', () => {
  * Rules
  * ------------------------------------------------------------------ */
 
+/**
+ * The wall-jump alternates walls.
+ *
+ * Off the same wall twice would climb any wall in the game, and every "four
+ * rows needs a ladder" in all twenty-seven rooms would become optional. This
+ * slides Tommy down the left frame wall, kicks off it, steers him back to the
+ * same wall and presses jump again — and requires that nothing happens.
+ */
+check('a wall-jump kicks off a wall, and not the same wall twice', () => {
+    const h = harness();
+    const p = h.run.player;
+    const room = h.run.room();
+
+    // Find open air against the left frame wall, high enough to slide.
+    let row = -1;
+    for (let ty = 4; ty < C.ROWS - 6 && row < 0; ty++) {
+        let clear = true;
+        for (let k = 0; k < 4; k++) {
+            if (room.get(1, ty + k) !== C.Tile.EMPTY || room.get(2, ty + k) !== C.Tile.EMPTY) clear = false;
+        }
+        if (clear && Tiles.isSolid(room.get(0, ty + 1))) row = ty;
+    }
+    assert(row >= 0, 'no open wall face in the start room to test against');
+
+    p.placeAt(C.TILE + C.PLAYER_W / 2 + 1, (row + 2) * C.TILE);
+    p.mode = 'walk';
+    p.onGround = false;
+    p.vy = 60;
+    h.hold(['left']);
+    h.step(20);
+    assert(p.wallSlide === -1, 'holding into the wall while falling did not slide (wallSlide ' + p.wallSlide + ')');
+    assert(p.vy <= C.WALL_SLIDE_V + 1, 'sliding, but falling at ' + p.vy.toFixed(0));
+
+    h.tap('jump');
+    h.step(1);
+    assert(p.vy < -C.WALL_JUMP_V * 0.9, 'jump against the wall did not kick (vy ' + p.vy.toFixed(0) + ')');
+    assert(p.vx > 0, 'the kick did not push away from the wall (vx ' + p.vx.toFixed(0) + ')');
+
+    // Back to the same wall, falling again, and jump: it must refuse.
+    p.placeAt(C.TILE + C.PLAYER_W / 2 + 1, (row + 2) * C.TILE);
+    p.onGround = false;
+    p.lastWall = -1;
+    p.vy = 60;
+    h.hold(['left']);
+    h.step(20);
+    h.tap('jump');
+    h.step(1);
+    assert(p.vy > 0, 'kicked off the same wall twice (vy ' + p.vy.toFixed(0) + ')');
+    return 'slid at ' + C.WALL_SLIDE_V + 'px/s, kicked, and refused the repeat';
+});
+
+/**
+ * Stomps chain: each one before touching down is worth one more multiple.
+ */
+check('stomps chain without touching the ground', () => {
+    const h = harness();
+    const p = h.run.player;
+    let ents = null;
+    for (let i = 0; i < h.run.mine.rooms.length; i++) {
+        h.run.roomIndex = i;
+        ents = h.run.ents();
+        if (ents.enemies.filter(e => e.kind !== 'guardian').length >= 2) break;
+    }
+    const targets = ents.enemies.filter(e => e.kind !== 'guardian');
+    assert(targets.length >= 2, 'no room in mine 1 has two enemies to chain');
+
+    const stomp = function (e) {
+        const b = e.box();
+        const before = h.run.score;
+        p.placeAt(b.x, b.y - b.h / 4);
+        p.mode = 'walk';
+        p.onGround = false;
+        p.invuln = 0;
+        p.vy = C.STOMP_MIN_V * 2;
+        h.run.hitstop = 0;
+        h.step(1);
+        assert(e.dead, 'the ' + e.kind + ' survived the stomp');
+        return h.run.score - before;
+    };
+    const first = stomp(targets[0]);
+    const second = stomp(targets[1]);
+    assert(second === first * 2, 'second stomp in a chain scored ' + second + ', first ' + first);
+    assert(h.run.hitstop > 0, 'a stomp did not hold the simulation');
+    return first + ' then ' + second;
+});
+
 console.log('\nrules');
 
 check('the fuse burns down and food puts it back', () => {

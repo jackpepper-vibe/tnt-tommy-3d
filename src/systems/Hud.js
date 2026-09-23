@@ -130,7 +130,8 @@
         });
 
         bus.on(EV.ENEMY_STOMPED, function (e) {
-            self.float('+' + C.SCORE_STOMP, e.x, e.y - 10, 'gold');
+            const chain = e.chain > 1 ? '  x' + e.chain : '';
+            self.float('+' + e.points + chain, e.x, e.y - 10, 'gold');
         });
     };
 

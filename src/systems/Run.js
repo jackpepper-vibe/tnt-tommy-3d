@@ -71,6 +71,10 @@
         this._checkpointDwell = 0;
         this._timer = 0;
         this._transition = null;
+        /** Seconds the simulation is held for an impact. See `C.HITSTOP_STOMP`. */
+        this.hitstop = 0;
+        /** Stomps since Tommy last touched the ground. */
+        this.stompChain = 0;
         this.best = loadBest();
     }
 
@@ -138,6 +142,12 @@
      * ------------------------------------------------------------------ */
 
     Run.prototype.update = function (dt, input) {
+        // Hit-stop freezes everything — the fuse, the patrols, Tommy — and
+        // leaves the renderer drawing, so an impact reads as a blow.
+        if (this.hitstop > 0) {
+            this.hitstop -= dt;
+            return;
+        }
         this._timer += dt;
 
         switch (this.state) {
@@ -171,6 +181,7 @@
 
     Run.prototype._updatePlaying = function (dt, input) {
         this.elapsed += dt;
+        this._jumpHeld = input.isDown('jump') || input.isDown('up');
 
         this._burnFuse(dt);
         if (this.state !== 'playing') return;
@@ -183,6 +194,7 @@
         this.player.update(dt, room, input, ents);
         this.player.carry();
         this.dog.update(dt, this.player);
+        if (this.player.onGround || this.player.mode !== 'walk') this.stompChain = 0;
 
         if (this._checkWarp(input)) return;
         if (input.justPressed('plant')) this._plant();
@@ -260,10 +272,14 @@
 
     Run.prototype._collectPickups = function () {
         const ents = this.ents();
-        const pb = this.player.box();
+        const player = this.player;
+        const pb = player.box();
 
         for (const p of ents.pickups) {
             if (p.taken) continue;
+            // Nuggets close by drift in, so a deck is swept rather than
+            // picked over pixel by pixel.
+            if (p.kind === 'ore') p.attract(player.x, player.centreY(), C.FIXED_DT);
             const b = p.box();
             if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
 
@@ -408,12 +424,22 @@
             if (p.vy > C.STOMP_MIN_V && p.y <= b.y + b.h * C.STOMP_BAND) {
                 e.dead = true;
                 if (typeof e.onStomped === 'function') e.onStomped();
-                this.score += C.SCORE_STOMP;
-                p.vy = -C.STOMP_BOUNCE;
+                /*
+                 * Chains: every stomp before Tommy touches down again is worth
+                 * one more multiple of the last. It turns a room of patrols
+                 * from a set of things to avoid into a thing to *use* — hop
+                 * from head to head and the score climbs.
+                 */
+                this.stompChain = Math.min(C.STOMP_CHAIN_MAX, this.stompChain + 1);
+                const points = C.SCORE_STOMP * this.stompChain;
+                this.score += points;
+                p.vy = -(this._jumpHeld ? C.STOMP_BOUNCE_HELD : C.STOMP_BOUNCE);
                 p.rising = true;
                 p.onGround = false;
                 p.fallSpeed = 0;
-                this.bus.emit(EV.ENEMY_STOMPED, { x: b.x, y: b.y, kind: e.kind });
+                this.hitstop = C.HITSTOP_STOMP;
+                this.bus.emit(EV.ENEMY_STOMPED, { x: b.x, y: b.y, kind: e.kind, chain: this.stompChain, points: points });
+                this.bus.emit(EV.SHAKE, { amount: 0.35 + this.stompChain * 0.05, seconds: 0.14 });
                 continue;
             }
 
@@ -469,6 +495,8 @@
         const p = this.player;
         this.energy -= amount;
         p.knock(knockDir);
+        this.hitstop = C.HITSTOP_HURT;
+        this.stompChain = 0;
         this.bus.emit(EV.PLAYER_HURT, { x: p.x, y: p.y, cause: cause, amount: amount });
         this.bus.emit(EV.SHAKE, { amount: 0.55, seconds: 0.22 });
         if (this.energy <= 0) {
@@ -570,6 +598,7 @@
             }
         }
 
+        if (bomb.room === this.roomIndex) this.hitstop = Math.max(this.hitstop, C.HITSTOP_BLAST);
         this.bus.emit(EV.BLAST, { x: bomb.x, y: bomb.y, broke: broke, killed: killed });
         this.bus.emit(EV.SHAKE, { amount: 1, seconds: 0.4 });
     };

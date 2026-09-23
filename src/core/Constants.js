@@ -155,6 +155,47 @@
     C.AIR_MAX = 150;
     C.AIR_DRAG = 220;
 
+    /* ---- feel ---- */
+
+    /**
+     * Turning round on the ground is faster than speeding up.
+     *
+     * Reversing at full speed used to take the same tenth of a second as
+     * starting from rest, and on a narrow deck over a spike bed that tenth is
+     * the difference between turning round and walking off the end. A skid is
+     * shown, so the snap reads as a deliberate stop rather than a glitch.
+     */
+    C.TURN_ACC_MUL = 2.4;
+
+    /**
+     * Apex hang: gravity eases off near the top of a held jump.
+     *
+     * It is the few frames of float every good platformer has at the peak — the
+     * moment the player adjusts their landing. Worth under a pixel of height, so
+     * the three-row rule is untouched; `scripts/smoke.mjs` measures the apex in
+     * the simulation, not just on paper, to keep it that way.
+     */
+    C.APEX_HANG_V = 70;
+    C.APEX_HANG_MUL = 0.55;
+
+    /**
+     * Walls: slide down them, and kick off them.
+     *
+     * A wall-jump **must alternate walls**. Off one wall and then the other is
+     * how you climb a chimney, and that is a skill worth having; off the same
+     * wall twice is how you climb *any* wall, which would make every "four rows
+     * needs a ladder" in the game negotiable. So the side you last kicked off
+     * is locked until you touch the ground, a ladder or a rope.
+     *
+     * The kick's height is a jump's height at most — `WALL_JUMP_V` clears three
+     * rows exactly — so even a chimney climb is three rows at a time.
+     */
+    C.WALL_SLIDE_V = 96;
+    C.WALL_JUMP_V = 382;
+    C.WALL_KICK = 178;
+    C.WALL_JUMP_LOCK = 0.16;   // s of lost air control toward the wall after a kick
+    C.WALL_COYOTE = 0.08;
+
     C.CLIMB_V = 108;           // ladder, up and down
     C.VINE_V = 88;             // hanging rope — deliberately slower than a ladder
 
@@ -242,6 +283,22 @@
      * Game feel
      * ------------------------------------------------------------------ */
 
+    /**
+     * Hit-stop: the whole simulation holds for a few frames on an impact.
+     *
+     * The single cheapest way to make a hit *land*. A stomp that kills with no
+     * pause reads as the enemy disappearing; the same stomp with seventy
+     * milliseconds of freeze reads as a blow. The renderer keeps drawing
+     * through it, so the shake and the particles carry the moment.
+     */
+    C.HITSTOP_STOMP = 0.07;
+    C.HITSTOP_HURT = 0.12;
+    C.HITSTOP_BLAST = 0.06;
+
+    /** Nuggets drift to Tommy from this close, so sweeping a deck feels generous. */
+    C.MAGNET_R = 30;
+    C.MAGNET_V = 240;
+
     C.HURT_INVULN = 1.1;       // s of invulnerability after taking a hit
     C.RESPAWN_INVULN = 1.8;
     C.DEATH_FREEZE = 0.9;      // s of death animation before the respawn
@@ -307,6 +364,15 @@
     C.STOMP_MIN_V = 120;       // px/s of fall needed for a landing to count
     C.STOMP_BAND = 0.35;       // how far below the enemy's centre the feet may be
     C.STOMP_BOUNCE = 300;      // px/s up off the kill — below a full jump's 410
+    /**
+     * Holding jump through a stomp bounces higher — the standard reward for
+     * timing it — but never a full jump. From an enemy's head a full jump
+     * would clear four rows, and the three-row rule is not something an enemy
+     * standing in the right place should be able to break.
+     */
+    C.STOMP_BOUNCE_HELD = 372;
+    /** Each stomp in a chain, without touching the ground, scores this many more times. */
+    C.STOMP_CHAIN_MAX = 8;
     C.SCORE_STOMP = 150;
 
     /**

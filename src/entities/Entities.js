@@ -65,6 +65,9 @@
         /** Bob phase, fixed per pickup so the room breathes rather than pulses. */
         this.phase = (tx * 7 + ty * 13) % 100 / 100 * Math.PI * 2;
         this.t = 0;
+        /** Offset from home while being drawn in by the magnet. */
+        this.pullX = 0;
+        this.pullY = 0;
     }
 
     Pickup.prototype.update = function (dt) {
@@ -78,12 +81,26 @@
             }
             return;
         }
-        this.y = this.homeY + Math.sin(this.t * 2.4 + this.phase) * 1.8;
+        this.x = this.homeX + this.pullX;
+        this.y = this.homeY + this.pullY + Math.sin(this.t * 2.4 + this.phase) * 1.8;
+    };
+
+    /** Drift toward a point, if it is within `C.MAGNET_R`. */
+    Pickup.prototype.attract = function (px, py, dt) {
+        const dx = px - this.x, dy = py - this.y;
+        const d = Math.hypot(dx, dy);
+        if (d > C.MAGNET_R || d < 0.5) return;
+        const step = Math.min(d, C.MAGNET_V * dt * (1.4 - d / C.MAGNET_R));
+        this.pullX += dx / d * step;
+        this.pullY += dy / d * step;
+        this.x = this.homeX + this.pullX;
+        this.y = this.homeY + this.pullY;
     };
 
     Pickup.prototype.take = function () {
         this.taken = true;
         this.timer = this.spec.respawn;
+        this.pullX = this.pullY = 0;
     };
 
     Pickup.prototype.box = function () {
