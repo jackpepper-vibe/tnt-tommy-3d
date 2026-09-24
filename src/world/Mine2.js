@@ -356,14 +356,6 @@
 
                 g.ladder(36, 5, 22);
 
-                /*
-                 * The door from the Engine Room is shuttered from this side. First time
-                 * through, this room is reached from above; the lever by the door makes
-                 * it a short cut for the run back.
-                 */
-                g.gate(1, 19, 4);
-                g.lever(6, 22);
-
                 g.hook(14, 6);
                 g.hook(9, 9);
             }

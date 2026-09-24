@@ -461,13 +461,6 @@
                 g.crawler(34, 16);
                 g.orb(19, 16);
 
-                /*
-                 * The door on to the Last Vault is shuttered; the lever is on the high
-                 * deck. The vault can still be reached up the Chimney.
-                 */
-                g.gate(40, 19, 4);
-                g.lever(33, 4);
-
                 g.hook(16, 6);
             }
         },

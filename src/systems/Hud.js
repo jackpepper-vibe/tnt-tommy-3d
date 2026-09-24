@@ -141,6 +141,10 @@
             self.toast('THE DOG HAS FOUND SOMETHING', 'good');
         });
 
+        bus.on(EV.GATE_SHUT, function () {
+            self.toast('SHUT — THERE IS A LEVER IN THIS ROOM', 'bad');
+        });
+
         bus.on(EV.LEVER_THROWN, function () {
             self.toast('A GATE WINDS OPEN', 'good');
         });

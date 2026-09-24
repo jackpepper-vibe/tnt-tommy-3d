@@ -898,24 +898,36 @@ check('the dog points at a hidden cog and the cog shows itself', () => {
     return 'revealed from ' + (C.SNIFF_R / C.TILE) + ' tiles';
 });
 
+/**
+ * No room ships a gate at the moment — the doorway gates read as bugs and were
+ * taken out — so this builds one into a room to keep the mechanic honest for
+ * the next time a room uses it.
+ */
 check('a lever opens every gate in its room', () => {
     const h = harness();
     const run = h.run;
-    const idx = run.entities.findIndex(e => e.gates.length);
-    assert(idx >= 0, 'no gated room in mine 1');
-    run.roomIndex = idx;
     const ents = run.ents();
-    const g0 = ents.gates[0];
-    assert(Tiles.isSolid(run.room().get(g0.tx, g0.ty)), 'a shut gate is not solid');
-    const lever = ents.levers[0];
+    const room = run.room();
+    const M = TNT.Machines;
+    let gx = -1, gy = C.ROWS - 2;
+    for (let tx = 10; tx < C.COLS - 10 && gx < 0; tx++) {
+        if (room.get(tx, gy) === C.Tile.EMPTY && room.get(tx, gy - 1) === C.Tile.EMPTY) gx = tx;
+    }
+    assert(gx >= 0, 'nowhere on the floor to put a test gate');
+    room.set(gx, gy, C.Tile.GATE);
+    room.set(gx, gy - 1, C.Tile.GATE);
+    ents.gates.push(new M.Gate(gx, gy), new M.Gate(gx, gy - 1));
+    const lever = new M.Lever(gx - 4, gy);
+    ents.levers.push(lever);
+    assert(Tiles.isSolid(room.get(gx, gy)), 'a shut gate is not solid');
     run.player.placeAt(lever.x, lever.y);
     run.player.invuln = 5;
     h.step(1);
     assert(lever.thrown, 'walked into the lever and it did not throw');
     for (const g of ents.gates) {
-        assert(!Tiles.isSolid(run.room().get(g.tx, g.ty)), 'a gate stayed shut at (' + g.tx + ',' + g.ty + ')');
+        assert(!Tiles.isSolid(room.get(g.tx, g.ty)), 'a gate stayed shut at (' + g.tx + ',' + g.ty + ')');
     }
-    return ents.gates.length + ' gate tiles opened in ' + run.room().name;
+    return 'two gate tiles opened';
 });
 
 check('the plunger will not fire while the Governor runs', () => {
@@ -1007,6 +1019,53 @@ check('a heavy landing costs fuse, and never kills', () => {
     run.bus.emit(TNT.EV.PLAYER_LANDED, { x: 0, y: 0, speed: C.FALL_SAFE - 10, hard: false });
     assert(run.energy === 50, 'a safe landing cost fuse');
     return 'costs ' + C.FALL_DMG + ', floors at 1';
+});
+
+/**
+ * Every exit of every room, walked or climbed for real.
+ *
+ * The reachability pass proves the *content* can be reached; this proves the
+ * *doors* can be used. It exists because shuttered gates were once put across
+ * three doorways on the main route — the validator was satisfied, since each
+ * gated room could be reached another way, and a player walked into a locked
+ * door in the second room of the game and reasonably took it for a bug.
+ */
+check('every doorway and shaft in every mine can be passed through', () => {
+    let tried = 0;
+    const stuck = [];
+    for (let m = 0; m < 3; m++) {
+        const probe = new Run();
+        probe.mines[m].rooms.forEach(function (room, idx) {
+            for (const dir in room.exits) {
+                tried++;
+                const h = harness();
+                if (m) h.run.startMine(m);
+                const run = h.run;
+                run.roomIndex = idx;
+                run.energy = 1e6;
+                const p = run.player;
+                const r = run.room();
+                let hold;
+                if (dir === 'right') { p.reset(C.ROOM_W - 3 * C.TILE, C.ROOM_H - C.TILE, true); hold = 'right'; }
+                else if (dir === 'left') { p.reset(3 * C.TILE, C.ROOM_H - C.TILE, true); hold = 'left'; }
+                else if (dir === 'up') {
+                    let ty = 1;
+                    while (ty < C.ROWS - 1 && Tiles.isClimbable(r.get(20, ty))) ty++;
+                    p.reset(20.5 * C.TILE, ty * C.TILE, true); hold = 'up';
+                } else {
+                    let ty = C.ROWS - 2;
+                    while (ty > 1 && Tiles.isClimbable(r.get(20, ty))) ty--;
+                    p.reset(20.5 * C.TILE, (ty + 1) * C.TILE, true); hold = 'down';
+                }
+                p.active = true;
+                h.hold([hold]);
+                for (let i = 0; i < 1200 && run.roomIndex === idx; i++) { p.invuln = 99; h.step(1); }
+                if (run.roomIndex === idx) stuck.push(C.MINES[m].name + '/' + room.id + ' ' + dir);
+            }
+        });
+    }
+    assert(!stuck.length, 'could not leave by: ' + stuck.join(', '));
+    return tried + ' exits, all passable';
 });
 
 console.log('\nmachinery');

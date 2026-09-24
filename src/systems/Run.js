@@ -420,6 +420,7 @@
     Run.prototype._checkLevers = function () {
         const ents = this.ents();
         if (!ents.levers.length) return;
+        this._hintGate(ents);
         const pb = this.player.box();
         for (const lever of ents.levers) {
             if (lever.thrown) continue;
@@ -429,6 +430,27 @@
                 this.bus.emit(EV.LEVER_THROWN, { x: lever.x, y: lever.y });
                 this.bus.emit(EV.SHAKE, { amount: 0.25, seconds: 0.3 });
             }
+        }
+    };
+
+    /**
+     * Pushing against a shut gate says what it is.
+     *
+     * A shutter with no explanation reads as a door that is broken — the first
+     * gates in the game sat across doorways, and a player took them for a bug.
+     * So walking into one says there is a lever, once per approach.
+     */
+    Run.prototype._hintGate = function (ents) {
+        const p = this.player;
+        if (this._gateHintT > 0) { this._gateHintT -= C.FIXED_DT; return; }
+        const dir = p.facing >= 0 ? 1 : -1;
+        const tx = Math.floor((p.x + dir * (C.PLAYER_W / 2 + 2)) / C.TILE);
+        const ty = Math.floor((p.y - 4) / C.TILE);
+        for (const g of ents.gates) {
+            if (g.open || g.tx !== tx || g.ty !== ty) continue;
+            this._gateHintT = 4;
+            this.bus.emit(EV.GATE_SHUT, { x: g.tx * C.TILE + C.TILE / 2, y: g.ty * C.TILE });
+            return;
         }
     };
 

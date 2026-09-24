@@ -138,16 +138,6 @@
 
                 // The only long climb: floor to the powder shelf.
                 g.ladder(12, 11, 16);
-
-                /*
-                 * The first gate in the game. The door on to the Deep Cut is
-                 * shuttered and the lever is on the roof deck at the far end,
-                 * so the room's lesson changes from "cross it" to "climb it" —
-                 * and the Deep Cut can still be reached from above by anyone
-                 * who would rather not.
-                 */
-                g.gate(40, 19, 4);
-                g.lever(34, 4);
             }
         },
 
