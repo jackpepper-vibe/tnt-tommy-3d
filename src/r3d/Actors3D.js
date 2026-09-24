@@ -1050,6 +1050,8 @@
      * it has to be identifiable at a glance from across a room, at maybe twenty
      * pixels — and no amount of colour rescues the wrong shape.
      */
+    const PICKUP_SCALE = { ore: 1.4, food: 1.5, cog: 1.2 };
+
     const PICKUP_RIGS = {
         /** A bundle of sticks under a strap, with a fuse out of the top. */
         tnt: function (b) {
@@ -1065,28 +1067,73 @@
             b.cyl(0.06, 0.45, 0, 0.028, 0.12, 'x', R3D.col('#7a6038'), 6);
         },
         /**
-         * A struck coin, standing on its edge.
+         * A minted gold coin, standing on its edge.
          *
-         * Bigger than it was by half. These are the thing you cross a room for
-         * and there are only a handful per deck, so a small dull disc reads as
-         * litter — a collectible has to look worth the detour. Thick edge,
-         * bright rim, and a stamped face that catches the light as it turns.
+         * The first two passes were a flat disc and then a ring — both read as
+         * a washer at room scale. What makes a coin read as a *coin* is relief:
+         * a raised rim that catches the light, a milled edge, and something
+         * stamped in the middle. Here that is a five-point star on both faces,
+         * raised off a slightly sunken field, so as it spins the light runs
+         * round the rim and across the star.
          */
         ore: function (b) {
-            const gold = R3D.col('#f0bb26');
-            const rim = R3D.col('#fff0a0');
-            const cut = R3D.col('#9c6b0e');
-            b.cyl(0, 0, 0, 0.28, 0.085, 'z', gold, 16, rim);
-            for (const s of [1, -1]) {
-                b.cyl(0, 0, s * 0.044, 0.215, 0.014, 'z', cut, 16);
-                b.cyl(0, 0, s * 0.05, 0.115, 0.014, 'z', rim, 12);
+            const gold = R3D.col('#e8a91c');
+            const field = R3D.col('#c98a12');
+            const lit = R3D.col('#fff0a0');
+            const R = 0.3, T = 0.1;
+            b.cyl(0, 0, 0, R * 0.86, T * 0.8, 'z', field, 24, field);       // sunken field
+            // Raised rim, as a ring of short bars, and milling round the edge.
+            const n = 28;
+            for (let k = 0; k < n; k++) {
+                const a = (k / n) * Math.PI * 2;
+                b.rbox(Math.cos(a) * R * 0.93, Math.sin(a) * R * 0.93, 0, (2 * Math.PI * R) / n + 0.01,
+                       R * 0.15, T, a + Math.PI / 2, gold, lit);
+                if (k % 2 === 0) {
+                    b.rbox(Math.cos(a) * R * 1.0, Math.sin(a) * R * 1.0, 0, 0.018, 0.02, T * 0.9,
+                           a + Math.PI / 2, lit);
+                }
+            }
+            // The star, stamped on both faces.
+            for (const side of [1, -1]) {
+                const z = side * T * 0.42;
+                for (let k = 0; k < 5; k++) {
+                    const a = Math.PI / 2 + (k / 5) * Math.PI * 2;
+                    b.rbox(Math.cos(a) * R * 0.28, Math.sin(a) * R * 0.28, z, R * 0.52, R * 0.16, T * 0.35,
+                           a, gold, lit);
+                }
+                b.cyl(0, 0, z, R * 0.2, T * 0.36, 'z', lit, 12);
             }
         },
-        /** A tin billy-can with a lid. */
+        /**
+         * A miner's pasty on a checked cloth, still steaming.
+         *
+         * It was a tin can, and a small grey cylinder does not say "food" to
+         * anyone. A pasty is *the* miner's lunch, and its silhouette — a
+         * golden half-moon with a crimped crust along the top — reads as food
+         * from across a room. The red-and-white cloth under it is what makes it
+         * readable against dark iron.
+         */
         food: function (b) {
-            b.cyl(0, -0.02, 0, 0.19, 0.3, 'y', R3D.col('#b0784a'), 12, R3D.col('#caa06a'));
-            b.cyl(0, 0.16, 0, 0.2, 0.05, 'y', R3D.col('#8fae5a'), 12);
-            b.cyl(0, 0.22, 0, 0.05, 0.08, 'y', R3D.col('#6b4a28'), 8);
+            const crust = R3D.col('#d88f34'), crustLit = R3D.col('#ffd07a');
+            const base = R3D.col('#9a5a1c');
+            // The cloth: a three-by-three check.
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const red = (i + j) % 2 === 0;
+                    b.box(-0.24 + i * 0.16, -0.16, -0.16 + j * 0.16, 0.16, 0.025, 0.16,
+                          R3D.col(red ? '#d43a2e' : '#f4efe4'), F.ALL);
+                }
+            }
+            // The pasty: a squashed half-dome, flat underneath.
+            b.ellipsoid(0, -0.14, 0, 0.3, 0.2, 0.17, crust, 16, 8, 0.5, base);
+            // The crimp: a row of pinched knuckles along the top seam.
+            for (let k = 0; k <= 8; k++) {
+                const a = Math.PI * (0.1 + 0.8 * (k / 8));
+                const x = -Math.cos(a) * 0.29, y = -0.14 + Math.sin(a) * 0.2;
+                b.ellipsoid(x, y + 0.02, 0, 0.038, 0.042, 0.05, k % 2 ? crustLit : crust, 8, 5);
+            }
+            // Two steam cuts in the crust.
+            for (const x of [-0.08, 0.08]) b.rbox(x, -0.01, 0.15, 0.08, 0.018, 0.02, 0.5, base);
         },
         /** A helmet, since that is what a spare life is here. */
         heart: function (b) {
@@ -1394,6 +1441,9 @@
             // just rocks a little.
             mesh.rotation.set(0, p.kind === 'ore' ? t * 2.4 + p.phase : Math.sin(t + p.phase) * 0.25, 0);
             if (p.kind === 'cog') mesh.rotation.set(0, Math.sin(t * 0.8) * 0.4, t * 1.6);
+            // Drawn larger than their pick-up boxes: at room scale a coin the
+            // size of its box is a speck, and these are what you cross a room for.
+            mesh.scale.setScalar(PICKUP_SCALE[p.kind] || 1);
 
             if (p.spec.glow) {
                 /*
@@ -1407,14 +1457,36 @@
                  * colour, collectables need the extra push to stay the
                  * brightest thing on screen.
                  */
+                if (p.kind === 'ore') {
+                    // A glint across the face, once a turn, when it faces you.
+                    const face = Math.abs(Math.cos(t * 2.4 + p.phase));
+                    if (face > 0.93) {
+                        const glint = set.pools.glowSprite.next();
+                        glint.position.set(mesh.position.x + 0.08, mesh.position.y + 0.1, ACTOR_Z + 0.2);
+                        const g = (face - 0.93) / 0.07;
+                        glint.scale.set(0.5 * g, 0.5 * g, 1);
+                        tint(glint, '#ffffff', 0.9);
+                    }
+                }
+                if (p.kind === 'food') {
+                    // Steam off a hot pasty.
+                    for (let i = 0; i < 2; i++) {
+                        const k = (t * 0.7 + i * 0.5 + p.phase) % 1;
+                        const puff = set.pools.glowSprite.next();
+                        puff.position.set(mesh.position.x + Math.sin(k * 6 + i) * 0.06, mesh.position.y + 0.15 + k * 0.6,
+                                          ACTOR_Z - 0.05);
+                        puff.scale.set(0.18 + k * 0.3, 0.18 + k * 0.3, 1);
+                        tint(puff, '#fff4e0', 0.22 * Math.sin(k * Math.PI));
+                    }
+                }
                 const hot = p.kind === 'tnt' ? '#ffb060'
                     : (p.kind === 'oxygen' ? '#8fe4f4'
                     : (p.kind === 'heart' ? '#ffd0e0'
-                    : (p.kind === 'cog' ? '#fff4c8' : '#fff0a0')));
+                    : (p.kind === 'cog' ? '#fff4c8' : (p.kind === 'food' ? '#ffe2b0' : '#fff0a0'))));
                 const warm = p.kind === 'tnt' ? '#ff7a2c'
                     : (p.kind === 'oxygen' ? '#3ab4d8'
                     : (p.kind === 'heart' ? '#ff6a94'
-                    : (p.kind === 'cog' ? '#ffb030' : '#ffc41e')));
+                    : (p.kind === 'cog' ? '#ffb030' : (p.kind === 'food' ? '#ff9a3c' : '#ffc41e'))));
 
                 const pulse = 0.9 + Math.sin(t * 3 + p.phase) * 0.1;
                 const core = set.pools.glowSprite.next();
@@ -1498,11 +1570,17 @@
                 mesh.rotation.y = 0;
                 if (e.state === 'hang') mesh.scale.setScalar(1.1);
             } else if (e.kind === 'guardian') {
-                mesh.rotation.y = Math.sin(t * 0.9) * 0.5;
+                // Chasing: a hard blue glow. Resting: dim and sagging — the
+                // window. Idle at its post: a slow pulse.
+                const resting = e.state === 'rest';
+                mesh.rotation.y = resting ? 0 : Math.sin(t * 0.9) * 0.5;
+                if (resting) mesh.position.y -= 0.12;
                 const halo = set.pools.glowSprite.next();
                 halo.position.set(mesh.position.x, mesh.position.y, ACTOR_Z - 0.1);
-                halo.scale.set(2.4, 2.4, 1);
-                tint(halo, '#7fb0ff', 0.3);
+                const s = resting ? 1.2 : (e.state === 'chase' ? 2.6 : 2.0 + Math.sin(t * 2) * 0.2);
+                halo.scale.set(s, s, 1);
+                tint(halo, resting ? '#3a4a66' : (e.state === 'chase' ? '#8fc0ff' : '#5f86c0'),
+                     resting ? 0.2 : 0.38);
             } else if (e.kind === 'dog') {
                 // Braced before a charge: dips, and holds.
                 if (e.state === 'rouse') mesh.position.y -= 0.06;

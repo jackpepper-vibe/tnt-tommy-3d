@@ -47,7 +47,7 @@
     const PICKUP_SPEC = {
         tnt:    { w: 10, h: 14, score: C.SCORE_TNT,   glow: true,  respawn: 0 },
         ore:    { w: 9,  h: 9,  score: C.SCORE_ORE,   glow: true,  respawn: 0 },
-        food:   { w: 11, h: 11, score: C.SCORE_FOOD,  glow: false, respawn: C.FOOD_RESPAWN },
+        food:   { w: 11, h: 11, score: C.SCORE_FOOD,  glow: true,  respawn: C.FOOD_RESPAWN },
         heart:  { w: 12, h: 11, score: C.SCORE_HEART, glow: true,  respawn: 0 },
         oxygen: { w: 10, h: 14, score: 0,             glow: true,  respawn: 0 },
         cog:    { w: 14, h: 14, score: C.SCORE_COG,   glow: true,  respawn: 0 }
@@ -130,7 +130,7 @@
         dog:      { w: 15, h: 11, speed: 46, damage: C.DMG_ENEMY },
         bat:      { w: 14, h: 10, speed: 74, damage: C.DMG_ENEMY },
         spider:   { w: 11, h: 11, speed: 110, damage: C.DMG_ENEMY },
-        guardian: { w: 13, h: 13, speed: 40, damage: C.DMG_ENEMY },
+        guardian: { w: 13, h: 13, speed: 30, damage: C.DMG_ENEMY },
         orb:      { w: 11, h: 11, speed: 70, damage: C.DMG_ENEMY }
     };
 
@@ -458,6 +458,9 @@
         this.x = this.homeX;
         this.y = this.homeY;
         this.reformIn = 0;
+        /** 'idle' at its post, 'chase', or 'rest' between bursts. */
+        this.state = 'idle';
+        this.timer = 0;
         void room;
     }
 
@@ -489,11 +492,40 @@
         this.t += dt;
         if (!player || !player.active) return;
 
-        const tx = player.x;
-        const ty = player.centreY();
+        let tx = player.x;
+        let ty = player.centreY();
+        const far = Math.hypot(tx - this.x, ty - this.y);
+
+        /*
+         * It hunts in bursts, and only what it can nearly see.
+         *
+         * It used to home in on Tommy from anywhere in the room, through
+         * anything, without a break — play-testing found it the enemy most
+         * likely to end a life, because there was never a moment to get away
+         * from it. Now it wakes only when he is within `SENTINEL_WAKE`, gives up
+         * and drifts home once he is past `SENTINEL_LOSE`, and after each burst
+         * of chasing it stops to recharge, its lamp dimmed — the window to put
+         * distance between you, or to land on it.
+         */
+        if (this.state === 'rest') {
+            this.timer -= dt;
+            if (this.timer <= 0) { this.state = 'chase'; this.timer = SENTINEL_CHASE; }
+            return;
+        }
+        if (this.state === 'idle') {
+            if (far < SENTINEL_WAKE) { this.state = 'chase'; this.timer = SENTINEL_CHASE; }
+            tx = this.homeX;
+            ty = this.homeY;
+        } else {
+            this.timer -= dt;
+            if (far > SENTINEL_LOSE) { this.state = 'idle'; }
+            else if (this.timer <= 0) { this.state = 'rest'; this.timer = SENTINEL_REST; return; }
+        }
+
         const dx = tx - this.x;
         const dy = ty - this.y;
         const d = Math.hypot(dx, dy) || 1;
+        if (this.state === 'idle' && d < 2) return;
 
         /*
          * It goes through rock, but not through water.
@@ -521,6 +553,11 @@
         const bob = Math.sin(this.t * 2.2) * 6 * dt;
         if (dry(this.x, this.y + bob)) this.y += bob;
     };
+
+    const SENTINEL_WAKE = C.TILE * 9;
+    const SENTINEL_LOSE = C.TILE * 14;
+    const SENTINEL_CHASE = 3.2;
+    const SENTINEL_REST = 1.8;
 
     Guardian.prototype.box = function () {
         return box(this.x, this.y, this.spec.w, this.spec.h);
@@ -560,7 +597,7 @@
      * standing still under a bat learns why not to.
      */
     const BAT_SWOOP = 0.95;
-    const BAT_REST = 2.4;
+    const BAT_REST = 3.4;
 
     Bat.prototype.update = function (dt, player) {
         if (this.dead) { this.deadT = (this.deadT || 0) + dt; return; }
@@ -1337,7 +1374,7 @@
             }
             if (e.kind === 'orb') e.y = e.minY;
             else if (e.kind === 'spider') { e.y = e.homeY; e.state = 'wait'; e.timer = SPIDER_WAIT; e.thread = 0; }
-            else if (e.kind === 'guardian') { e.x = e.homeX; e.y = e.homeY; e.reformIn = 0; }
+            else if (e.kind === 'guardian') { e.x = e.homeX; e.y = e.homeY; e.reformIn = 0; e.state = 'idle'; e.timer = 0; }
             else if (e.kind === 'dog') { e.x = e.minX; e.state = 'patrol'; e.timer = 0; }
             else e.x = e.minX;
         }

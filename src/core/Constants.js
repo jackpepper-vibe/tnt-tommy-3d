@@ -311,7 +311,11 @@
     C.MAGNET_R = 30;
     C.MAGNET_V = 240;
 
-    C.HURT_INVULN = 1.1;       // s of invulnerability after taking a hit
+    /**
+     * Invulnerability after a hit. Long enough to get clear of whatever did
+     * it, so one mistake is one hit and not a chain of them into a death.
+     */
+    C.HURT_INVULN = 1.7;
     C.RESPAWN_INVULN = 1.8;
     C.DEATH_FREEZE = 0.9;      // s of death animation before the respawn
     C.CHECKPOINT_DWELL = 0.35; // s stood safely on the ground before it counts
@@ -354,14 +358,24 @@
     C.DANGER_BELOW = 30;       // energy at which the danger track takes over
     C.DANGER_CLEAR = 42;       // and the energy it has to recover to before it lets go
 
-    C.DMG_ENEMY = 34;
-    C.DMG_RIVET = 24;          // a minecart bot's shot
-    C.DMG_RAIL = 24;           // standing on a live rail
-    C.DMG_HOOK = 30;           // struck by a swinging hook
-    C.DMG_SPIKE = 38;
-    C.DMG_VENT = 26;
-    C.DMG_CRUSH = 50;
-    C.DMG_BOULDER = 36;
+    /**
+     * What a hit costs, out of a full fuse of 100.
+     *
+     * Brought down across the board after play-testing found the game "a
+     * little too easy to die" in. At the old values three touches ended a life
+     * — and with more enemies that shoot, swoop and roll, three touches came
+     * quickly. Now it is four or five, and the fuse is still the thing that
+     * runs out if you play slowly, which is the pressure the game is meant to
+     * have. Crushers stay the dearest: a piston is always telegraphed.
+     */
+    C.DMG_ENEMY = 22;
+    C.DMG_RIVET = 16;          // a minecart bot's shot
+    C.DMG_RAIL = 16;           // standing on a live rail
+    C.DMG_HOOK = 20;           // struck by a swinging hook
+    C.DMG_SPIKE = 24;
+    C.DMG_VENT = 18;
+    C.DMG_CRUSH = 34;
+    C.DMG_BOULDER = 22;
     C.DROWN_RATE = 30;         // energy per second underwater without the tank
 
     /* ------------------------------------------------------------------ *

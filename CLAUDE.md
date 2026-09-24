@@ -200,7 +200,7 @@ gets slower and then dies, a long way from the cause.
 Three passes, and none of them is optional before pushing.
 
 ```
-node scripts/smoke.mjs           40 checks on the rules, headless, no browser
+node scripts/smoke.mjs           41 checks on the rules, headless, no browser
 node scripts/validate-world.mjs  reachability: sticks, valves, cogs, gates
 node scripts/check-rooms.mjs     build every room, report all faults at once
 node scripts/look.mjs [pose…]    captures on the REAL GPU — judge art from these

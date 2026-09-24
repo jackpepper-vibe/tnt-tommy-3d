@@ -39,6 +39,8 @@ const POSES = {
     hero:       { focus: true, eval: ['bare', 'TNT.game.put(9, 22)', 'TNT.game.step(30)'] },
     heroRun:    { focus: true, eval: ['bare', 'TNT.game.put(6, 22)', 'TNT.game.hold(["right"])', 'TNT.game.step(40)'] },
     heroJump:   { focus: true, eval: ['bare', 'TNT.game.put(6, 22)', 'TNT.game.hold(["jump"])', 'TNT.game.step(14)'] },
+    /* Close-up of the pickups on the start room's floor: a meal and two nuggets. */
+    pickups:    { focus: true, focusAt: [12, 22], eval: ['bare', 'TNT.game.put(5, 22)', 'TNT.game.step(20)'] },
     heroDog:    { focus: true, eval: ['bare', 'TNT.game.put(4, 22)', 'TNT.game.hold(["right"])', 'TNT.game.step(70)', 'TNT.game.hold([])', 'TNT.game.step(90)'] },
     heroClimb:  { focus: true, eval: ['bare', 'TNT.game.put(5, 12)', 'TNT.game.hold(["up"])', 'TNT.game.step(30)'] },
     /* A minecart bot winding up on Tommy, a rivet already in the air. */
@@ -164,13 +166,14 @@ for (const name of want) {
 
     const file = path.join(outDir, name + '.png');
     let clip;
+    if (pose.focusAt) await page.evaluate(a => { window.__focusAt = a; }, pose.focusAt);
     if (pose.focus) {
         // Project Tommy to the screen and crop round him.
         const at = await page.evaluate(() => {
             const scene = TNT.game.scene;
             const v = new THREE.Vector3();
-            scene.actors.tommy.getWorldPosition(v);
-            v.y += 0.6;
+            if (window.__focusAt) v.set(window.__focusAt[0] + 0.5, 24 - window.__focusAt[1] - 0.2, 0.45);
+            else { scene.actors.tommy.getWorldPosition(v); v.y += 0.6; }
             v.project(scene.camera);
             return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
         });

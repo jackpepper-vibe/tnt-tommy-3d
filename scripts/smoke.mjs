@@ -1068,6 +1068,39 @@ check('every doorway and shaft in every mine can be passed through', () => {
     return tried + ' exits, all passable';
 });
 
+/**
+ * The sentinel hunts in bursts, and only what is near. Play-testing found an
+ * always-on homing drone the likeliest thing in the game to end a life.
+ */
+check('a sentinel ignores Tommy far off, and rests between chases', () => {
+    const h = harness();
+    let e = null;
+    for (let i = 0; i < h.run.mine.rooms.length && !e; i++) {
+        e = h.run.entities[i].enemies.find(x => x.kind === 'guardian');
+        if (e) h.run.roomIndex = i;
+    }
+    assert(e, 'no sentinel in mine 1');
+    const p = h.run.player;
+    const far = e.homeX < C.ROOM_W / 2 ? C.ROOM_W - 2 * C.TILE : 2 * C.TILE;
+    p.reset(far, C.ROOM_H - C.TILE, true);
+    p.active = true;
+    h.run.energy = 1e6;
+    h.seconds(1, []);
+    assert(e.state === 'idle', 'woke from across the room (state ' + e.state + ')');
+    assert(Math.hypot(e.x - e.homeX, e.y - e.homeY) < 8, 'drifted off its post toward a distant Tommy');
+
+    // Now stand next to it and let it chase, and it must stop to rest.
+    let rested = false;
+    for (let i = 0; i < 6 / C.FIXED_DT && !rested; i++) {
+        p.placeAt(e.x + C.TILE * 3, e.y + C.PLAYER_H / 2 + C.TILE * 2);
+        p.invuln = 99;
+        h.step(1);
+        rested = e.state === 'rest';
+    }
+    assert(rested, 'chased for six seconds without a break');
+    return 'stayed home at range, rested after a burst';
+});
+
 console.log('\nmachinery');
 
 /** Start mine `m` and go to the first room whose entities satisfy `pick`. */
