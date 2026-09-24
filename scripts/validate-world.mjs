@@ -147,6 +147,14 @@ function warpPartners(room, tx, ty) {
     return [];
 }
 
+/** Rows of lift above a fan standing at (tx, ty), as `Machines.Fan` measures it. */
+function fanRows(room, tx, ty) {
+    let top = ty;
+    while (top > 1 && ty - top < C.FAN_ROWS && !Tiles.isSolid(room.get(tx, top - 1))) top--;
+    // The rider hovers a row or two under the top, so credit a little less.
+    return Math.max(JUMP_ROWS, ty - top - 2);
+}
+
 /* ------------------------------------------------------------------ *
  * Lifts
  * ------------------------------------------------------------------ */
@@ -349,7 +357,10 @@ function explore(mine) {
 
             // Jumping — the main verb, and the reason the decks are three rows
             // apart. A trampoline underfoot launches more than twice as far.
-            const height = room.get(tx, ty + 1) === T.TRAMPOLINE ? TRAMP_ROWS : JUMP_ROWS;
+            // A fan's column carries you up it; model it as a launch of the
+            // column's height, like a trampoline — see `Machines.Fan`.
+            const height = room.get(tx, ty + 1) === T.TRAMPOLINE ? TRAMP_ROWS
+                : room.get(tx, ty) === T.FAN ? fanRows(room, tx, ty) : JUMP_ROWS;
             for (const [nx, ny] of hops(roomIdx, tx, ty, height)) {
                 push(roomIdx, nx, ny, GROUND);
             }

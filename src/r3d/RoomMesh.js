@@ -571,6 +571,36 @@
                         catwalk(room, kit, pal, tx, ty);
                         break;
 
+                    case T.RAIL: {
+                        /*
+                         * A live rail: a catwalk carrying two copper conductors
+                         * on white insulators. The copper and the pots are the
+                         * tell before it ever sparks — nothing else on a deck
+                         * is that colour.
+                         */
+                        catwalk(room, kit, pal, tx, ty);
+                        const copper = R3D.col('#d07a3a'), copperLit = R3D.col('#ffb070');
+                        for (const dz of [-0.18, 0.18]) {
+                            p.box(x, y + 0.56, TRIM_Z + 0.07 + dz, 1, 0.05, 0.05, copper, F.ALL, copperLit);
+                        }
+                        for (const dz of [-0.18, 0.18]) {
+                            p.cyl(x, y + 0.51, TRIM_Z + 0.07 + dz, 0.05, 0.08, 'y', R3D.col('#e8e4d8'), 8);
+                        }
+                        break;
+                    }
+
+                    case T.FAN: {
+                        // The housing, flush with the floor; the blades turn in `Actors3D`.
+                        const iron = R3D.col(pal.iron), ironLit = R3D.col(pal.ironLit);
+                        p.cyl(x, y - 0.42, TRIM_Z, 0.48, 0.16, 'y', iron, 18, ironLit);
+                        p.cyl(x, y - 0.36, TRIM_Z, 0.42, 0.04, 'y', R3D.col(pal.ironDark), 18);
+                        for (let i = -2; i <= 2; i++) {
+                            p.box(x + i * 0.16, y - 0.33, TRIM_Z, 0.03, 0.03, 0.8, ironLit, F.SLAB);
+                        }
+                        g.cyl(x, y - 0.37, TRIM_Z, 0.36, 0.01, 'y', R3D.mixCol(pal.glass, '#000000', 0.7), 16);
+                        break;
+                    }
+
                     case T.LADDER: {
                         /*
                          * A steel ladder: flat-bar stiles, round rungs proud of

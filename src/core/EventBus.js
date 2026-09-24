@@ -95,6 +95,7 @@
         BOSS_DEFEATED: 'boss-defeated',   // {x, y}
         VALVE_OPENED: 'valve-opened',     // {x, y}
         UPGRADE_BOUGHT: 'upgrade-bought', // {id, level}
+        RAIL_LIVE: 'rail-live',           // {x, y}
         SHAKE: 'shake',                   // {amount, seconds}
         FLOAT_TEXT: 'float-text',         // {text, x, y, colour, seconds}
         STATE_CHANGED: 'state-changed'    // {from, to}

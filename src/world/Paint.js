@@ -229,6 +229,20 @@
         return this.fill(x, y, 1, h || 3, 'I');
     };
 
+    /**
+     * A floor fan, on the row a player stands in — like a vent. The air above
+     * it lifts, up to `C.FAN_ROWS` or the first rock. Put a deck to step off
+     * onto near the top of the column, or the ride goes nowhere.
+     */
+    Grid.prototype.fan = function (x, y) {
+        return this.set(x, y, 'A');
+    };
+
+    /** A run of live rail: a deck that is electrified on a cycle. */
+    Grid.prototype.rail = function (x, y, w) {
+        return this.fill(x, y, w, 1, 'Z');
+    };
+
     /* ------------------------------------------------------------------ *
      * Actors
      * ------------------------------------------------------------------ */
@@ -289,6 +303,8 @@
     Grid.prototype.lever = function (x, y) { return this.put('l', x, y); };
     /** One of the Governor's valves, standing on a deck. The vault has three. */
     Grid.prototype.valve = function (x, y) { return this.put('U', x, y); };
+    /** A swinging hook, pivoted in the open air under a roof. */
+    Grid.prototype.hook = function (x, y) { return this.put('k', x, y); };
 
     Grid.prototype.walker = function (x, y) { return this.put('B', x, y); };
     Grid.prototype.crawler = function (x, y) { return this.put('c', x, y); };
@@ -379,7 +395,7 @@
     };
 
     /** Characters that represent an actor rather than terrain. */
-    const ACTOR_CHARS = '@DCMHOBcdFSgoKPhvYlU';
+    const ACTOR_CHARS = '@DCMHOBcdFSgoKPhvYlUk';
 
     /**
      * The ladder that carries a vertical room link. Runs the full height of the

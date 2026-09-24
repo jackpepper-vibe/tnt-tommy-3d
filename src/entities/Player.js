@@ -305,6 +305,20 @@
         if (held && !grounded && Math.abs(this.vy) < C.APEX_HANG_V) g *= C.APEX_HANG_MUL;
         this.vy = Math.min(this.vy + g * dt, C.MAX_FALL);
 
+        /*
+         * Fans. The column lifts harder than gravity pulls, fading at its top
+         * so a rider hovers there; while in it nothing counts as a fall.
+         */
+        const lift = ents ? ents.updraft(this.x, this.centreY()) : 0;
+        if (lift > 0) {
+            this.vy = Math.max(this.vy - C.FAN_ACC * lift * dt, -C.FAN_V);
+            this.fallSpeed = 0;
+            this.rising = false;
+            this.boosted = true;
+            if (this.onGround && this.vy < 0) { this.onGround = false; this.ridingLift = null; }
+        }
+        this.inDraft = lift > 0;
+
         // Pressed against a wall on the way down: slide, don't drop.
         this.wallSlide = 0;
         if (wall !== 0 && this.vy > 0 && ax === wall) {
@@ -902,6 +916,7 @@
         if (this.mode === 'rope') return 'rope';
         if (this.mode === 'swim') return 'swim';
         if (!this.onGround && this.wallSlide !== 0) return 'wall';
+        if (!this.onGround && this.inDraft) return 'float';
         if (!this.onGround) return this.vy < 0 ? 'rise' : 'fall';
         if (Math.abs(this.vx) > 22) return 'run';
         return 'idle';

@@ -1044,6 +1044,9 @@
         this.bus = null;
         this.levers = [];
         this.gates = [];
+        this.fans = [];
+        this.rails = [];
+        this.hooks = [];
         /** The Governor, in the vault only. */
         this.boss = null;
         const valveMarks = [];
@@ -1101,6 +1104,9 @@
                 case 'valve':
                     valveMarks.push(s);
                     break;
+                case 'hook':
+                    this.hooks.push(new TNT.Machines.Hook(s.tx, s.ty, room));
+                    break;
                 default:
                     throw new Error(room.id + ': no entity for spawn kind "' + s.kind + '"');
             }
@@ -1112,7 +1118,13 @@
         for (let ty = 0; ty < C.ROWS; ty++) {
             for (let tx = 0; tx < C.COLS; tx++) {
                 const t = room.get(tx, ty);
-                if (t === T.GATE) {
+                if (t === T.FAN) {
+                    this.fans.push(new TNT.Machines.Fan(tx, ty, room));
+                } else if (t === T.RAIL && room.get(tx - 1, ty) !== T.RAIL) {
+                    let end = tx;
+                    while (room.get(end + 1, ty) === T.RAIL) end++;
+                    this.rails.push(new TNT.Machines.Rail(tx, end, ty));
+                } else if (t === T.GATE) {
                     this.gates.push(new TNT.Machines.Gate(tx, ty));
                 } else if (t === T.VENT) {
                     this.vents.push(new Vent(tx, ty));
@@ -1220,6 +1232,11 @@
         for (const e of this.enemies) e.update(dt, player, this);
         for (const l of this.levers) l.update(dt);
         for (const g of this.gates) g.update(dt);
+        for (const f of this.fans) f.update(dt);
+        for (const h of this.hooks) h.update(dt);
+        for (const r of this.rails) {
+            if (r.update(dt)) bus.emit(TNT.EV.RAIL_LIVE, { x: (r.tx0 + r.tx1 + 1) / 2 * C.TILE, y: r.ty * C.TILE });
+        }
         if (this.boss && player) this.boss.update(dt, player, this);
         for (let i = this.shots.length - 1; i >= 0; i--) {
             const s = this.shots[i];
@@ -1306,6 +1323,7 @@
 
         this.shots.length = 0;
         if (this.boss) this.boss.rewind();
+        for (const h of this.hooks) h.t = 0;
         for (const p of this.pickups) { p.pullX = p.pullY = 0; }
         for (const e of this.enemies) {
             e.dead = false;
@@ -1329,6 +1347,19 @@
         for (const b of this.boulders) { b.falling = false; b.phase = 0; b.y = b.homeY; b.vy = 0; }
         for (const v of this.vents) { v.phase = 0; v.state = 'idle'; v.height = 0; }
         for (const l of this.lifts) { l.t = 0; l.dir = 1; l.pause = 0; l.x = l.aX; l.y = l.aY; l.prevX = l.x; l.prevY = l.y; }
+    };
+
+    /** The fans' lift at a point, 0..1. */
+    RoomEntities.prototype.updraft = function (px, py) {
+        let lift = 0;
+        for (const f of this.fans) lift = Math.max(lift, f.lift(px, py));
+        return lift;
+    };
+
+    /** The rail run covering a tile, if any. */
+    RoomEntities.prototype.railAt = function (tx, ty) {
+        for (const r of this.rails) if (r.covers(tx, ty)) return r;
+        return null;
     };
 
     /** Put a shot in the air. Called by the patrols that shoot. */

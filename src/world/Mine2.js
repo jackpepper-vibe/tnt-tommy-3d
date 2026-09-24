@@ -38,6 +38,7 @@
             blurb: 'Down from the surface',
             cell: [0, 2],
             exits: { right: true, up: true },
+            works: 'winding',
             /**
              * The way in. Wider decks and a straight shaft, so a player who has
              * just lost a life in the middle of the mine has somewhere legible
@@ -82,6 +83,7 @@
             blurb: 'Rotten boards',
             cell: [1, 2],
             exits: { left: true, right: true, up: true },
+            works: 'stores',
             /**
              * Half this room's decking is rotten. Crumbling planks give way
              * under weight and come back a few seconds later, so the room is
@@ -127,6 +129,8 @@
                 g.orb(9, 10);
 
                 g.ladder(5, 8, 13);
+
+                g.hook(18, 1);
             }
         },
 
@@ -136,6 +140,7 @@
             blurb: 'It is rising',
             cell: [2, 2],
             exits: { left: true },
+            works: 'fans',
             flooding: true,
             /**
              * The flooding seam, and a dead end — so entering it is always a
@@ -192,6 +197,7 @@
             blurb: 'Standing water',
             cell: [0, 1],
             exits: { right: true, up: true, down: true },
+            works: 'tanks',
             /**
              * A flooded shaft you go down through, not a puddle you wade across.
              *
@@ -256,6 +262,7 @@
             blurb: 'Belts and pistons',
             cell: [1, 1],
             exits: { left: true, right: true, up: true, down: true },
+            works: 'flywheel',
             /**
              * The junction room — linked on all four sides — and the busiest in
              * the mine. Two conveyor decks running against each other, three
@@ -298,6 +305,10 @@
                 g.crawler(6, 19);
 
                 g.ladder(19, 5, 7);
+
+                // Two live rails, out of step with each other.
+                g.rail(15, 14, 8);
+                g.rail(16, 8, 9);
             }
         },
 
@@ -307,6 +318,7 @@
             blurb: 'The steep way up',
             cell: [2, 1],
             exits: { left: true, up: true },
+            works: 'winding',
             /**
              * A staircase room: the decks climb in a diagonal rather than
              * stacking, so the whole room is one long ascent with nowhere to
@@ -351,6 +363,9 @@
                  */
                 g.gate(1, 19, 4);
                 g.lever(6, 22);
+
+                g.hook(14, 6);
+                g.hook(9, 9);
             }
         },
 
@@ -364,6 +379,7 @@
             blurb: 'Ventilation',
             cell: [0, 0],
             exits: { right: true, down: true },
+            works: 'fans',
             /**
              * Vents in the floor and the roof beams, and a trampoline in the
              * corner that is the only way onto the top gallery. Overshooting it
@@ -402,6 +418,10 @@
                 g.crawler(12, 16);
                 g.orb(35, 10);
 
+
+                // Floor fans: rides up the two sides of the room.
+                g.fan(6, 22);
+                g.fan(38, 22);
             }
         },
 
@@ -411,6 +431,8 @@
             blurb: 'No lamps down here',
             cell: [1, 0],
             exits: { left: true, right: true, down: true },
+            /** A blackout: no lamps. The helmet, and whatever glows, is all there is. */
+            dark: true,
             /**
              * The long rope room. Two lines strung across the width of it, and
              * the decks deliberately broken underneath, so crossing the gallery

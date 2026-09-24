@@ -98,6 +98,12 @@ const POSES = {
             'TNT.game.step(260)'
         ]
     },
+    fans:       { eval: ['TNT.game.begin(1)', 'bare', 'TNT.game.room("fanHouse")', 'TNT.game.put(38, 22)', 'TNT.game.step(70)'] },
+    rails:      { eval: ['TNT.game.begin(1)', 'bare', 'TNT.game.room("engineRoom")', 'TNT.game.step(170)'] },
+    hooks:      { eval: ['TNT.game.begin(1)', 'bare', 'TNT.game.room("slantShaft")', 'TNT.game.step(100)'] },
+    dark:       { eval: ['TNT.game.begin(1)', 'bare', 'TNT.game.room("blackGallery")', 'TNT.game.step(60)'] },
+    flywheel:   { eval: ['bare', 'TNT.game.room("pumpHouse")', 'TNT.game.step(60)'] },
+    winding:    { eval: ['TNT.game.begin(2)', 'bare', 'TNT.game.room("theOverlook")', 'TNT.game.step(60)'] },
     bossNoWorks: {
         eval: [
             'bare', 'TNT.game.room("vault")',

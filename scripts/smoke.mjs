@@ -1009,6 +1009,74 @@ check('a heavy landing costs fuse, and never kills', () => {
     return 'costs ' + C.FALL_DMG + ', floors at 1';
 });
 
+console.log('\nmachinery');
+
+/** Start mine `m` and go to the first room whose entities satisfy `pick`. */
+function roomWhere(h, m, pick) {
+    if (m) h.run.startMine(m);
+    const i = h.run.entities.findIndex(pick);
+    if (i >= 0) h.run.roomIndex = i;
+    return i >= 0 ? h.run.entities[i] : null;
+}
+
+check('a fan carries Tommy up its column and lets him hover', () => {
+    const h = harness();
+    const ents = roomWhere(h, 1, e => e.fans.length);
+    assert(ents, 'no fan in Blackdamp');
+    const fan = ents.fans[0];
+    const p = h.run.player;
+    p.placeAt(fan.tx * C.TILE + C.TILE / 2, (fan.ty + 1) * C.TILE);
+    p.invuln = 99;
+    h.run.energy = 1e6;
+    const startY = p.y;
+    h.seconds(2.5, []);
+    const risen = (startY - p.y) / C.TILE;
+    assert(risen > C.JUMP_APEX / C.TILE, 'the fan lifted only ' + risen.toFixed(1) + ' rows');
+    assert(p.y / C.TILE > fan.top - 0.5, 'the fan threw Tommy past the top of its column');
+    return 'rose ' + risen.toFixed(1) + ' rows of ' + (fan.ty - fan.top + 1);
+});
+
+check('a live rail bites whoever stands on it, and only when live', () => {
+    const h = harness();
+    const ents = roomWhere(h, 0, e => e.rails.length);
+    assert(ents, 'no live rail in Copperlode');
+    const rail = ents.rails[0];
+    const p = h.run.player;
+    const stand = function () {
+        p.placeAt((rail.tx0 + 1) * C.TILE + C.TILE / 2, rail.ty * C.TILE);
+        p.onGround = true;
+        p.invuln = 0;
+        h.run.hitstop = 0;
+    };
+    rail.phase = 0;
+    h.run.energy = 80;
+    stand();
+    h.step(1);
+    assert(h.run.energy > 79, 'an idle rail cost fuse');
+    rail.phase = 1.8 + 0.7 + 0.01;       // just live
+    stand();
+    h.step(1);
+    assert(h.run.energy < 80 - C.DMG_RAIL + 2, 'a live rail cost nothing (fuse ' + h.run.energy.toFixed(1) + ')');
+    return 'idle rail free, live rail ' + C.DMG_RAIL;
+});
+
+check('a swinging hook strikes whoever is in its arc', () => {
+    const h = harness();
+    const ents = roomWhere(h, 0, e => e.hooks.length);
+    assert(ents, 'no hook in Copperlode');
+    const hook = ents.hooks[0];
+    h.step(1);
+    const p = h.run.player;
+    p.placeAt(hook.x, hook.y + C.PLAYER_H / 2);
+    p.invuln = 0;
+    h.run.energy = 80;
+    h.run.hitstop = 0;
+    hook.t -= C.FIXED_DT;                 // so the step lands it where it was
+    h.step(1);
+    assert(h.run.energy < 80, 'stood in the hook\'s path and it passed through');
+    return 'arc ' + (hook.len / C.TILE).toFixed(1) + ' tiles long';
+});
+
 /* ------------------------------------------------------------------ *
  * Result
  * ------------------------------------------------------------------ */

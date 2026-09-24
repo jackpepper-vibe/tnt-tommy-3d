@@ -73,6 +73,130 @@
     };
 
     /* ------------------------------------------------------------------ *
+     * Fans
+     * ------------------------------------------------------------------ */
+
+    /**
+     * A floor fan and the column of rising air above it.
+     *
+     * The column runs up from the grille until it meets rock (or `C.FAN_ROWS`
+     * rows, whichever is first) and passes through decks, so a fan can carry
+     * Tommy up past a floor and let him step off onto it. The lift fades over
+     * the top two rows, so a rider hovers just under the top of the column
+     * rather than being fired into the roof — steering off sideways is the
+     * exit, and it is always there.
+     *
+     * Fans are the level's decision about height, like a trampoline, so they
+     * can go where a ladder would be tedious. They never replace a jump.
+     */
+    function Fan(tx, ty, room) {
+        this.kind = 'fan';
+        this.tx = tx;
+        this.ty = ty;
+        let top = ty;
+        while (top > 1 && ty - top < C.FAN_ROWS && !TNT.Tiles.isSolid(room.get(tx, top - 1))) top--;
+        this.top = top;
+        this.spin = 0;
+    }
+
+    Fan.prototype.update = function (dt) {
+        this.spin += dt * 14;
+    };
+
+    /** Lift at a point, 0..1 — 1 in the body of the column, fading at its top. */
+    Fan.prototype.lift = function (px, py) {
+        if (Math.floor(px / C.TILE) !== this.tx) return 0;
+        const row = py / C.TILE;
+        if (row < this.top || row > this.ty + 1) return 0;
+        return Util.clamp((row - this.top) / 2, 0.25, 1);
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Live rails
+     * ------------------------------------------------------------------ */
+
+    /**
+     * A run of live rail: a deck that carries current on a cycle.
+     *
+     * Off for most of it, then a crackle along the rail — the tell — then live
+     * for a moment, when standing on it costs fuse and throws you off. Runs
+     * are phased by where they start, so two rails in a room fire in turn and
+     * the room has a rhythm to cross to.
+     */
+    const ZAP_OFF = 1.8, ZAP_WARN = 0.7, ZAP_LIVE = 0.7;
+
+    function Rail(tx0, tx1, ty) {
+        this.kind = 'rail';
+        this.tx0 = tx0;
+        this.tx1 = tx1;
+        this.ty = ty;
+        const cycle = ZAP_OFF + ZAP_WARN + ZAP_LIVE;
+        this.phase = ((tx0 * 7 + ty * 3) % 10) / 10 * cycle;
+        this.state = 'off';
+        /** 0..1 through the current state, for the renderer. */
+        this.k = 0;
+    }
+
+    Rail.prototype.update = function (dt) {
+        const cycle = ZAP_OFF + ZAP_WARN + ZAP_LIVE;
+        this.phase = (this.phase + dt) % cycle;
+        const p = this.phase;
+        const was = this.state;
+        if (p < ZAP_OFF) { this.state = 'off'; this.k = p / ZAP_OFF; }
+        else if (p < ZAP_OFF + ZAP_WARN) { this.state = 'warn'; this.k = (p - ZAP_OFF) / ZAP_WARN; }
+        else { this.state = 'live'; this.k = (p - ZAP_OFF - ZAP_WARN) / ZAP_LIVE; }
+        return was !== 'live' && this.state === 'live';
+    };
+
+    Rail.prototype.covers = function (tx, ty) {
+        return ty === this.ty && tx >= this.tx0 && tx <= this.tx1;
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Wrecking hooks
+     * ------------------------------------------------------------------ */
+
+    /**
+     * A cargo hook on a chain, swinging from the roof.
+     *
+     * The arc is fixed and visible — the chain is always drawn — so it is a
+     * timing hazard with nothing hidden in it: watch it pass, then go. It is
+     * iron and cannot be stomped; landing on it is being hit by it.
+     */
+    const HOOK_PERIOD = 2.9;
+    const HOOK_SWING = 0.85;          // radians either side of plumb
+
+    function Hook(tx, ty, room) {
+        this.kind = 'hook';
+        this.px = tileCentre(tx);
+        this.py = ty * C.TILE;
+        let rows = 0;
+        while (rows < 12 && !TNT.Tiles.isFloor(room.get(tx, ty + rows + 1))) rows++;
+        this.len = Util.clamp(rows - 0.8, 3, 9) * C.TILE;
+        this.phase = ((tx * 13 + ty * 7) % 10) / 10 * HOOK_PERIOD;
+        this.angle = 0;
+        this.x = this.px;
+        this.y = this.py + this.len;
+        this.t = 0;
+    }
+
+    Hook.prototype.update = function (dt) {
+        this.t += dt;
+        this.angle = Math.sin((this.t + this.phase) / HOOK_PERIOD * Math.PI * 2) * HOOK_SWING;
+        this.x = this.px + Math.sin(this.angle) * this.len;
+        this.y = this.py + Math.cos(this.angle) * this.len;
+    };
+
+    /** Which way the hook is travelling, for the knock-back. */
+    Hook.prototype.dir = function () {
+        return Math.cos((this.t + this.phase) / HOOK_PERIOD * Math.PI * 2) >= 0 ? 1 : -1;
+    };
+
+    Hook.prototype.box = function () {
+        return box(this.x, this.y, 15, 15);
+    };
+
+    /* ------------------------------------------------------------------ *
      * The Governor
      * ------------------------------------------------------------------ */
 
@@ -331,6 +455,9 @@
     };
 
     TNT.Machines = {
+        Fan: Fan,
+        Rail: Rail,
+        Hook: Hook,
         Lever: Lever,
         Gate: Gate,
         Valve: Valve,

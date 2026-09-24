@@ -233,7 +233,9 @@
         const climbing = player.mode === 'climb';
         lamp.position.set(px + face * 0.35, py + 0.9, 1.2);
         lamp.target.position.set(px + (climbing ? 0 : face * 7), py + (climbing ? 3 : -0.3), -3.4);
-        lamp.intensity = (run.state === 'playing' || run.state === 'transition') && player.alive ? 2.2 * flicker : 0;
+        lamp.intensity = (run.state === 'playing' || run.state === 'transition') && player.alive
+            ? (this.dark ? 3.2 : 2.2) * flicker : 0;
+        lamp.distance = this.dark ? 24 : 18;
 
         if (this.roomView) {
             for (const src of this.roomView.lights) {
@@ -510,6 +512,15 @@
      */
     Scene3D.prototype.setRoom = function (room, dir) {
         const built = RoomMesh.build(room, this.palette);
+        /*
+         * A blackout room drops the fill to almost nothing, so the helmet is
+         * the light — the one room type where the headlamp stops being
+         * atmosphere and becomes the thing you navigate by.
+         */
+        this.dark = !!room.dark;
+        this.ambient.intensity = this.dark ? 0.16 : 0.56;
+        this.hemi.intensity = this.dark ? 0.1 : 0.36;
+        this.key.intensity = this.dark ? 0.08 : 0.42;
 
         if (this.oldView) {
             R3D.dispose(this.oldView.group);

@@ -597,6 +597,25 @@
             }
         }
 
+        // Live rails bite whoever is standing on one when it goes live.
+        if (p.onGround && ents.rails.length) {
+            const tx = Math.floor(p.x / C.TILE), ty = Math.floor((p.y + 2) / C.TILE);
+            const rail = ents.railAt(tx, ty);
+            if (rail && rail.state === 'live') {
+                this._hurt(C.DMG_RAIL, 'rail', p.facing >= 0 ? -1 : 1);
+                p.vy = -260;
+                return;
+            }
+        }
+
+        for (const h of ents.hooks) {
+            const b = h.box();
+            if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
+            this._hurt(C.DMG_HOOK, 'hook', h.dir());
+            p.vx = h.dir() * 220;
+            return;
+        }
+
         for (const v of ents.vents) {
             if (v.state !== 'blast') continue;
             const b = v.box();

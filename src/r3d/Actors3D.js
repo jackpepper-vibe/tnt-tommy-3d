@@ -402,6 +402,15 @@
             set(u.legR, 0.1, -0.3);
             u.body.rotation.x = 0;
             u.head.rotation.z = 0.2;
+        } else if (pose === 'float') {
+            // Riding a fan's air: arms out, legs dangling, jacket billowing.
+            const bob = Math.sin(t * 6);
+            set(u.armL, 1.9 + bob * 0.15, 0.3);
+            set(u.armR, 1.7 - bob * 0.15, 0.3);
+            set(u.legL, 0.2 + bob * 0.1, -0.4);
+            set(u.legR, -0.15 - bob * 0.1, -0.3);
+            u.body.scale.set(1.04, 1, 1.06);
+            u.head.rotation.z = 0.12;
         } else if (pose === 'rise') {
             // Tucked: knees up, arms thrown up and forward.
             set(u.legL, 1.0, -1.5);
@@ -1291,6 +1300,27 @@
             b.rbox(-0.14, 0.28, 0.05, 0.18, 0.1, 0.18, -0.5, R3D.col('#3a2a20'));
         }, solid, 4);
 
+        /** Fan blades, four of them round a hub, turned by the sync pass. */
+        set.pools.fanBlades = new Pool(set.group, function (b) {
+            for (let k = 0; k < 4; k++) {
+                b.rbox(0, 0, 0, 0.72, 0.16, 0.04, k * Math.PI / 2 + 0.2, R3D.col('#8a8a92'), R3D.col('#c8c8d0'));
+            }
+            b.cyl(0, 0, 0.02, 0.1, 0.08, 'z', R3D.col('#d8b060'), 10);
+        }, solid, 4);
+
+        /** One link of hook chain, and the hook itself: a counterweight and a barb. */
+        set.pools.hookLink = new Pool(set.group, function (b) {
+            b.cyl(0, 0, 0, 0.1, 0.05, 'z', R3D.col('#6a625a'), 8);
+        }, solid, 80);
+        set.pools.hook = new Pool(set.group, function (b) {
+            b.cyl(0, 0.24, 0, 0.26, 0.4, 'y', R3D.col('#3a3430'), 12, R3D.col('#6a5e54'));
+            b.cyl(0, 0.46, 0, 0.1, 0.1, 'y', R3D.col('#d8b060'), 8);
+            b.box(0, -0.02, 0, 0.3, 0.14, 0.3, R3D.col('#e8a41c'), F.ALL);        // the warning band
+            b.cyl(0, -0.22, 0, 0.06, 0.34, 'y', R3D.col('#5a524a'), 8);
+            b.rbox(0.16, -0.42, 0, 0.36, 0.09, 0.09, 0.9, R3D.col('#5a524a'));
+            b.rbox(0.28, -0.3, 0, 0.18, 0.09, 0.09, -0.3, R3D.col('#8a8278'));
+        }, solid, 4);
+
         /** A falling cinder: a glowing lump with a molten core. */
         set.pools.cinder = new Pool(set.group, function (b) {
             b.sphere(0, 0, 0, 0.2, R3D.col('#ff7a2a'), 10, 7);
@@ -1532,6 +1562,66 @@
                 tr.scale.set(0.55 * k, 0.4 * k, 1);
                 tint(tr, i === 0 ? '#ffd27a' : '#ff6a2a', 0.8 * k);
             }
+        }
+
+        // Fans: blades turning, and air rising up the column.
+        for (const f of ents.fans) {
+            const blades = set.pools.fanBlades.next();
+            blades.position.set(f.tx + 0.5, C.ROWS - f.ty - 0.82, ACTOR_Z - 0.55);
+            blades.rotation.set(-1.25, 0, f.spin);
+            const rows = f.ty - f.top + 1;
+            for (let i = 0; i < 7; i++) {
+                const k = (t * 0.9 + i / 7) % 1;
+                const streak = set.pools.glowSprite.next();
+                streak.position.set(f.tx + 0.5 + Math.sin(i * 2.3 + t) * 0.28,
+                                    C.ROWS - f.ty - 0.8 + k * rows, ACTOR_Z - 0.3);
+                streak.scale.set(0.12, 0.9, 1);
+                tint(streak, '#b8d8ff', 0.28 * Math.sin(k * Math.PI));
+            }
+        }
+
+        // Live rails: sparks as a warning, an arc the length of the run when live.
+        for (const r of ents.rails) {
+            if (r.state === 'off') continue;
+            const y = C.ROWS - r.ty + 0.08;
+            const len = r.tx1 - r.tx0 + 1;
+            if (r.state === 'warn') {
+                const n = 2 + Math.floor(r.k * 5);
+                for (let i = 0; i < n; i++) {
+                    const sp = set.pools.glowSprite.next();
+                    const x = r.tx0 + ((Math.sin(t * 37 + i * 12.9) * 0.5 + 0.5) * len);
+                    sp.position.set(x, y + Math.random() * 0.1, ACTOR_Z - 0.1);
+                    const s = 0.2 + Math.random() * 0.25;
+                    sp.scale.set(s, s, 1);
+                    tint(sp, '#bfe8ff', 0.9);
+                }
+            } else {
+                const arc = set.pools.glowSprite.next();
+                arc.position.set(r.tx0 + len / 2, y, ACTOR_Z - 0.1);
+                arc.scale.set(len + 1, 0.55 + Math.sin(t * 60) * 0.15, 1);
+                tint(arc, '#9fdcff', 0.95);
+                const core = set.pools.glowSprite.next();
+                core.position.set(r.tx0 + len / 2, y, ACTOR_Z - 0.05);
+                core.scale.set(len + 0.4, 0.22, 1);
+                tint(core, '#ffffff', 0.95);
+            }
+        }
+
+        // Hooks, on their chains.
+        for (const h of ents.hooks) {
+            const px = R3D.wx(h.px), py = R3D.wy(h.py);
+            const hx = R3D.wx(h.x), hy = R3D.wy(h.y);
+            const len = Math.hypot(hx - px, hy - py);
+            const links = Math.max(3, Math.floor(len / 0.2));
+            for (let i = 0; i < links; i++) {
+                const k = (i + 0.5) / links;
+                const link = set.pools.hookLink.next();
+                link.position.set(px + (hx - px) * k, py + (hy - py) * k, ACTOR_Z - 0.2);
+                link.rotation.set(0, i % 2 ? Math.PI / 2 : 0, h.angle);
+            }
+            const mesh = set.pools.hook.next();
+            mesh.position.set(hx, hy, ACTOR_Z - 0.1);
+            mesh.rotation.set(0, 0, h.angle);
         }
 
         // Levers.

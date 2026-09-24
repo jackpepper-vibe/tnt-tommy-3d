@@ -48,7 +48,9 @@
         'G': T.DETONATOR,
         'T': T.TRAMPOLINE,
         'Q': T.TELEPORT,
-        'I': T.GATE
+        'I': T.GATE,
+        'A': T.FAN,
+        'Z': T.RAIL
     };
 
     /**
@@ -85,7 +87,8 @@
         'v': 'liftV',       // vertical lift; likewise
         'Y': 'cog',         // a brass cog, hidden until the dog finds it
         'l': 'lever',       // throws every gate in the room open
-        'U': 'valve'        // one of the Governor's three weak points
+        'U': 'valve',       // one of the Governor's three weak points
+        'k': 'hook'         // a hook on a chain, swinging from the roof
     };
 
     Tiles.TERRAIN_CHARS = TERRAIN;
@@ -102,7 +105,7 @@
     /** Stand on it from above, pass through it from below. */
     Tiles.isOneWay = function (t) {
         return t === T.PLATFORM || t === T.CRUMBLE || t === T.BELT_R ||
-               t === T.BELT_L || t === T.TRAMPOLINE;
+               t === T.BELT_L || t === T.TRAMPOLINE || t === T.RAIL;
     };
 
     /** Anything Tommy's feet can rest on. */

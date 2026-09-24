@@ -38,6 +38,7 @@
             blurb: 'Warm already',
             cell: [0, 2],
             exits: { right: true, up: true },
+            works: 'furnace',
             /**
              * The entrance, and the last room in the game that is entirely safe
              * to stand still in. Everything here is a jump; the lava starts next
@@ -82,6 +83,7 @@
             blurb: 'Tipping floor',
             cell: [1, 2],
             exits: { left: true, right: true, up: true },
+            works: 'furnace',
             /**
              * A molten floor with three pools in it, and belts on the decks
              * above running toward the drops. Standing still on a conveyor here
@@ -125,6 +127,8 @@
                 g.orb(19, 10);
                 g.bat(30, 15);
 
+
+                g.rail(16, 14, 9);
             }
         },
 
@@ -134,6 +138,9 @@
             blurb: 'It is rising',
             cell: [2, 2],
             exits: { left: true, up: true },
+            works: 'furnace',
+            /** A blackout: no lamps. The helmet, and whatever glows, is all there is. */
+            dark: true,
             flooding: true,
             /**
              * The second flooding seam, and unlike Fire Damp it is not a dead
@@ -185,6 +192,7 @@
             blurb: 'Ash underfoot',
             cell: [0, 1],
             exits: { right: true, up: true, down: true },
+            works: 'stores',
             /**
              * A long haulage drift, mostly intact, and the mine's junction on
              * the left. The fissure in the back wall hides the spare helmet —
@@ -223,6 +231,8 @@
                 g.orb(16, 16);
                 g.crawler(34, 13);
 
+
+                g.hook(18, 1);
             }
         },
 
@@ -232,6 +242,7 @@
             blurb: 'Do not stop',
             cell: [1, 1],
             exits: { left: true, right: true, down: true },
+            works: 'furnace',
             /**
              * The hardest room in the game and the one it is named for. A lava
              * floor with no islands, crumbling decks over it, pistons on two of
@@ -271,6 +282,10 @@
                 g.spider(14, 1);
                 g.spider(29, 1);
 
+
+                // A fan up the left side, and a live rail across the upper right.
+                g.fan(6, 19);
+                g.rail(22, 11, 10);
             }
         },
 
@@ -280,6 +295,7 @@
             blurb: 'Straight up',
             cell: [2, 1],
             exits: { left: true, up: true, down: true },
+            works: 'fans',
             /**
              * A vertical room: narrow decks alternating left and right the whole
              * way up, with the cage running the full height on the right for
@@ -346,6 +362,7 @@
             blurb: 'You can see the whole seam',
             cell: [0, 0],
             exits: { right: true, down: true },
+            works: 'winding',
             /**
              * Open and high, with two rope lines strung the width of it. After
              * the Furnace this is deliberately a breather — the danger here is
@@ -388,6 +405,8 @@
 
                 // A cog under the low line, taken hand over hand.
                 g.cog(10, 16);
+
+                g.hook(22, 1);
             }
         },
 
@@ -397,6 +416,7 @@
             blurb: 'Everything burnt through',
             cell: [1, 0],
             exits: { left: true, right: true },
+            works: 'flywheel',
             /**
              * Almost every board in here is rotten, and the two trampolines are
              * the only reliable way back up once they go. The ceiling above the
@@ -447,6 +467,8 @@
                  */
                 g.gate(40, 19, 4);
                 g.lever(33, 4);
+
+                g.hook(16, 6);
             }
         },
 

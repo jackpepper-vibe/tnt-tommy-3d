@@ -69,8 +69,10 @@
         buildWall(room, wall, plate, openings, pal);
         buildFrames(metal, plate, openings, columns, pal);
         buildPipes(room, metal, glow, openings, emitters, pal, rng);
-        buildLamps(room, metal, glow, columns, lights, pal, rng);
+        // A blackout room has its fittings but none of them lit.
+        if (!room.dark) buildLamps(room, metal, glow, columns, lights, pal, rng);
         buildHall(hall, group, spinners, pal, rng);
+        setPiece(room.works, hall, glow, group, spinners, pal, rng);
         gradeHall(hall, pal);
 
         const add = function (b, name, material, order) {
@@ -98,6 +100,10 @@
                 for (const s of spinners) {
                     if (s.spin) s.mesh.rotation.z = s.phase + t * s.spin;
                     if (s.stroke) s.mesh.position.y = s.baseY + Math.sin(t * s.rate + s.phase) * s.stroke;
+                    if (s.travel) {
+                        const k = 0.5 + 0.5 * Math.sin(t * s.travel.rate + s.phase);
+                        s.mesh.position.x = s.travel.from + (s.travel.to - s.travel.from) * k;
+                    }
                 }
             }
         };
@@ -676,6 +682,163 @@
         _hallMat = new THREE.MeshBasicMaterial({ vertexColors: true });
         _hallMat.userData.shared = true;
         return _hallMat;
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Set pieces
+     * ------------------------------------------------------------------ */
+
+    /**
+     * The one big machine each room's windows look out on.
+     *
+     * Without these every hall is the same hall — boilers, stacks, a gear or
+     * two — and the rooms blur into one another however different their decks
+     * are. A room named for its engine should *show* its engine. So each room
+     * names a set piece (`works` in its definition) and the hall is built round
+     * it: a flywheel, ventilation fans, furnace mouths, gas holders, a winding
+     * headframe, or a store with a travelling crane. It is the room's landmark:
+     * the thing you remember it by.
+     *
+     * Static parts go into the graded hall buffer; moving ones become spinners.
+     */
+    function setPiece(kind, b, glow, group, spinners, pal, rng) {
+        const iron = R3D.col(pal.iron), ironLit = R3D.col(pal.ironLit), ironDk = R3D.col(pal.ironDark);
+        const paint = R3D.col(pal.paint), paintLit = R3D.col(pal.paintLit);
+        const brass = R3D.col(pal.brass);
+
+        const spinner = function (build, x, y, z, spin) {
+            const sb = new R3D.Builder();
+            build(sb);
+            gradeHall(sb, pal, x, y, z);
+            const mesh = new THREE.Mesh(sb.geometry(), hallMaterial());
+            mesh.position.set(x, y, z);
+            mesh.renderOrder = -4;
+            group.add(mesh);
+            const s = { mesh: mesh, spin: spin, phase: rng.range(0, 6) };
+            spinners.push(s);
+            return s;
+        };
+
+        const wheel = function (sb, r, spokes, col, lit) {
+            const n = Math.max(24, Math.round(r * 8));
+            for (let k = 0; k < n; k++) {
+                const a = (k / n) * Math.PI * 2;
+                sb.rbox(Math.cos(a) * r, Math.sin(a) * r, 0, (2 * Math.PI * r) / n + 0.05, r * 0.12, 0.6,
+                        a + Math.PI / 2, col, lit);
+            }
+            for (let k = 0; k < spokes; k++) {
+                sb.rbox(0, 0, 0, r * 2, r * 0.07, 0.4, (k / spokes) * Math.PI, col, lit);
+            }
+            sb.cyl(0, 0, 0, r * 0.14, 0.8, 'z', lit, 16, brass);
+        };
+
+        switch (kind) {
+            case 'flywheel': {
+                // A great flywheel, half sunk in a pit, turning fast.
+                const x = rng.range(12, C.COLS - 12), y = 6.5, z = -10;
+                spinner(function (sb) { wheel(sb, 7, 6, iron, ironLit); }, x, y, z, rng.chance(0.5) ? 0.7 : -0.7);
+                b.box(x, 0.5, z, 16, 1.2, 4, ironDk, F.TOP | F.FRONT);
+                for (const s of [-1, 1]) {
+                    b.box(x + s * 1.2, 3.2, z - 0.8, 0.8, 6.4, 0.8, paint, F.ALL, paintLit);   // bearings
+                }
+                b.cyl(x, 6.5, z - 0.8, 0.7, 3, 'z', brass, 14);
+                break;
+            }
+            case 'fans': {
+                // Ventilation fans in round ducts, one large and one small.
+                const sizes = [4.2, 2.6];
+                for (let i = 0; i < sizes.length; i++) {
+                    const r = sizes[i];
+                    const x = i ? rng.range(26, C.COLS - 6) : rng.range(6, 16);
+                    const y = rng.range(9, 16), z = -9.5 - i;
+                    const ring = 40;
+                    for (let k = 0; k < ring; k++) {
+                        const a = (k / ring) * Math.PI * 2;
+                        b.rbox(x + Math.cos(a) * (r + 0.3), y + Math.sin(a) * (r + 0.3), z, 0.8, 0.5, 1.2,
+                               a + Math.PI / 2, iron, ironLit);
+                    }
+                    spinner(function (sb) {
+                        for (let k = 0; k < 5; k++) {
+                            sb.rbox(0, 0, 0, r * 1.9, r * 0.34, 0.1, (k / 5) * Math.PI, ironLit, ironLit);
+                        }
+                        sb.cyl(0, 0, 0.1, r * 0.2, 0.4, 'z', brass, 14);
+                    }, x, y, z + 0.2, (i ? 3.2 : 2.2) * (rng.chance(0.5) ? 1 : -1));
+                }
+                break;
+            }
+            case 'furnace': {
+                // Furnace mouths in a brick bank, each glowing, with a stack.
+                const z = -11;
+                const x0 = rng.range(3, 10);
+                b.box(C.COLS / 2, 3, z - 1, C.COLS + 20, 6, 2, paint, F.TOP | F.FRONT, paintLit);
+                for (let i = 0; i < 4; i++) {
+                    const x = x0 + i * rng.range(8, 11);
+                    b.box(x, 2.2, z + 0.05, 2.4, 2.4, 0.2, ironDk, F.FRONT);
+                    glow.box(x, 2.0, z + 0.2, 2.0, 1.8, 0.02, R3D.mixCol(pal.lava, '#000000', 0.25), F.FRONT);
+                    glow.box(x, 1.4, z + 0.22, 2.0, 0.6, 0.02, R3D.mixCol(pal.lava, '#fff0c0', 0.4), F.FRONT);
+                    b.cyl(x, 12, z - 1.2, 0.8, 18, 'y', ironDk, 12, ironLit);
+                }
+                break;
+            }
+            case 'tanks': {
+                // Gas holders: great drums inside a lattice of guide columns.
+                const n = rng.int(1, 2);
+                for (let i = 0; i < n; i++) {
+                    const x = i ? rng.range(28, C.COLS - 4) : rng.range(6, 18);
+                    const z = -13 - i * 2, r = rng.range(4, 5.5), h = rng.range(9, 13);
+                    b.cyl(x, h / 2, z, r, h, 'y', iron, 24, ironLit);
+                    for (let y = 1.5; y < h; y += 2.2) b.cyl(x, y, z, r * 1.02, 0.25, 'y', ironLit, 24);
+                    for (let k = 0; k < 6; k++) {
+                        const a = (k / 6) * Math.PI * 2;
+                        b.box(x + Math.cos(a) * (r + 0.8), (h + 3) / 2, z + Math.sin(a) * (r + 0.8), 0.35, h + 3, 0.35,
+                              paint, F.ALL, paintLit);
+                    }
+                    b.cyl(x, h + 2.8, z, r + 0.9, 0.3, 'y', paint, 24, paintLit);
+                }
+                break;
+            }
+            case 'winding': {
+                // A headframe: two raked legs, a crosshead, and sheave wheels turning.
+                const x = rng.range(10, C.COLS - 10), z = -10;
+                for (const s of [-1, 1]) {
+                    b.rbox(x + s * 3.2, 9, z, 0.6, 19, 0.6, s * 0.18, paint, paintLit);
+                    b.rbox(x + s * 1.2, 9, z - 1.5, 0.5, 18, 0.5, -s * 0.08, paint, paintLit);
+                }
+                for (let y = 4; y < 18; y += 3.5) b.box(x, y, z, 7 - y * 0.2, 0.3, 0.3, paint, F.ALL, paintLit);
+                b.box(x, 18.6, z, 7, 0.8, 1.6, ironDk, F.ALL, ironLit);
+                for (const s of [-1, 1]) {
+                    spinner(function (sb) { wheel(sb, 2.2, 4, iron, ironLit); }, x + s * 1.8, 20.2, z + 0.4,
+                            s * 1.1);
+                    // Ropes down from each sheave.
+                    b.box(x + s * 1.8 + s * 2.2, 10, z + 0.4, 0.06, 20, 0.06, ironDk, F.FRONT);
+                }
+                break;
+            }
+            case 'stores': {
+                // Stacked crates and drums, and a gantry crane that travels.
+                const z = -9;
+                const timber = R3D.col(pal.timber), timberTop = R3D.col(pal.timberTop);
+                for (let i = 0; i < 9; i++) {
+                    const x = rng.range(2, C.COLS - 2);
+                    const stack = rng.int(1, 4);
+                    for (let k = 0; k < stack; k++) {
+                        const s = rng.range(1.4, 2);
+                        b.box(x + rng.range(-0.3, 0.3), s / 2 + k * s, z - rng.range(0, 3), s, s, s, timber, F.ALL,
+                              timberTop);
+                    }
+                }
+                b.box(C.COLS / 2, 16, z - 2, C.COLS + 20, 0.8, 0.8, paint, F.ALL, paintLit);    // gantry rail
+                const crane = spinner(function (sb) {
+                    sb.box(0, 0, 0, 3, 1, 1.4, iron, F.ALL, ironLit);
+                    sb.box(0, -3.5, 0, 0.06, 6, 0.06, ironDk, F.FRONT);
+                    sb.box(0, -6.8, 0, 1.4, 1.4, 1.4, timber, F.ALL, timberTop);
+                }, C.COLS / 2, 15.2, z - 1.6, 0);
+                crane.travel = { from: 6, to: C.COLS - 6, rate: 0.12 };
+                break;
+            }
+            default:
+                break;
+        }
     }
 
     /* ------------------------------------------------------------------ *

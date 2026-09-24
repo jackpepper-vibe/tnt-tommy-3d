@@ -42,6 +42,7 @@
             blurb: 'Where the shift starts',
             cell: [0, 2],
             exits: { right: true, up: true },
+            works: 'stores',
             /**
              * The opening room: a climbing frame with the shaft up the middle.
              *
@@ -96,6 +97,7 @@
             blurb: 'Mind the spikes',
             cell: [1, 2],
             exits: { left: true, right: true },
+            works: 'stores',
             /**
              * Teaches the drop-through: the quickest way down the middle of this
              * room is to hold Down on each deck in turn, and the spike bed on
@@ -155,6 +157,9 @@
             blurb: 'The flooded end',
             cell: [2, 2],
             exits: { left: true, up: true },
+            works: 'tanks',
+            /** A blackout: no lamps. The helmet, and whatever glows, is all there is. */
+            dark: true,
             /**
              * The sump. Drowns you without the tank, and the tank is on the
              * shelf above it — so the first visit is a look and the second is
@@ -227,6 +232,7 @@
             blurb: 'Haulage level',
             cell: [0, 1],
             exits: { right: true, down: true },
+            works: 'furnace',
             /**
              * A haulage drift cut in two by a lava channel, with the tram the
              * only way across it.
@@ -301,6 +307,9 @@
                 g.guardian(12, 6);
 
                 g.ladder(9, 8, 13);
+
+                // A cargo hook swinging over the middle decks — the first one.
+                g.hook(29, 12);
             }
         },
 
@@ -310,6 +319,7 @@
             blurb: 'Machinery, running',
             cell: [1, 1],
             exits: { left: true, right: true, up: true },
+            works: 'flywheel',
             /**
              * Two pistons on the floor and two vents in it. A timing room: every
              * deck is jumpable, so the only thing between you and the top is
@@ -349,6 +359,9 @@
                 g.bat(9, 15);
 
                 g.ladder(6, 8, 13);
+
+                // A live rail across the middle: cross it between pulses.
+                g.rail(13, 14, 9);
             }
         },
 
@@ -358,6 +371,7 @@
             blurb: 'The winding cage',
             cell: [2, 1],
             exits: { left: true, up: true, down: true },
+            works: 'winding',
             /**
              * The spine of the mine: the only room linked both up and down. The
              * cage runs in its own headframe on the left, cut away at each

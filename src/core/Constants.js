@@ -81,7 +81,9 @@
         DETONATOR: 14,  // the plunger; the mine exit once every stick is in
         TRAMPOLINE: 15, // launches you higher than a jump reaches
         TELEPORT: 16,   // paired warp pads; press Down on one
-        GATE: 17        // a shutter: solid until the room's lever is thrown
+        GATE: 17,       // a shutter: solid until the room's lever is thrown
+        FAN: 18,        // a floor fan; the air above it lifts you
+        RAIL: 19        // a live rail: a deck that carries current on a cycle
     };
 
     /** Tiles that stop horizontal movement outright. */
@@ -89,7 +91,7 @@
 
     /** Tiles you can stand on from above but pass through from below. */
     C.ONEWAY_TILES = new Set([
-        C.Tile.PLATFORM, C.Tile.CRUMBLE, C.Tile.BELT_R, C.Tile.BELT_L, C.Tile.TRAMPOLINE
+        C.Tile.PLATFORM, C.Tile.CRUMBLE, C.Tile.BELT_R, C.Tile.BELT_L, C.Tile.TRAMPOLINE, C.Tile.RAIL
     ]);
 
     /** Tiles that can be climbed vertically. */
@@ -196,6 +198,15 @@
     C.WALL_KICK = 178;
     C.WALL_JUMP_LOCK = 0.16;   // s of lost air control toward the wall after a kick
     C.WALL_COYOTE = 0.08;
+
+    /**
+     * Fans. The column of air above a floor fan lifts at `FAN_ACC` — more than
+     * gravity, so it carries you — up to `FAN_V`, and runs at most `FAN_ROWS`
+     * rows high. See `Machines.Fan`.
+     */
+    C.FAN_ACC = 2700;
+    C.FAN_V = 190;
+    C.FAN_ROWS = 10;
 
     C.CLIMB_V = 108;           // ladder, up and down
     C.VINE_V = 88;             // hanging rope — deliberately slower than a ladder
@@ -345,6 +356,8 @@
 
     C.DMG_ENEMY = 34;
     C.DMG_RIVET = 24;          // a minecart bot's shot
+    C.DMG_RAIL = 24;           // standing on a live rail
+    C.DMG_HOOK = 30;           // struck by a swinging hook
     C.DMG_SPIKE = 38;
     C.DMG_VENT = 26;
     C.DMG_CRUSH = 50;

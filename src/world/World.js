@@ -42,6 +42,10 @@
         this.flooding = !!def.flooding;
         /** `{ at: [tx, ty] }` in the vault: where the Governor is built. */
         this.boss = def.boss || null;
+        /** A blackout room: no lamps, only the helmet and what glows. */
+        this.dark = !!def.dark;
+        /** The machine the room's back wall shows. See `Works`. */
+        this.works = def.works || null;
         /** Shown once, on arrival, under the room name. */
         this.blurb = def.blurb || '';
 
