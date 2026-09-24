@@ -454,6 +454,17 @@
     C.SCORE_TIME_BASE = 15000; // decays by SCORE_TIME_DECAY per second elapsed
     C.SCORE_TIME_DECAY = 25;
     C.SCORE_COG = 500;         // a brass cog, found by the dog
+
+    /**
+     * Coins are money.
+     *
+     * They used to be worth twenty-five points and nothing else, which a
+     * player rightly asked the point of. Now every coin goes in the purse and
+     * is spent at the workshop between mines, and every hundred picked up is a
+     * spare helmet on the spot — the oldest reward in platforming, and the one
+     * that makes stripping a deck worth the detour. A mine holds about 110.
+     */
+    C.COINS_PER_LIFE = 100;
     C.SCORE_VALVE = 1000;      // one of the Governor's valves
     C.SCORE_GOVERNOR = 5000;   // and the Governor itself
 

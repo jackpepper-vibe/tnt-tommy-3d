@@ -85,6 +85,7 @@
         surround(room, kit, pal);
         rockRuns(room, kit, pal);
         tankShell(room, plain);
+        water(room, kit, pal);
         trim(room, kit, pal, lights);
         decor(room, kit, pal, lights, rng);
 
@@ -117,7 +118,7 @@
         if (!liquid.isEmpty()) {
             // Ordinary alpha, not additive: water has to take light *out* of
             // what shows through it.
-            const mesh = new THREE.Mesh(liquid.geometry(), R3D.liquidMaterial());
+            const mesh = new THREE.Mesh(liquid.geometry(), R3D.waterMaterial(pal));
             mesh.name = 'water';
             mesh.renderOrder = 2;
             group.add(mesh);
@@ -160,7 +161,7 @@
         const rivet = R3D.col('#a8947a');
         const rust = R3D.col('#7a4520');
 
-        const isWater = function (tx, ty) { return room.get(tx, ty) === T.WATER; };
+        const isWater = function (tx, ty) { return room.isWet(tx, ty); };
 
         for (let ty = 0; ty < C.ROWS; ty++) {
             for (let tx = 0; tx < C.COLS; tx++) {
@@ -227,6 +228,41 @@
                         p.sphere(x, y - 0.34, 0.0, 0.045, rivet, 6, 5);
                     }
                 }
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Water
+     * ------------------------------------------------------------------ */
+
+    /**
+     * The body of every sump: one quad per wet cell, drawn by the water
+     * shader (`R3D.waterMaterial`), and the tank's riveted back wall behind it.
+     *
+     * The quads carry, in their red channel, the height of the surface of their
+     * column — so the shader can darken with real depth, continuously, rather
+     * than in one-tile steps. Steps were what made the old sump read as a blue
+     * panel ruled into bands.
+     *
+     * Every *wet* cell is drawn, not every water tile: a ladder in a sump or a
+     * coin at the bottom of one is still in the water, and drawing only water
+     * tiles left a dry hole round each.
+     */
+    function water(room, kit, pal) {
+        const back = R3D.mixCol(pal.iron, '#10202a', 0.35);
+        const backLit = R3D.mixCol(pal.ironLit, '#2a4a5a', 0.3);
+        for (let tx = 0; tx < C.COLS; tx++) {
+            let surface = -1;
+            for (let ty = 0; ty < C.ROWS; ty++) {
+                if (!room.isWet(tx, ty)) { surface = -1; continue; }
+                if (surface < 0) surface = C.ROWS - ty;            // world Y of the top of this column
+                const x = R3D.tileX(tx), y = R3D.tileY(ty);
+                const c = new THREE.Color(surface / C.ROWS, 0, 0);
+                kit.liquid.box(x, y, TRIM_Z + 0.34, 1, 1, 0.02, c, F.FRONT);
+                // The tank's back wall: riveted plate, cool and dark.
+                kit.plate.box(x, y, -1.05, 1, 1, 0.1, back, F.FRONT);
+                if ((tx + ty) % 5 === 0) kit.plain.sphere(x - 0.3, y + 0.3, -0.99, 0.04, backLit, 6, 4);
             }
         }
     }
@@ -910,46 +946,9 @@
                         break;
                     }
 
-                    case T.WATER: {
-                        /*
-                         * WATER DARKENS WHAT IS BEHIND IT.
-                         *
-                         * The body used to go on the additive pass, which is the
-                         * one thing water must never do: adding light to the
-                         * rock behind it made a sump look like a lit glass
-                         * brick standing in front of the wall rather than a
-                         * hole in the floor full of water. It is a tinted,
-                         * transparent pass now, so the rock reads *through* it,
-                         * darker and bluer, the way depth actually works.
-                         *
-                         * The bands are gone too. Every tile carried one bright
-                         * horizontal stripe at one of three hashed heights, and
-                         * neighbouring tiles that hashed alike joined theirs up
-                         * into long unbroken lines — a sump came out looking
-                         * like a rack of fluorescent tubes. Depth is carried by
-                         * the tint alone now, and the only bright thing is the
-                         * surface, which `Actors3D` moves.
-                         */
-                        /*
-                         * Darkened by how far down the column this tile sits,
-                         * not by a surface/not-surface flag. The flag put one
-                         * hard step across the whole body at exactly the same
-                         * height in every column, which is a band — the thing
-                         * the bands were removed for. Counting upward to the
-                         * surface and ramping over four steps reads as depth.
-                         */
-                        let below = 0;
-                        while (below < 4 && room.get(tx, ty - below - 1) === T.WATER) below++;
-                        const tint = R3D.mixCol(pal.water, '#000000', 0.24 + below * 0.07);
-                        liquid.box(x, y, TRIM_Z + 0.34, 1, 1, 0.02, tint, F.FRONT);
+                    case T.WATER:
+                        break;       // drawn by `water`, over every wet cell
 
-                        // Where it meets the bed, a little bounced light.
-                        if (Tiles.isFloor(room.get(tx, ty + 1))) {
-                            g.box(x, y - 0.44, TRIM_Z + 0.35, 1, 0.1, 0.02,
-                                  R3D.mixCol(pal.water, '#ffffff', 0.16), F.FRONT);
-                        }
-                        break;
-                    }
 
                     case T.TRAMPOLINE: {
                         // Sprung canvas on a frame. Sits at the top of its tile

@@ -354,6 +354,25 @@
     Scene3D.prototype._ambientParticles = function (dt) {
         if (!this.roomView || this.slide) return;
         const view = this.roomView;
+
+        // Bubbles: rising from the bed of every sump, and from Tommy's helmet
+        // when he is under.
+        const ents = this.run.ents();
+        this._bubbleT = (this._bubbleT || 0) + dt;
+        if (ents && ents.waterTops.length && this._bubbleT > 0.12) {
+            this._bubbleT = 0;
+            const top = ents.waterTops[Math.floor(Math.random() * ents.waterTops.length)];
+            let bed = top.ty;
+            while (bed < C.ROWS - 1 && this.run.room().isWet(top.tx, bed + 1)) bed++;
+            this.burst((top.tx + 0.2 + Math.random() * 0.6) * C.TILE, (bed + 0.9) * C.TILE, {
+                count: 1, colour: '#bfe8ff', speed: 0.2, life: (bed - top.ty + 1) * 0.16,
+                lift: 6, grav: 0, drag: 0.1, z: 0.1 });
+            const p = this.run.player;
+            if (p.inWater && this.run.state === 'playing') {
+                this.burst(p.x + p.facing * 4, p.centreY() - 8, {
+                    count: 1, colour: '#e0f6ff', speed: 0.3, life: 0.9, lift: 5, grav: 0, drag: 0.2, z: 0.7 });
+            }
+        }
         view.steamT = (view.steamT || 0) + dt;
         if (view.steamT > 0.09) {
             view.steamT = 0;
@@ -634,6 +653,10 @@
             self.burst(e.x + 6, e.y - 14, { count: 3, colour: '#fff2d0', speed: 1.4, life: 0.3, lift: 2, grav: 0 });
         });
 
+        bus.on(EV.SPLASH, function (e) {
+            self.burst(e.x, e.y, { count: 14, colour: '#9fd8ff', speed: 3.2, life: 0.5, lift: 3, grav: -9 });
+        });
+
         bus.on(EV.ENEMY_FIRED, function (e) {
             self.burst(e.x, e.y, { count: 8, colour: '#ffc060', speed: 3, life: 0.2, grav: -2 });
         });
@@ -729,6 +752,7 @@
         const run = this.run;
         this.t += dt;
 
+        R3D.time.value = this.t;
         this._updateSlide(dt);
         this._ambientParticles(dt);
         // Grit off the wall while Tommy slides down it.

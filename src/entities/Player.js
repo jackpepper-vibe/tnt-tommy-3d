@@ -154,7 +154,11 @@
         if (this.blastCooldown > 0) this.blastCooldown -= dt;
         if (this.dropping > 0) this.dropping -= dt;
 
-        this.inWater = room.at(this.x, this.centreY()) === T.WATER;
+        const wasWet = this.inWater;
+        this.inWater = room.wetAt(this.x, this.centreY());
+        if (wasWet !== this.inWater) {
+            this.bus.emit(TNT.EV.SPLASH, { x: this.x, y: this.centreY(), into: this.inWater });
+        }
 
         const ax = input.axisX();
         if (ax !== 0) this.facing = ax;

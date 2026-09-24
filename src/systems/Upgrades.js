@@ -1,10 +1,11 @@
 /**
  * TNT Tommy — the workshop's catalogue, and what each purchase changes.
  *
- * Brass cogs are hidden three to a mine, and the dog is what finds them. They
- * are spent between mines, at the workshop, on kit that lasts for the rest of
- * the run. That is the whole of the progression, and it is kept deliberately
- * small: six items, most of them one-offs, none of which touch the jump.
+ * Two currencies, spent between mines at the workshop on kit that lasts the
+ * rest of the run. **Coins** are the everyday money — a mine holds about 110 —
+ * and buy the everyday kit. **Brass cogs** are rare, three to a mine and found
+ * by the dog, and are what the special kit costs on top. Six items, most of
+ * them one-offs, none of which touch the jump.
  *
  * **Nothing here changes how high Tommy jumps or how far he can reach.** Every
  * one of the twenty-seven rooms is authored against the three-row rule, and an
@@ -22,27 +23,27 @@
 
     const CATALOGUE = [
         {
-            id: 'fuse', name: 'Slow Fuse', cost: 2, max: 2,
+            id: 'fuse', name: 'Slow Fuse', coins: 60, cogs: 0, max: 2,
             blurb: 'The fuse burns a fifth slower. Buy it twice for more.'
         },
         {
-            id: 'helmet', name: 'Spare Helmet', cost: 1, max: 3,
+            id: 'helmet', name: 'Spare Helmet', coins: 40, cogs: 0, max: 3,
             blurb: 'One more life, straight away.'
         },
         {
-            id: 'charge', name: 'Bigger Charge', cost: 2, max: 1,
+            id: 'charge', name: 'Bigger Charge', coins: 50, cogs: 1, max: 1,
             blurb: 'Blasts reach half as far again, and clear shots out of the air.'
         },
         {
-            id: 'boots', name: 'Hobnail Boots', cost: 2, max: 1,
+            id: 'boots', name: 'Hobnail Boots', coins: 50, cogs: 1, max: 1,
             blurb: 'Long drops cost nothing, and spikes bite half as hard.'
         },
         {
-            id: 'lunch', name: 'Bigger Lunch Tin', cost: 1, max: 1,
+            id: 'lunch', name: 'Bigger Lunch Tin', coins: 30, cogs: 0, max: 1,
             blurb: 'Every meal puts half as much fuse back again.'
         },
         {
-            id: 'tank', name: 'Air Tank', cost: 3, max: 1,
+            id: 'tank', name: 'Air Tank', coins: 0, cogs: 2, max: 1,
             blurb: 'Start every mine already carrying the oxygen tank.'
         }
     ];

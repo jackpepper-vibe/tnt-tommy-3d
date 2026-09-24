@@ -995,18 +995,39 @@ check('the workshop turns cogs into kit, and kit changes the rules', () => {
     h.seconds(1.6, []);
     assert(run.state === 'workshop', 'a cleared mine did not open the workshop');
 
-    run.cogs = 2;
-    assert(!run.buy('tank'), 'bought a 3-cog tank with 2 cogs');
-    run.cogs = 5;
-    assert(run.buy('boots'), 'could not buy boots with 5 cogs');
-    assert(run.cogs === 3, 'boots cost ' + (5 - run.cogs) + ', not 2');
+    run.cogs = 1;
+    run.coins = 500;
+    assert(!run.buy('tank'), 'bought a 2-cog tank with 1 cog');
+    run.coins = 40;
+    assert(!run.buy('boots'), 'bought 50-coin boots with 40 coins');
+    run.coins = 120;
+    assert(run.buy('boots'), 'could not buy boots with 120 coins and a cog');
+    assert(run.cogs === 0 && run.coins === 70, 'boots cost ' + (120 - run.coins) + ' coins, ' + (1 - run.cogs) + ' cogs');
     assert(!run.buy('boots'), 'bought boots twice');
     assert(run.mods.spikeMul === 0.5, 'boots did not halve spikes');
-    assert(run.buy('tank'), 'could not buy the tank with 3 cogs');
+    run.cogs = 2;
+    assert(run.buy('tank'), 'could not buy the tank with 2 cogs');
     run.leaveWorkshop();
     assert(run.state === 'playing' && run.mineIndex === 1, 'did not go down the next mine');
     assert(run.player.hasOxygen, 'bought the air tank and started without it');
     return 'boots and tank bought, mine 2 started with the tank';
+});
+
+check('coins fill the purse, and a hundred is a spare helmet', () => {
+    const h = harness();
+    const run = h.run;
+    const lives = run.lives;
+    run.coinTally = C.COINS_PER_LIFE - 1;
+    const ore = run.ents().pickups.find(p => p.kind === 'ore' && !p.taken) ||
+        run.entities.flatMap(e => e.pickups).find(p => p.kind === 'ore');
+    run.roomIndex = run.entities.findIndex(e => e.pickups.includes(ore));
+    run.player.placeAt(ore.x, ore.y);
+    run.player.invuln = 5;
+    h.step(1);
+    assert(ore.taken, 'stood on a coin and did not take it');
+    assert(run.coins === 1, 'the purse holds ' + run.coins + ', not 1');
+    assert(run.lives === lives + 1, 'the hundredth coin gave no helmet');
+    return 'purse ' + run.coins + ', lives ' + lives + ' → ' + run.lives;
 });
 
 check('a heavy landing costs fuse, and never kills', () => {

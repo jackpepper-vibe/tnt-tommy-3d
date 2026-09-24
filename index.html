@@ -45,8 +45,11 @@
 
             <div class="hud__right">
                 <span class="score" id="score">000000</span>
-                <span class="medals" id="medals" title="Rooms stripped of every nugget">
+                <span class="medals" id="medals" title="Medals: rooms stripped of every coin">
                     <i class="medals__icon"></i><b id="medal-count">0</b><span class="medals__of">/</span><b id="medal-total">9</b>
+                </span>
+                <span class="purse" id="purse" title="Coins in your purse — spend them at the workshop; every 100 is a spare helmet">
+                    <i class="coin__icon"></i><b id="coin-count">0</b>
                 </span>
                 <span class="cogs" id="cogs" title="Brass cogs found in this mine — the dog sniffs them out">
                     <i class="cogs__icon"></i><b id="cog-count">0</b><span class="cogs__of">/</span><b id="cog-total">3</b>
@@ -124,8 +127,9 @@
                     <p>Twelve sticks of dynamite are hidden through nine rooms of each
                        works. Find them, break the Governor that guards the vault, and
                        drop the plunger — and mind the fuse, because lifting the last
-                       stick starts the seam coming down. The dog sniffs out brass cogs;
-                       spend them at the workshop between mines.</p>
+                       stick starts the seam coming down. Coins buy kit at the workshop
+                       between mines — every hundred is a spare helmet — and the dog
+                       sniffs out brass cogs for the special kit.</p>
 
                     <div class="ships-row">
                         <span class="ship-chip ship-1"><span class="ship-dot"></span>COPPERLODE</span>
@@ -191,8 +195,9 @@
             <div class="card card--workshop">
                 <p class="card__eyebrow" id="shop-eyebrow">The seam is down</p>
                 <h2 class="card__title">The Workshop</h2>
-                <p class="card__tagline">Brass cogs buy kit that lasts the rest of the run.
-                    You have <b class="shop__bank" id="shop-cogs">0</b> to spend.</p>
+                <p class="card__tagline">Coins and brass cogs buy kit that lasts the rest of the run.
+                    You have <i class="coin__icon"></i><b class="shop__bank" id="shop-coins">0</b>
+                    and <i class="cogs__icon"></i><b class="shop__bank" id="shop-cogs">0</b> to spend.</p>
                 <div class="shop" id="shop" role="list"></div>
                 <p class="card__keys">&larr; &rarr; choose &nbsp;·&nbsp; ENTER buy &nbsp;·&nbsp; pick the last card to go on</p>
             </div>

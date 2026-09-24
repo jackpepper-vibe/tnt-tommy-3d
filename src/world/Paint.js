@@ -72,6 +72,16 @@
      * be if the wall were real.
      */
     function Grid() {
+        /**
+         * Cells that are water *underneath* whatever was painted there.
+         *
+         * A grid cell holds one character, so a coin or a stick laid in a sump
+         * — or a ladder run down into one — used to replace the water in its
+         * cell outright. Each left a dry pocket in the tank: a dark square you
+         * could see and could not swim in. Anything written over water is
+         * remembered here, and `World.Room` keeps the cell wet.
+         */
+        this.wet = new Set();
         this.cells = [];
         for (let y = 0; y < C.ROWS; y++) {
             this.cells.push(new Array(C.COLS).fill('.'));
@@ -87,7 +97,12 @@
     };
 
     Grid.prototype.set = function (x, y, ch) {
-        if (this.inside(x, y)) this.cells[y][x] = ch;
+        if (!this.inside(x, y)) return this;
+        const key = y * C.COLS + x;
+        if (ch === 'W' || this.cells[y][x] === 'W') this.wet.add(key);
+        // Rock or the plunger over water really does displace it.
+        if (ch === '#' || ch === 'X') this.wet.delete(key);
+        this.cells[y][x] = ch;
         return this;
     };
 
@@ -432,7 +447,9 @@
         render: function (build) {
             const g = new Grid();
             build(g);
-            return g.toStrings();
+            const rows = g.toStrings();
+            rows.wet = Array.from(g.wet);
+            return rows;
         }
     };
 

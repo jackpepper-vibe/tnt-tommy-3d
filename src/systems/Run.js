@@ -80,6 +80,10 @@
         this.dog.placeAt(this.mine.spawnX, this.mine.spawnY, 1);
         /** Brass cogs held, across the run; spent at the workshop. */
         this.cogs = 0;
+        /** Coins in the purse, across the run; spent at the workshop. */
+        this.coins = 0;
+        /** Coins picked up towards the next spare helmet. See `C.COINS_PER_LIFE`. */
+        this.coinTally = 0;
         /** Cogs found in this mine, out of `C.COGS_PER_MINE`. */
         this.cogsFound = 0;
         /** Levels of each workshop item bought. See `Upgrades`. */
@@ -126,6 +130,8 @@
         this.score = 0;
         this.elapsed = 0;
         this.cogs = 0;
+        this.coins = 0;
+        this.coinTally = 0;
         this.upgrades = Upgrades.fresh();
         this.mods = Upgrades.mods(this.upgrades);
         this.startMine(0);
@@ -337,6 +343,16 @@
                     break;
                 case 'food':
                     this.energy = Math.min(C.ENERGY_MAX, this.energy + C.FOOD_ENERGY * this.mods.foodMul);
+                    break;
+                case 'ore':
+                    this.coins++;
+                    this.coinTally++;
+                    if (this.coinTally >= C.COINS_PER_LIFE) {
+                        this.coinTally -= C.COINS_PER_LIFE;
+                        if (this.lives < C.LIVES_MAX) this.lives++;
+                        else this.score += C.SCORE_HEART;
+                        this.bus.emit(EV.COIN_LIFE, { x: p.x, y: p.y });
+                    }
                     break;
                 case 'cog':
                     this.cogs++;
@@ -854,14 +870,15 @@
         if (!item || this.state !== 'workshop') return false;
         if (this.upgrades[id] >= item.max) return false;
         if (id === 'helmet' && this.lives >= C.LIVES_MAX) return false;
-        return this.cogs >= item.cost;
+        return this.cogs >= item.cogs && this.coins >= item.coins;
     };
 
     /** Spend cogs on an item. Returns whether it was bought. */
     Run.prototype.buy = function (id) {
         if (!this.canBuy(id)) return false;
         const item = Upgrades.item(id);
-        this.cogs -= item.cost;
+        this.cogs -= item.cogs;
+        this.coins -= item.coins;
         this.upgrades[id]++;
         this.mods = Upgrades.mods(this.upgrades);
         if (id === 'helmet') this.lives = Math.min(C.LIVES_MAX, this.lives + 1);

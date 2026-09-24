@@ -249,6 +249,8 @@ body[data-screen="victory"] .hud {
 .cogs__of { opacity: 0.5; }
 
 .cogs__icon {
+    display: inline-block;
+    vertical-align: -2px;
     width: 13px;
     height: 13px;
     margin-right: 0.15rem;
@@ -267,6 +269,29 @@ body[data-screen="victory"] .hud {
     0% { transform: scale(1.6); }
     100% { transform: scale(1); }
 }
+
+/* --- the purse ----------------------------------------------------------- */
+
+.purse {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.95em;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+
+.coin__icon {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    vertical-align: -1px;
+    background: radial-gradient(circle at 38% 35%, #fff4b0 0 18%, #f0b428 40%, #a86c14 100%);
+    box-shadow: inset 0 0 0 1.5px #c88a18, 0 0 6px rgba(255, 200, 87, 0.5);
+}
+
+.purse.is-bumped { animation: bump 0.35s ease-out; }
 
 /* --- the Governor --------------------------------------------------------- */
 
@@ -327,13 +352,15 @@ body[data-screen="victory"] .hud {
 .medals b { color: var(--ink); }
 .medals__of { opacity: 0.5; }
 
+/* A silver star: a room stripped of every coin. Not gold, and not round, so it
+   is never mistaken for the coin purse beside it. */
 .medals__icon {
-    width: 11px;
-    height: 11px;
+    width: 13px;
+    height: 13px;
     margin-right: 0.15rem;
-    border-radius: 50%;
-    background: linear-gradient(160deg, #ffe9a8, var(--gold) 45%, #a86c14);
-    box-shadow: 0 0 6px rgba(255, 200, 87, 0.55);
+    background: linear-gradient(160deg, #ffffff, #c8d0dc 45%, #7a8494);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    filter: drop-shadow(0 0 4px rgba(220, 230, 255, 0.6));
 }
 
 /* ==========================================================================

@@ -149,6 +149,13 @@
         f.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.17);
     };
 
+    /** Into or out of the water. */
+    Synth.prototype.splash = function () {
+        const f = this._noise('lowpass', 2400, 0.8, 0.16, 0.005, 0.3);
+        f.frequency.exponentialRampToValueAtTime(500, this.ctx.currentTime + 0.3);
+        this._tone('sine', 300, 700, 0.05, 0.01, 0.12);
+    };
+
     /** A footfall on steel — very quiet, or it becomes a metronome. */
     Synth.prototype.step = function () {
         this._noise('bandpass', 1600 + Math.random() * 600, 6, 0.025, 0.002, 0.03);

@@ -941,6 +941,79 @@
         return m;
     };
 
+    /**
+     * The shared clock every animated material reads. `Scene3D` advances it
+     * once a frame; the uniform object is shared, so one write updates them all.
+     */
+    R3D.time = { value: 0 };
+
+    /**
+     * Water: a shader rather than a flat tint.
+     *
+     * The sump used to be one transparent colour laid over the tank, and it
+     * read as a blue panel — nothing in it moved and nothing said *water*. This
+     * darkens continuously with depth (from the surface height carried in the
+     * vertex colour), throws moving caustics that fade as the water deepens,
+     * and lays soft shafts of light down from the surface. It is still
+     * ordinary alpha, not additive: water takes light out of what is behind it.
+     */
+    R3D.waterMaterial = function (pal) {
+        return R3D.cached('water:' + pal.water, function () {
+            return new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: R3D.time,
+                    uShallow: { value: R3D.mixCol(pal.water, '#6fd0ff', 0.25) },
+                    uDeep: { value: R3D.mixCol(pal.water, '#02080e', 0.78) },
+                    uLight: { value: R3D.col('#d8f4ff') }
+                },
+                vertexColors: true,
+                transparent: true,
+                depthWrite: false,
+                vertexShader: [
+                    'varying vec3 vWorld;',
+                    'varying float vSurface;',
+                    'void main() {',
+                    '  vec4 w = modelMatrix * vec4(position, 1.0);',
+                    '  vWorld = w.xyz;',
+                    '  vSurface = color.r * ' + C.ROWS.toFixed(1) + ';',
+                    '  gl_Position = projectionMatrix * viewMatrix * w;',
+                    '}'
+                ].join('\n'),
+                fragmentShader: [
+                    'uniform float uTime;',
+                    'uniform vec3 uShallow, uDeep, uLight;',
+                    'varying vec3 vWorld;',
+                    'varying float vSurface;',
+                    '',
+                    '// Interfering sines folded into thin bright lines: the net of light',
+                    '// a rippling surface throws onto everything under it.',
+                    'float caustic(vec2 p) {',
+                    '  float c = sin(p.x * 2.1 + uTime * 1.2 + sin(p.y * 1.6 + uTime * 0.7) * 1.4);',
+                    '  c += sin(p.y * 2.6 - uTime * 1.0 + sin(p.x * 1.3 - uTime * 0.9) * 1.4);',
+                    '  c += sin((p.x + p.y) * 1.7 + uTime * 0.8);',
+                    '  c /= 3.0;',
+                    '  return pow(max(0.0, 1.0 - abs(c)), 9.0);',
+                    '}',
+                    '',
+                    'void main() {',
+                    '  // Depth below this column\'s surface, in tiles, and as 0..1 over eight.',
+                    '  float below = max(0.0, vSurface - vWorld.y);',
+                    '  float d = clamp(below / 6.5, 0.0, 1.0);',
+                    '  vec3 col = mix(uShallow, uDeep, pow(d, 0.7));',
+                    '  col += uLight * caustic(vWorld.xy * 1.2) * 0.22 * (1.0 - d);',
+                    '  // Soft shafts slanting down from the surface.',
+                    '  float ray = pow(max(0.0, sin(vWorld.x * 0.8 + vWorld.y * 0.25 + sin(uTime * 0.3 + vWorld.x * 0.2) * 1.5)), 10.0);',
+                    '  col += uLight * ray * 0.1 * (1.0 - d);',
+                    '  // A bright skin just under the surface.',
+                    '  col += uLight * smoothstep(0.35, 0.0, below) * 0.25;',
+                    '  gl_FragColor = vec4(col, mix(0.5, 0.86, d));',
+                    '  #include <encodings_fragment>',
+                    '}'
+                ].join('\n')
+            });
+        });
+    };
+
     /** Contact shadows: multiplied down onto whatever is behind. */
     R3D.shadeMaterial = function () {
         return R3D.cached('shade', function () {

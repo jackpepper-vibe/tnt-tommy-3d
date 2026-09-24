@@ -49,7 +49,22 @@
         /** Shown once, on arrival, under the room name. */
         this.blurb = def.blurb || '';
 
-        const parsed = Tiles.parse(Paint.render(def.build), def.id);
+        const rows = Paint.render(def.build);
+        const parsed = Tiles.parse(rows, def.id);
+
+        /*
+         * Water is a property of the cell, not only of its tile: a ladder can
+         * stand in a sump and a stick can lie at the bottom of one, and both
+         * cells are still wet. An actor's cell goes back to being water
+         * outright; a ladder keeps its tile and is wet as well.
+         */
+        this.wet = new Uint8Array(C.COLS * C.ROWS);
+        for (const key of rows.wet || []) this.wet[key] = 1;
+        for (let i = 0; i < parsed.tiles.length; i++) {
+            if (parsed.tiles[i] === T.WATER) this.wet[i] = 1;
+            else if (this.wet[i] && parsed.tiles[i] === T.EMPTY) parsed.tiles[i] = T.WATER;
+        }
+
         this.base = parsed.tiles;
         this.live = new Uint8Array(parsed.tiles);
         this.spawns = parsed.spawns;
@@ -79,6 +94,16 @@
     /** Tile under a pixel position. */
     Room.prototype.at = function (px, py) {
         return this.get(Math.floor(px / C.TILE), Math.floor(py / C.TILE));
+    };
+
+    /** Is this cell under water? True for a ladder or a pickup in a sump, too. */
+    Room.prototype.isWet = function (tx, ty) {
+        if (tx < 0 || ty < 0 || tx >= C.COLS || ty >= C.ROWS) return false;
+        return this.wet[ty * C.COLS + tx] === 1;
+    };
+
+    Room.prototype.wetAt = function (px, py) {
+        return this.isWet(Math.floor(px / C.TILE), Math.floor(py / C.TILE));
     };
 
     /**

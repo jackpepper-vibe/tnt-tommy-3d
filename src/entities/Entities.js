@@ -542,7 +542,7 @@
         const dry = (function (self) {
             return function (px, py) {
                 if (!self.room) return true;
-                return self.room.at(px, py) !== T.WATER;
+                return !self.room.wetAt(px, py);
             };
         })(this);
 
@@ -645,7 +645,8 @@
         for (let i = 1; i < steps; i++) {
             const k = i / steps;
             const t = this.room.at(Util.lerp(this.x, player.x, k), Util.lerp(this.y, player.centreY(), k));
-            if (Tiles.isFloor(t) || t === T.WATER) return false;
+            if (Tiles.isFloor(t) || this.room.wetAt(Util.lerp(this.x, player.x, k),
+                                                    Util.lerp(this.y, player.centreY(), k))) return false;
         }
         return true;
     };
@@ -1020,7 +1021,7 @@
      * go is not a fight, and the tank is on the critical path.
      */
     function wet(room, tx, ty) {
-        return room.get(tx, ty) === T.WATER;
+        return room.isWet(tx, ty);
     }
 
     function openSpanX(room, tx, ty) {
@@ -1171,7 +1172,7 @@
                     this.detonator = { x: tileCentre(tx), y: ty * C.TILE + C.TILE };
                 } else if (t === T.CRUMBLE) {
                     this.crumbleTiles.push({ tx: tx, ty: ty });
-                } else if (t === T.WATER && room.get(tx, ty - 1) !== T.WATER) {
+                } else if (room.isWet(tx, ty) && !room.isWet(tx, ty - 1)) {
                     this.waterTops.push({ tx: tx, ty: ty });
                 } else if (t === T.LAVA) {
                     lavaLow = Math.max(lavaLow, ty);

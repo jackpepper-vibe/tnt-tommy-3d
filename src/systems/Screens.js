@@ -92,6 +92,7 @@
         const shop = document.getElementById('shop');
         if (!shop) return;
         set('shop-cogs', run.cogs);
+        set('shop-coins', run.coins);
         set('shop-eyebrow', run.mine.name + ' is down');
 
         const items = TNT.Upgrades.CATALOGUE;
@@ -115,7 +116,8 @@
                 const owned = level >= item.max;
                 if (owned) card.classList.add('is-owned');
                 else if (!run.canBuy(item.id)) card.classList.add('is-poor');
-                const pips = '<i class="cogs__icon"></i>'.repeat(item.cost);
+                const pips = (item.coins ? '<i class="coin__icon"></i>' + item.coins + ' ' : '') +
+                    '<i class="cogs__icon"></i>'.repeat(item.cogs);
                 const tail = owned ? 'OWNED' : (item.max > 1 ? level + ' / ' + item.max : '');
                 card.innerHTML = '<span class="shop__name">' + item.name + '</span>' +
                     '<span class="shop__blurb">' + item.blurb + '</span>' +

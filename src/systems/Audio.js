@@ -218,6 +218,8 @@
         // Each stomp in a chain rises in pitch, so a run of them sings.
         bus.on(EV.ENEMY_STOMPED, function (e) { self.play('boom', 0.4, 1 + (e.chain - 1) * 0.1); });
         bus.on(EV.DOG_BARK, function () { self.sfx('bark'); });
+        bus.on(EV.SPLASH, function () { self.sfx('splash'); });
+        bus.on(EV.COIN_LIFE, function () { self.play('life'); });
         bus.on(EV.SECRET_FOUND, function () { self.sfx('chime', 660); });
         bus.on(EV.ARMOUR_CLANG, function () { self.sfx('clang'); });
         bus.on(EV.ENEMY_FIRED, function () { self.sfx('shot'); });

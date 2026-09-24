@@ -95,7 +95,8 @@ const POSES = {
                 const d = run.entities[idx].detonator;
                 run.player.reset(d.x, d.y, true);
                 run.player.active = true;
-                run.cogs = 4;
+                run.cogs = 2;
+                run.coins = 118;
             })()`,
             'TNT.game.step(260)'
         ]

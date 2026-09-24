@@ -39,12 +39,15 @@
             escapeTime: root.querySelector('#escape-time'),
             minimap: root.querySelector('#minimap'),
             cogs: root.querySelector('#cogs'),
+            purse: root.querySelector('#purse'),
+            coinCount: root.querySelector('#coin-count'),
             cogCount: root.querySelector('#cog-count'),
             cogTotal: root.querySelector('#cog-total'),
             governor: root.querySelector('#governor'),
             valves: root.querySelector('#governor-valves')
         };
         this._lastCogs = -1;
+        this._lastCoins = -1;
         this._pips = [];
         this._bossFor = null;
         this._roomShown = 0;
@@ -141,6 +144,11 @@
             self.toast('THE DOG HAS FOUND SOMETHING', 'good');
         });
 
+        bus.on(EV.COIN_LIFE, function (e) {
+            self.toast(C.COINS_PER_LIFE + ' COINS — A SPARE HELMET', 'good');
+            self.float('1UP', e.x, e.y - 30, 'gold');
+        });
+
         bus.on(EV.GATE_SHUT, function () {
             self.toast('SHUT — THERE IS A LEVER IN THIS ROOM', 'bad');
         });
@@ -223,6 +231,17 @@
         }
 
         this.el.kit.classList.toggle('is-on', run.player.hasOxygen);
+
+        if (run.coins !== this._lastCoins) {
+            if (this._lastCoins >= 0 && run.coins > this._lastCoins) {
+                const el = this.el.purse;
+                el.classList.remove('is-bumped');
+                void el.offsetWidth;
+                el.classList.add('is-bumped');
+            }
+            this._lastCoins = run.coins;
+            this.el.coinCount.textContent = run.coins;
+        }
 
         if (run.cogsFound !== this._lastCogs) {
             if (this._lastCogs >= 0 && run.cogsFound > this._lastCogs) {

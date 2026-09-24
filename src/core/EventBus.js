@@ -97,6 +97,8 @@
         UPGRADE_BOUGHT: 'upgrade-bought', // {id, level}
         RAIL_LIVE: 'rail-live',           // {x, y}
         GATE_SHUT: 'gate-shut',           // {x, y}
+        SPLASH: 'splash',                 // {x, y, into}
+        COIN_LIFE: 'coin-life',           // {x, y}
         SHAKE: 'shake',                   // {amount, seconds}
         FLOAT_TEXT: 'float-text',         // {text, x, y, colour, seconds}
         STATE_CHANGED: 'state-changed'    // {from, to}
