@@ -454,6 +454,10 @@
             while (clear < 7 && room.get(tx, ty + 1 + clear) === T.EMPTY) clear++;
             if (clear < 4) continue;
 
+            // Never in front of the Governor's face — a lamp hung there
+            // blew it out to a yellow disc.
+            if (room.boss && Math.abs(tx - room.boss.at[0]) < 7 && ty < room.boss.at[1] + 5) continue;
+
             const drop = Math.min(clear - 2.2, rng.range(1.2, 3));
             const x = R3D.tileX(tx);
             const top = R3D.tileY(ty) - 0.5;

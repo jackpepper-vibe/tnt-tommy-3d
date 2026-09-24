@@ -600,6 +600,170 @@
     }
 
     /* ------------------------------------------------------------------ *
+     * The Governor
+     * ------------------------------------------------------------------ */
+
+    /**
+     * The engine in the vault wall.
+     *
+     * Built once and parked; shown in whichever room has a boss. It is the
+     * largest single thing in the game and it has to read as a *character*
+     * from across the room — so it has a face. A boiler drum lying across the
+     * wall, a round front plate with two pressure gauges for eyes and a furnace
+     * door for a mouth, two stacks, and a piston either side working like
+     * shoulders. The eyes carry its mood: amber idling, red when it is about to
+     * fire, white for a moment when it is hurt.
+     *
+     * It sits behind the play plane, in front of the wall. It is scenery that
+     * fights — the valves are the parts you touch.
+     */
+    function buildGovernor(mat, glowMat) {
+        const g = new THREE.Group();
+        const iron = R3D.col('#3a3430'), ironLit = R3D.col('#6a5e54'), ironDk = R3D.col('#1c1816');
+        const brass = R3D.col('#b8893e'), brassLit = R3D.col('#f0c874');
+        const paint = R3D.col('#4e1a10'), paintLit = R3D.col('#7a3020');
+
+        g.add(part(function (b) {
+            // The drum, banded — set back far enough that its curve never
+            // bulges through the face plate in front of it.
+            b.cyl(0, 0, -1.3, 2.1, 7.4, 'x', iron, 24, ironLit);
+            for (let x = -3.2; x <= 3.2; x += 1.6) {
+                if (Math.abs(x) < 2) continue;              // hidden by the face anyway
+                b.cyl(x, 0, -1.3, 2.16, 0.18, 'x', ironLit, 24);
+            }
+            // The face plate, riveted round its rim.
+            b.cyl(0, 0, 1.2, 1.9, 0.4, 'z', paint, 28, paintLit);
+            // The brass rim is a disc *behind* the plate, a little larger, so
+            // only its edge shows round the face.
+            b.cyl(0, 0, 1.0, 2.05, 0.3, 'z', brass, 28, brassLit);
+            for (let k = 0; k < 16; k++) {
+                const a = (k / 16) * Math.PI * 2;
+                b.sphere(Math.cos(a) * 1.72, Math.sin(a) * 1.72, 1.42, 0.07, brassLit, 6, 4);
+            }
+            // Gauge rims — the eyes.
+            for (const s of [-1, 1]) {
+                b.cyl(s * 0.72, 0.55, 1.5, 0.5, 0.2, 'z', brass, 20, brassLit);
+                b.cyl(s * 0.72, 0.55, 1.58, 0.42, 0.05, 'z', ironDk, 20);
+                // A heavy brow over each.
+                b.rbox(s * 0.72, 1.12, 1.6, 0.9, 0.16, 0.2, s * 0.18, ironDk, ironLit);
+            }
+            // The furnace door, its hinges and its bars — the mouth.
+            b.box(0, -0.72, 1.52, 1.5, 0.62, 0.14, ironDk, F.ALL, ironLit);
+            for (let x = -0.55; x <= 0.56; x += 0.22) b.box(x, -0.72, 1.62, 0.07, 0.52, 0.06, iron);
+            for (const s of [-1, 1]) b.box(s * 0.86, -0.72, 1.56, 0.14, 0.4, 0.14, brass);
+            // Stacks.
+            for (const s of [-1, 1]) {
+                b.cyl(s * 2.2, 3.4, -0.8, 0.45, 3.2, 'y', ironDk, 14, ironLit);
+                b.cyl(s * 2.2, 5.05, -0.8, 0.58, 0.2, 'y', ironLit, 14);
+            }
+            // Feet bolted to the wall.
+            for (const s of [-1, 1]) b.box(s * 2.8, -2.1, -1.3, 1.2, 0.5, 1.6, ironDk, F.ALL, ironLit);
+        }, mat));
+
+        // Eyes (glass) and mouth (fire), on the additive pass so they burn.
+        const eyes = [];
+        for (const s of [-1, 1]) {
+            const eye = part(function (b) {
+                b.cyl(0, 0, 0, 0.36, 0.04, 'z', R3D.col('#ffffff'), 20);
+            }, glowMat.clone());
+            eye.position.set(s * 0.72, 0.55, 1.62);
+            eye.material.userData.shared = false;
+            g.add(eye);
+            eyes.push(eye);
+        }
+        const needles = [];
+        for (const s of [-1, 1]) {
+            const needle = part(function (b) {
+                b.box(0, 0.16, 0, 0.05, 0.32, 0.03, R3D.col('#1a1010'));
+            }, mat);
+            needle.position.set(s * 0.72, 0.55, 1.68);
+            g.add(needle);
+            needles.push(needle);
+        }
+        const mouth = part(function (b) {
+            b.box(0, 0, 0, 1.3, 0.45, 0.04, R3D.col('#ffffff'));
+        }, glowMat.clone());
+        mouth.position.set(0, -0.72, 1.56);
+        mouth.material.userData.shared = false;
+        g.add(mouth);
+
+        // A working piston at each shoulder.
+        const pistons = [];
+        for (const s of [-1, 1]) {
+            const cyl = part(function (b) {
+                b.cyl(0, 0, 0, 0.42, 2.2, 'y', iron, 14, ironLit);
+                b.cyl(0, 1.12, 0, 0.5, 0.16, 'y', brass, 14);
+            }, mat);
+            cyl.position.set(s * 4.3, -0.4, -0.3);
+            g.add(cyl);
+            const rod = part(function (b) {
+                b.cyl(0, 0.9, 0, 0.14, 1.8, 'y', brassLit, 10);
+                b.box(0, 1.9, 0, 0.8, 0.3, 0.5, paint, F.ALL, paintLit);
+            }, mat);
+            rod.position.set(s * 4.3, 0.7, -0.3);
+            g.add(rod);
+            pistons.push(rod);
+        }
+
+        g.userData = { eyes: eyes, needles: needles, mouth: mouth, pistons: pistons, shake: 0 };
+        return g;
+    }
+
+    /** The steam main from the Governor to each of its valves, rebuilt per vault. */
+    function buildMains(boss, mat) {
+        const b = new R3D.Builder();
+        const pipe = R3D.col('#5a4636'), lit = R3D.col('#8a6a4c');
+        const bx = R3D.wx(boss.x), by = R3D.wy(boss.y);
+        const z = -1.7;
+        for (const v of boss.valves) {
+            const vx = R3D.wx(v.x), vy = R3D.wy(v.y) + 0.1;
+            // Across at the Governor's height, then down to the valve.
+            b.cyl((bx + vx) / 2, by - 1.2, z, 0.16, Math.abs(vx - bx), 'x', pipe, 10, lit);
+            b.cyl(vx, (by - 1.2 + vy) / 2, z, 0.16, Math.abs(by - 1.2 - vy), 'y', pipe, 10, lit);
+            b.sphere(vx, by - 1.2, z, 0.22, lit, 10, 6);
+            // Brackets every few tiles down the drop.
+            for (let y = vy + 1; y < by - 1.4; y += 3) b.box(vx, y, z - 0.2, 0.5, 0.12, 0.3, lit, F.ALL);
+        }
+        const mesh = new THREE.Mesh(b.geometry(), mat);
+        mesh.name = 'mains';
+        return mesh;
+    }
+
+    function poseGovernor(g, boss, t, dt) {
+        const u = g.userData;
+        const dying = boss.state === 'dying';
+        const dead = boss.state === 'dead';
+        const hurt = boss.hurtT < 0.35;
+        const firing = boss.state === 'volley';
+
+        // Eyes: amber idle, red when about to fire, white flash when hurt, dark when dead.
+        const eyeHex = dead ? '#1a0a06' : hurt ? '#ffffff' : (firing || dying) ? '#ff3a1a' : '#ffb040';
+        const pulse = dead ? 0.2 : 0.75 + Math.sin(t * (firing ? 18 : 3)) * 0.25;
+        for (const eye of u.eyes) {
+            eye.material.color.copy(R3D.tmpCol(eyeHex)).multiplyScalar(pulse);
+        }
+        // Needles swing with its pressure — pinned hard over when it is angry.
+        const pressure = dead ? -2.4 : firing ? 1.2 + Math.sin(t * 30) * 0.15 : Math.sin(t * 1.3) * 0.5 + boss.broken() * 0.4;
+        for (let i = 0; i < u.needles.length; i++) u.needles[i].rotation.z = -pressure * (i ? 1 : -1);
+
+        // The mouth roars before a volley and while it fires.
+        const heat = dead ? 0.05 : firing ? 1.0 : 0.35 + Math.sin(t * 2) * 0.1;
+        u.mouth.material.color.copy(R3D.tmpCol('#ff7a2a')).multiplyScalar(heat);
+
+        // Pistons, faster as it loses valves.
+        const rate = dead ? 0 : 2.4 * (1 + boss.broken() * 0.3);
+        for (let i = 0; i < u.pistons.length; i++) {
+            u.pistons[i].position.y = 0.7 + Math.sin(t * rate + i * Math.PI) * 0.45;
+        }
+
+        // Shudder when hit or dying; sag when dead.
+        const shake = dying ? 0.12 : hurt ? 0.08 * (1 - boss.hurtT / 0.35) : 0;
+        g.position.x += Math.sin(t * 57) * shake;
+        g.position.y += Math.sin(t * 43) * shake - (dead ? 0.35 : 0);
+        g.rotation.z = dead ? 0.06 : 0;
+    }
+
+    /* ------------------------------------------------------------------ *
      * Rigs
      * ------------------------------------------------------------------ */
 
@@ -921,6 +1085,25 @@
             b.cyl(0, -0.08, 0, 0.3, 0.05, 'y', R3D.col('#e8a521'), 14);
             b.box(0, 0.06, 0.2, 0.1, 0.08, 0.06, R3D.col('#fff6d0'));
         },
+        /**
+         * A brass cog: a toothed ring round a four-spoke hub. Bigger than a
+         * nugget and a different metal — this is the thing the dog found, and
+         * it has to look like a *find*.
+         */
+        cog: function (b) {
+            const brass = R3D.col('#c89a3e');
+            const lit = R3D.col('#ffe08a');
+            const teeth = 10;
+            for (let k = 0; k < teeth; k++) {
+                const a = (k / teeth) * Math.PI * 2;
+                b.rbox(Math.cos(a) * 0.27, Math.sin(a) * 0.27, 0, 0.13, 0.12, 0.12, a, brass, lit);
+                b.rbox(Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0, 0.14, 0.07, 0.1, a + Math.PI / 2, brass, lit);
+            }
+            for (let k = 0; k < 4; k++) {
+                b.rbox(0, 0, 0, 0.36, 0.05, 0.08, k * Math.PI / 4 * 2, brass, lit);
+            }
+            b.cyl(0, 0, 0, 0.07, 0.14, 'z', lit, 10);
+        },
         /** A pressure bottle with a valve. */
         oxygen: function (b) {
             b.cyl(0, -0.02, 0, 0.155, 0.5, 'y', R3D.col('#3aa6c0'), 12, R3D.col('#63cfe4'));
@@ -1055,6 +1238,71 @@
         set.pools.glowSprite = new Pool(set.group, function (b) {
             b.plate(0, 0, 0, 1, 1, R3D.col('#ffffff'));
         }, R3D.haloMaterial('#ffffff', 0.5), 24);
+        /** A lever: an iron post and quadrant, and a handle that swings over. */
+        set.pools.leverBase = new Pool(set.group, function (b) {
+            b.box(0, 0.08, 0, 0.5, 0.16, 0.4, R3D.col('#2a2622'), F.ALL, R3D.col('#5a524a'));
+            b.cyl(0, 0.3, 0, 0.3, 0.1, 'z', R3D.col('#8a6a34'), 12, R3D.col('#d8b060'));
+            b.box(0, 0.22, 0, 0.1, 0.3, 0.12, R3D.col('#3a3430'), F.ALL);
+        }, solid, 4);
+        set.pools.leverHandle = new Pool(set.group, function (b) {
+            b.cyl(0, 0.3, 0, 0.04, 0.6, 'y', R3D.col('#6a625a'), 8);
+            b.sphere(0, 0.62, 0, 0.09, R3D.col('#d0342a'), 10, 7);
+        }, solid, 4);
+
+        /**
+         * One tile of shutter: iron slats with a warning edge down the side.
+         * The amber is deliberate — it is the hazard colour, and a gate is the
+         * one terrain feature that is *in the way on purpose*.
+         */
+        set.pools.gate = new Pool(set.group, function (b) {
+            b.box(0, 0, 0, 0.92, 1, 0.3, R3D.col('#3a3834'), F.ALL, R3D.col('#6a645c'));
+            for (let i = 0; i < 4; i++) {
+                b.box(0, -0.375 + i * 0.25, 0.17, 0.92, 0.07, 0.04, R3D.col('#5a544c'), F.ALL);
+            }
+            for (const s of [-1, 1]) b.box(s * 0.44, 0, 0.18, 0.06, 1, 0.05, R3D.col('#e8a41c'), F.FRONT);
+        }, solid, 16);
+        set.pools.gateHead = new Pool(set.group, function (b) {
+            b.box(0, 0.25, 0, 1.3, 0.5, 0.7, R3D.col('#2a2622'), F.ALL, R3D.col('#5a524a'));
+            b.cyl(0, 0.25, 0.36, 0.18, 0.1, 'z', R3D.col('#8a6a34'), 12);
+        }, solid, 4);
+
+        /**
+         * A pressure valve on the Governor's main: a stub of pipe out of the
+         * deck and a big red handwheel on top. Drawn with the same wheel the
+         * pipework on the walls carries, so it reads as *part of the works*,
+         * wired to the thing in the wall.
+         */
+        set.pools.valve = new Pool(set.group, function (b) {
+            b.cyl(0, 0.16, 0, 0.18, 0.32, 'y', R3D.col('#5a4636'), 12, R3D.col('#8a6a4c'));
+            b.cyl(0, 0.34, 0, 0.26, 0.1, 'y', R3D.col('#8a6a4c'), 14);
+            b.cyl(0, 0.46, 0, 0.12, 0.2, 'y', R3D.col('#6a5040'), 10);
+            const wheel = R3D.col('#c8302a'), wheelLit = R3D.col('#ff6a4a');
+            for (let k = 0; k < 14; k++) {
+                const a = (k / 14) * Math.PI * 2;
+                b.box(Math.cos(a) * 0.34, 0.6, Math.sin(a) * 0.34, 0.16, 0.07, 0.07, wheel, F.ALL, wheelLit);
+            }
+            for (let k = 0; k < 2; k++) {
+                b.box(0, 0.6, 0, k ? 0.7 : 0.06, 0.05, k ? 0.06 : 0.7, wheel, F.ALL, wheelLit);
+            }
+        }, solid, 4);
+        set.pools.valveBroken = new Pool(set.group, function (b) {
+            b.cyl(0, 0.12, 0, 0.18, 0.24, 'y', R3D.col('#2a201a'), 12);
+            b.rbox(0.12, 0.3, 0, 0.2, 0.12, 0.2, 0.6, R3D.col('#3a2a20'));
+            b.rbox(-0.14, 0.28, 0.05, 0.18, 0.1, 0.18, -0.5, R3D.col('#3a2a20'));
+        }, solid, 4);
+
+        /** A falling cinder: a glowing lump with a molten core. */
+        set.pools.cinder = new Pool(set.group, function (b) {
+            b.sphere(0, 0, 0, 0.2, R3D.col('#ff7a2a'), 10, 7);
+            b.sphere(0, 0.03, 0.06, 0.12, R3D.col('#ffd070'), 8, 6);
+        }, glow, 8);
+
+        set.governor = buildGovernor(solid, glow);
+        set.governor.visible = false;
+        set.group.add(set.governor);
+        set.mains = null;
+        set.mainsFor = null;
+
         /** A hot rivet in flight. Emissive, so it reads in the dark. */
         set.pools.rivet = new Pool(set.group, function (b) {
             b.cyl(0, 0, 0, 0.09, 0.26, 'x', R3D.col('#ffb050'), 8, R3D.col('#fff0c0'));
@@ -1109,12 +1357,13 @@
 
         // Pickups.
         for (const p of ents.pickups) {
-            if (p.taken) continue;
+            if (p.taken || !p.revealed) continue;
             const mesh = set.pools['pickup_' + p.kind].next();
             mesh.position.set(R3D.wx(p.x), R3D.wy(p.y) + 0.34, ACTOR_Z);
             // Coins spin edge-on so they flash as they turn; everything else
             // just rocks a little.
-            mesh.rotation.y = p.kind === 'ore' ? t * 2.4 + p.phase : Math.sin(t + p.phase) * 0.25;
+            mesh.rotation.set(0, p.kind === 'ore' ? t * 2.4 + p.phase : Math.sin(t + p.phase) * 0.25, 0);
+            if (p.kind === 'cog') mesh.rotation.set(0, Math.sin(t * 0.8) * 0.4, t * 1.6);
 
             if (p.spec.glow) {
                 /*
@@ -1130,10 +1379,12 @@
                  */
                 const hot = p.kind === 'tnt' ? '#ffb060'
                     : (p.kind === 'oxygen' ? '#8fe4f4'
-                    : (p.kind === 'heart' ? '#ffd0e0' : '#fff0a0'));
+                    : (p.kind === 'heart' ? '#ffd0e0'
+                    : (p.kind === 'cog' ? '#fff4c8' : '#fff0a0')));
                 const warm = p.kind === 'tnt' ? '#ff7a2c'
                     : (p.kind === 'oxygen' ? '#3ab4d8'
-                    : (p.kind === 'heart' ? '#ff6a94' : '#ffc41e'));
+                    : (p.kind === 'heart' ? '#ff6a94'
+                    : (p.kind === 'cog' ? '#ffb030' : '#ffc41e')));
 
                 const pulse = 0.9 + Math.sin(t * 3 + p.phase) * 0.1;
                 const core = set.pools.glowSprite.next();
@@ -1262,6 +1513,15 @@
 
         // Shots: a hot rivet and a short trail of heat behind it.
         for (const s of ents.shots) {
+            if (s.kind === 'cinder') {
+                const c = set.pools.cinder.next();
+                c.position.set(R3D.wx(s.x), R3D.wy(s.y), ACTOR_Z + 0.05);
+                const halo = set.pools.glowSprite.next();
+                halo.position.set(c.position.x, c.position.y + 0.25, ACTOR_Z);
+                halo.scale.set(0.9, 1.4, 1);
+                tint(halo, '#ff7a2a', 0.55);
+                continue;
+            }
             const mesh = set.pools.rivet.next();
             mesh.position.set(R3D.wx(s.x), R3D.wy(s.y), ACTOR_Z + 0.05);
             mesh.rotation.set(0, 0, t * 20);
@@ -1272,6 +1532,77 @@
                 tr.scale.set(0.55 * k, 0.4 * k, 1);
                 tint(tr, i === 0 ? '#ffd27a' : '#ff6a2a', 0.8 * k);
             }
+        }
+
+        // Levers.
+        for (const l of ents.levers) {
+            const base = set.pools.leverBase.next();
+            base.position.set(R3D.wx(l.x), R3D.wy(l.y), ACTOR_Z - 0.2);
+            const handle = set.pools.leverHandle.next();
+            handle.position.set(R3D.wx(l.x), R3D.wy(l.y) + 0.28, ACTOR_Z - 0.1);
+            handle.rotation.set(0, 0, 0.7 - l.swing * 1.4);
+        }
+
+        // Gates: each column winds up into its head as it opens.
+        const heads = new Map();
+        for (const gt of ents.gates) {
+            const key = gt.tx;
+            const top = heads.get(key);
+            if (top === undefined || gt.ty < top) heads.set(key, gt.ty);
+        }
+        for (const gt of ents.gates) {
+            const topRow = heads.get(gt.tx);
+            const rows = ents.gates.filter(function (o) { return o.tx === gt.tx; }).length;
+            const rise = gt.lift * rows;
+            const y = C.ROWS - gt.ty - 0.5 + rise;
+            if (y > C.ROWS - topRow - 0.5 + 0.1) continue;      // wound into the head
+            const mesh = set.pools.gate.next();
+            mesh.position.set(gt.tx + 0.5, y, ACTOR_Z - 0.35);
+        }
+        for (const [tx, ty] of heads) {
+            const head = set.pools.gateHead.next();
+            head.position.set(tx + 0.5, C.ROWS - ty, ACTOR_Z - 0.35);
+        }
+
+        // The Governor, its mains, and its valves.
+        const boss = ents.boss;
+        set.governor.visible = !!boss;
+        if (boss) {
+            if (set.mainsFor !== boss) {
+                if (set.mains) R3D.dispose(set.mains);
+                set.mains = buildMains(boss, set.solid);
+                set.mainsFor = boss;
+                set.group.add(set.mains);
+            }
+            set.governor.position.set(R3D.wx(boss.x), R3D.wy(boss.y), -2.1);
+            poseGovernor(set.governor, boss, t, dt);
+
+            for (const v of boss.valves) {
+                const broken = v.state === 'broken';
+                const mesh = set.pools[broken ? 'valveBroken' : 'valve'].next();
+                mesh.position.set(R3D.wx(v.x), R3D.wy(v.y), ACTOR_Z - 0.1);
+                mesh.rotation.set(0, v.state === 'open' ? t * 6 : 0, 0);
+                if (v.state === 'open') {
+                    // Venting: red heat round it and a column of steam.
+                    const glowS = set.pools.glowSprite.next();
+                    glowS.position.set(mesh.position.x, mesh.position.y + 0.5, ACTOR_Z);
+                    const s = 1.3 + Math.sin(t * 20) * 0.15;
+                    glowS.scale.set(s, s, 1);
+                    tint(glowS, '#ff4a1a', 0.75);
+                    for (let i = 0; i < 3; i++) {
+                        const k = (t * 1.8 + i / 3) % 1;
+                        const puff = set.pools.glowSprite.next();
+                        puff.position.set(mesh.position.x + Math.sin(k * 9 + i) * 0.1, mesh.position.y + 0.7 + k * 1.6,
+                                          ACTOR_Z - 0.05);
+                        puff.scale.set(0.4 + k * 0.7, 0.4 + k * 0.7, 1);
+                        tint(puff, '#c8d0d8', 0.35 * (1 - k));
+                    }
+                }
+            }
+        } else if (set.mains) {
+            R3D.dispose(set.mains);
+            set.mains = null;
+            set.mainsFor = null;
         }
 
         // Machinery.

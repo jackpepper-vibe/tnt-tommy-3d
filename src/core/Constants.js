@@ -80,11 +80,12 @@
         WATER: 13,      // drowns you without the oxygen tank
         DETONATOR: 14,  // the plunger; the mine exit once every stick is in
         TRAMPOLINE: 15, // launches you higher than a jump reaches
-        TELEPORT: 16    // paired warp pads; press Down on one
+        TELEPORT: 16,   // paired warp pads; press Down on one
+        GATE: 17        // a shutter: solid until the room's lever is thrown
     };
 
     /** Tiles that stop horizontal movement outright. */
-    C.SOLID_TILES = new Set([C.Tile.ROCK, C.Tile.CRACKED]);
+    C.SOLID_TILES = new Set([C.Tile.ROCK, C.Tile.CRACKED, C.Tile.GATE]);
 
     /** Tiles you can stand on from above but pass through from below. */
     C.ONEWAY_TILES = new Set([
@@ -425,6 +426,21 @@
     C.SCORE_LIFE_BONUS = 500;  // per life still held when a mine blows
     C.SCORE_TIME_BASE = 15000; // decays by SCORE_TIME_DECAY per second elapsed
     C.SCORE_TIME_DECAY = 25;
+    C.SCORE_COG = 500;         // a brass cog, found by the dog
+    C.SCORE_VALVE = 1000;      // one of the Governor's valves
+    C.SCORE_GOVERNOR = 5000;   // and the Governor itself
+
+    /** Cogs hidden in each mine. `scripts/smoke.mjs` holds every mine to it. */
+    C.COGS_PER_MINE = 3;
+    /**
+     * How close Tommy has to be before the dog smells a cog, in px.
+     *
+     * Near enough that the find belongs to the player who went looking — the
+     * dog confirms a hunch, it does not do the exploring — and far enough that
+     * a cog behind a wall or up a shaft is still pointed at from the room it
+     * is in.
+     */
+    C.SNIFF_R = C.TILE * 6;
 
     /* ------------------------------------------------------------------ *
      * Dynamite

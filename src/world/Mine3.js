@@ -142,6 +142,7 @@
              * of it costs you the way through.
              */
             build: function (g) {
+
                 g.lava(2, 23, 38, 1);
 
                 g.deck(20, [3, 8], [15, 7], [27, 9]);
@@ -168,6 +169,9 @@
                 g.walker(34, 19);
 
                 g.ladder(6, 5, 7);
+
+                // A cog on the high shelf at the top of the ladder.
+                g.cog(4, 7);
             }
         },
 
@@ -283,6 +287,7 @@
              * bottom half on the way back down.
              */
             build: function (g) {
+
                 g.rock(31, 4, 1, 16);
                 g.rock(31, 3, 7, 1);
                 g.rock(36, 20, 1, 2);
@@ -325,6 +330,9 @@
                 g.crawler(25, 13);
                 g.dog(9, 22);
 
+
+                // A cog at the top of the cage run in the stack.
+                g.cog(33, 4);
             }
         },
 
@@ -344,6 +352,7 @@
              * the drop, and the drop no longer hurts.
              */
             build: function (g) {
+
                 g.deck(20, [2, 9], [16, 8], [29, 9]);
                 g.deck(17, [7, 8], [22, 9]);
                 g.rope(5, 32, 15);
@@ -376,6 +385,9 @@
 
                 g.vine(6, 5, 7);
                 g.vine(28, 5, 7);
+
+                // A cog under the low line, taken hand over hand.
+                g.cog(10, 16);
             }
         },
 
@@ -392,6 +404,7 @@
              * paying attention in the Fan House.
              */
             build: function (g) {
+
                 g.spikes(8, 4, 5);
 
                 g.deck(20, [2, 6], [32, 8]);
@@ -427,6 +440,13 @@
                 g.guardian(30, 6);
                 g.crawler(34, 16);
                 g.orb(19, 16);
+
+                /*
+                 * The door on to the Last Vault is shuttered; the lever is on the high
+                 * deck. The vault can still be reached up the Chimney.
+                 */
+                g.gate(40, 19, 4);
+                g.lever(33, 4);
             }
         },
 
@@ -436,6 +456,8 @@
             blurb: 'The plunger',
             cell: [2, 0],
             exits: { left: true, down: true },
+            /** The last Governor: the fastest, with every attack it has. */
+            boss: { at: [21, 3] },
             /**
              * The end of the game. Two pistons and a guardian between the door
              * and the plunger, and a trampoline that gets you over both if you
@@ -446,6 +468,9 @@
                 g.crusher(26, 19);
                 g.crusher(31, 19);
                 g.tramp(20, 22, 2);
+                g.valve(9, 7);
+                g.valve(35, 13);
+                g.valve(12, 16);
 
                 g.deck(20, [2, 8], [13, 6], [24, 9]);
                 g.deck(17, [6, 9], [19, 8], [30, 8]);
@@ -466,13 +491,10 @@
                 g.ore(33, 7, 1);
 
                 g.spikes(14, 22, 4);
-                g.guardian(17, 9);
-                g.guardian(27, 6);
                 g.bat(22, 15);
                 g.walker(17, 19);
                 g.spider(29, 1);
                 g.spider(12, 1);
-                g.orb(9, 16);
 
                 g.ladder(6, 8, 13);
             }

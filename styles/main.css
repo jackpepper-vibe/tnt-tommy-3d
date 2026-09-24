@@ -235,6 +235,87 @@ body[data-screen="victory"] .hud {
     box-shadow: 0 0 10px rgba(90, 200, 222, 0.5);
 }
 
+/* --- cogs --------------------------------------------------------------- */
+
+.cogs {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.9em;
+    color: var(--ink-dim);
+}
+
+.cogs b { color: var(--ink); }
+.cogs__of { opacity: 0.5; }
+
+.cogs__icon {
+    width: 13px;
+    height: 13px;
+    margin-right: 0.15rem;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle, #1a120a 0 22%, transparent 24%),
+        conic-gradient(#e0b050 0 10%, #8a5a18 10% 20%, #e0b050 20% 30%, #8a5a18 30% 40%,
+                       #e0b050 40% 50%, #8a5a18 50% 60%, #e0b050 60% 70%, #8a5a18 70% 80%,
+                       #e0b050 80% 90%, #8a5a18 90% 100%);
+    box-shadow: 0 0 6px rgba(255, 190, 80, 0.5);
+}
+
+.cogs.is-bumped { animation: bump 0.5s ease-out; }
+
+@keyframes bump {
+    0% { transform: scale(1.6); }
+    100% { transform: scale(1); }
+}
+
+/* --- the Governor --------------------------------------------------------- */
+
+.governor {
+    position: absolute;
+    top: 4.2rem;
+    left: 50%;
+    transform: translate(-50%, -8px);
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.35rem 0.9rem;
+    background: var(--panel);
+    border: 1px solid rgba(255, 90, 60, 0.45);
+    border-radius: 6px;
+    color: #ffb4a0;
+    font-size: 0.78rem;
+    letter-spacing: 0.24em;
+    text-shadow: var(--shadow);
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.governor.is-shown { opacity: 1; transform: translate(-50%, 0); }
+
+.governor__valves { display: flex; gap: 0.35rem; }
+
+.governor__valves i {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #ff6a4a;
+    background: radial-gradient(circle, #ff8a5a 0 35%, #8a1c10 70%);
+    box-shadow: 0 0 8px rgba(255, 80, 40, 0.7);
+}
+
+.governor__valves i.is-broken {
+    border-color: #4a3a34;
+    background: #1e1614;
+    box-shadow: none;
+}
+
+.governor__valves i.is-open { animation: vent 0.35s infinite alternate; }
+
+@keyframes vent {
+    from { transform: scale(1); }
+    to { transform: scale(1.25); box-shadow: 0 0 14px rgba(255, 120, 60, 1); }
+}
+
 .medals {
     display: flex;
     align-items: center;
@@ -628,6 +709,90 @@ body[data-screen="victory"] .minimap {
 .ember:nth-child(5) { left: 67%; animation-duration: 8.5s;  animation-delay: 3.6s; }
 .ember:nth-child(6) { left: 80%; animation-duration: 10s;   animation-delay: 0.8s; }
 .ember:nth-child(7) { left: 91%; animation-duration: 9.5s;  animation-delay: 5.5s; width: 3px; height: 3px; }
+
+/* ==========================================================================
+   The workshop
+   ========================================================================== */
+
+.card--workshop { max-width: 980px; }
+
+.shop__bank { color: var(--gold); font-size: 1.2em; }
+
+.shop {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.8rem;
+    margin: 0 0 1.2rem;
+    text-align: left;
+}
+
+.shop__item {
+    pointer-events: auto;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.85rem 0.95rem 0.8rem;
+    font: inherit;
+    color: var(--ink);
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+
+.shop__item:hover,
+.shop__item.is-selected {
+    transform: translateY(-2px);
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold), 0 10px 26px rgba(0, 0, 0, 0.6);
+}
+
+.shop__name {
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-size: 0.9rem;
+}
+
+.shop__blurb {
+    color: var(--ink-dim);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    flex: 1;
+}
+
+.shop__cost {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    color: var(--ink-dim);
+}
+
+.shop__cost .cogs__icon { margin: 0; }
+
+.shop__item.is-poor { opacity: 0.55; }
+.shop__item.is-poor .shop__name { color: var(--ink-dim); }
+
+.shop__item.is-owned { opacity: 0.6; }
+.shop__item.is-owned .shop__cost { color: var(--good); }
+
+.shop__item.is-go {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: linear-gradient(180deg, var(--gold), #e2892b);
+    color: #241505;
+}
+
+.shop__item.is-go .shop__name { color: #241505; font-size: 1rem; }
+.shop__item.is-go .shop__blurb { color: #4a2a0a; flex: none; }
+
+.shop__item.is-bought { animation: bump 0.45s ease-out; }
 
 /* Portrait above the text once there is no room for it beside. */
 @media (max-width: 760px) {

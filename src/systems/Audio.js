@@ -42,6 +42,8 @@
         this.sources = {};
         this.current = '';
         this._lastPlayed = new Map();
+        /** Procedural voices for everything the samples do not cover. */
+        this.synth = null;
         this._listen();
     }
 
@@ -64,6 +66,7 @@
             this.musicGain = this.ctx.createGain();
             this.musicGain.gain.value = 0.5;
             this.musicGain.connect(this.master);
+            this.synth = new TNT.Synth(this.ctx, this.master);
             this._loadAll();
         } catch (err) {
             this.ctx = null;
@@ -99,7 +102,20 @@
         }
     };
 
-    Audio.prototype.play = function (name, gain) {
+    /**
+     * Play a synthesised voice by name, with the same retrigger guard the
+     * samples get.
+     */
+    Audio.prototype.sfx = function (name, arg) {
+        if (!this.synth || this.muted) return;
+        const now = this.ctx.currentTime;
+        const key = 'synth:' + name;
+        if ((this._lastPlayed.get(key) || -1) > now - 0.04) return;
+        this._lastPlayed.set(key, now);
+        this.synth[name](arg);
+    };
+
+    Audio.prototype.play = function (name, gain, rate) {
         if (!this.ctx || this.muted) return;
         const buf = this.buffers.get(name);
         if (!buf) return;
@@ -115,6 +131,7 @@
         const g = this.ctx.createGain();
         g.gain.value = gain === undefined ? 0.7 : gain;
         src.buffer = buf;
+        if (rate) src.playbackRate.value = rate;
         src.connect(g);
         g.connect(this.master);
         src.start();
@@ -168,7 +185,7 @@
         const run = this.run;
         if (run.state === 'playing' || run.state === 'transition') {
             this.music(run.danger ? 'danger' : 'theme');
-        } else if (run.state === 'title') {
+        } else if (run.state === 'title' || run.state === 'workshop') {
             this.music('theme');
         } else if (run.state === 'boom' || run.state === 'victory' || run.state === 'gameover') {
             this.music('');
@@ -183,6 +200,7 @@
             if (e.kind === 'tnt') self.play('tnt');
             else if (e.kind === 'food') self.play('food', 0.55);
             else if (e.kind === 'heart' || e.kind === 'oxygen') self.play('life');
+            else if (e.kind === 'cog') self.sfx('chime', 880);
             else self.play('food', 0.35);
         });
         bus.on(EV.ALL_TNT, function () { self.play('life'); });
@@ -197,7 +215,26 @@
         bus.on(EV.CRUMBLE, function () { self.play('bounce', 0.35); });
         // A stomp is a small explosion, not a bounce — it has to sound like a
         // kill or it reads as having simply hopped off the thing.
-        bus.on(EV.ENEMY_STOMPED, function () { self.play('boom', 0.4); });
+        // Each stomp in a chain rises in pitch, so a run of them sings.
+        bus.on(EV.ENEMY_STOMPED, function (e) { self.play('boom', 0.4, 1 + (e.chain - 1) * 0.1); });
+        bus.on(EV.DOG_BARK, function () { self.sfx('bark'); });
+        bus.on(EV.SECRET_FOUND, function () { self.sfx('chime', 660); });
+        bus.on(EV.ARMOUR_CLANG, function () { self.sfx('clang'); });
+        bus.on(EV.ENEMY_FIRED, function () { self.sfx('shot'); });
+        bus.on(EV.SHOT_HIT, function () { self.sfx('thump', 1.4); });
+        bus.on(EV.LEVER_THROWN, function () { self.sfx('clunk'); self.sfx('rumble'); });
+        bus.on(EV.VALVE_OPENED, function () { self.sfx('hiss', 1.2); });
+        bus.on(EV.VENT_FIRED, function () { self.sfx('hiss', 0.4); });
+        bus.on(EV.BOSS_TELL, function (e) { if (e.move === 'volley') self.sfx('roar'); });
+        bus.on(EV.BOSS_HURT, function () { self.sfx('clang'); self.play('boom', 0.6, 0.8); });
+        bus.on(EV.BOSS_BURST, function () { self.play('boom', 0.5, 0.7 + Math.random() * 0.4); });
+        bus.on(EV.BOSS_DEFEATED, function () { self.play('boom', 1, 0.6); self.play('life'); });
+        bus.on(EV.WALL_JUMP, function () { self.sfx('thump', 1.2); self.play('jump', 0.3); });
+        bus.on(EV.PLAYER_JUMPED, function () { self.play('jump', 0.25); });
+        bus.on(EV.PLAYER_LANDED, function (e) { self.sfx('thump', e.hard ? 0.7 : 1); });
+        bus.on(EV.PLAYER_SKID, function () { self.sfx('skid'); });
+        bus.on(EV.PLAYER_STEP, function () { self.sfx('step'); });
+        bus.on(EV.UPGRADE_BOUGHT, function () { self.sfx('chime', 990); });
         bus.on(EV.STATE_CHANGED, function (e) {
             if (e.to === 'victory') self.play('win');
         });

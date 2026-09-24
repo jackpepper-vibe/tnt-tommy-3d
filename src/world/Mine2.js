@@ -148,6 +148,7 @@
              * always somewhere to stand, and always less of it.
              */
             build: function (g) {
+
                 g.lava(2, 23, 38, 1);
 
                 g.deck(20, [3, 7], [13, 8], [25, 7], [34, 5]);
@@ -175,6 +176,9 @@
                 g.walker(33, 19);
 
                 g.ladder(37, 5, 19);
+
+                // A cog on the one-tile ledge by the ladder, in a room that floods.
+                g.cog(38, 10);
             }
         },
 
@@ -204,6 +208,7 @@
              * was lying at the bottom of the swim.
              */
             build: function (g) {
+
                 g.water(1, 12, 14, 11);
                 g.rock(15, 12, 2, 11);
 
@@ -239,6 +244,9 @@
                 g.orb(12, 10);
 
                 g.ladder(23, 8, 13);
+
+                // A cog on the bottom of the sump. Swum for, with the tank.
+                g.cog(2, 21);
             }
         },
 
@@ -305,6 +313,7 @@
              * rest. The tram at the top crosses the gap the stairs cannot.
              */
             build: function (g) {
+
                 g.steps(2, 20, 6, 1, 5);
                 g.deck(20, [30, 9]);
                 g.deck(17, [26, 8]);
@@ -334,6 +343,14 @@
                 g.dog(30, 22);
 
                 g.ladder(36, 5, 22);
+
+                /*
+                 * The door from the Engine Room is shuttered from this side. First time
+                 * through, this room is reached from above; the lever by the door makes
+                 * it a short cut for the run back.
+                 */
+                g.gate(1, 19, 4);
+                g.lever(6, 22);
             }
         },
 
@@ -401,6 +418,7 @@
              * boards.
              */
             build: function (g) {
+
                 g.deck(20, [2, 7], [16, 6], [31, 8]);
                 g.deck(17, [6, 7], [26, 8]);
                 g.rope(9, 30, 15);
@@ -435,6 +453,9 @@
 
                 g.vine(7, 8, 10);
                 g.vine(30, 5, 7);
+
+                // A cog hanging under the long line, taken hand over hand.
+                g.cog(17, 10);
             }
         },
 
@@ -444,6 +465,8 @@
             blurb: 'The plunger',
             cell: [2, 0],
             exits: { left: true, down: true },
+            /** The Governor hangs over the middle; Blackdamp's brings cinders. */
+            boss: { at: [21, 2] },
             /**
              * The plunger, reachable along the top band or straight up the
              * Slant Shaft. Two ways in matters more here than anywhere: this is
@@ -459,6 +482,9 @@
                 g.warp(30, 4);
                 g.crusher(31, 19);
                 g.crusher(24, 19);
+                g.valve(5, 4);
+                g.valve(28, 13);
+                g.valve(12, 19);
 
                 g.deck(20, [6, 9], [18, 8], [28, 8]);
                 g.deck(17, [3, 8], [16, 9], [29, 8]);
@@ -479,12 +505,10 @@
                 g.ore(26, 7, 2, 2);
 
                 g.spikes(13, 22, 4);
-                g.guardian(18, 9);
                 g.bat(25, 15);
                 g.walker(19, 19);
                 g.spider(12, 1);
                 g.spider(27, 1);
-                g.orb(9, 10);
                 g.crawler(33, 16);
 
                 g.ladder(37, 5, 22);

@@ -40,6 +40,8 @@
         this.exits = def.exits;
         /** Flood rooms: the lava bed rises while you are standing in it. */
         this.flooding = !!def.flooding;
+        /** `{ at: [tx, ty] }` in the vault: where the Governor is built. */
+        this.boss = def.boss || null;
         /** Shown once, on arrival, under the room name. */
         this.blurb = def.blurb || '';
 

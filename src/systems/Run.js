@@ -19,16 +19,26 @@
  * ------
  *   title → playing ⇄ transition
  *              ↓ dying → playing | gameover
- *              ↓ boom → cleared → playing (next mine) | victory
+ *              ↓ boom → workshop → playing (next mine)
+ *                     ↘ victory (after the last)
+ *
+ * GOALS
+ * -----
+ * A mine asks three things of you, in rising order of commitment: find the
+ * twelve sticks, break the Governor that guards the plunger, and get back to
+ * the plunger alive once the last stick starts the seam coming down. Beside
+ * that runs the optional thread — brass cogs, hidden and sniffed out by the
+ * dog — which pays for kit at the workshop between mines.
  */
 (function (TNT) {
     'use strict';
 
-    const { C, Util, Tiles, World, Entities, Player, Companion, EventBus } = TNT;
+    const { C, Util, Tiles, World, Entities, Player, Companion, EventBus, Upgrades } = TNT;
     const T = C.Tile;
     const EV = TNT.EV;
 
-    const STATES = ['title', 'playing', 'transition', 'dying', 'boom', 'cleared', 'gameover', 'victory'];
+    const STATES = ['title', 'playing', 'transition', 'dying', 'boom', 'cleared', 'workshop',
+                    'gameover', 'victory'];
 
     function Run() {
         this.bus = new EventBus();
@@ -68,6 +78,14 @@
         this.checkpoint = { room: this.roomIndex, x: this.mine.spawnX, y: this.mine.spawnY };
         this.player.placeAt(this.mine.spawnX, this.mine.spawnY);
         this.dog.placeAt(this.mine.spawnX, this.mine.spawnY, 1);
+        /** Brass cogs held, across the run; spent at the workshop. */
+        this.cogs = 0;
+        /** Cogs found in this mine, out of `C.COGS_PER_MINE`. */
+        this.cogsFound = 0;
+        /** Levels of each workshop item bought. See `Upgrades`. */
+        this.upgrades = Upgrades.fresh();
+        this.mods = Upgrades.mods(this.upgrades);
+
         this._checkpointDwell = 0;
         this._timer = 0;
         this._transition = null;
@@ -76,6 +94,19 @@
         /** Stomps since Tommy last touched the ground. */
         this.stompChain = 0;
         this.best = loadBest();
+
+        /*
+         * A heavy landing costs fuse. `C.FALL_DMG` was documented as doing
+         * this from the start and nothing ever applied it, so dropping the
+         * height of a room was free — the one traversal option with no
+         * downside. It never kills: the cost stops at one point of fuse.
+         */
+        const self = this;
+        this.bus.on(EV.PLAYER_LANDED, function (e) {
+            if (self.state !== 'playing' || e.speed < self.mods.fallSafe) return;
+            self.energy = Math.max(1, self.energy - C.FALL_DMG);
+            self.bus.emit(EV.PLAYER_HURT, { x: e.x, y: e.y, cause: 'fall', amount: C.FALL_DMG });
+        });
     }
 
     /* ------------------------------------------------------------------ *
@@ -94,6 +125,9 @@
         this.lives = C.LIVES_START;
         this.score = 0;
         this.elapsed = 0;
+        this.cogs = 0;
+        this.upgrades = Upgrades.fresh();
+        this.mods = Upgrades.mods(this.upgrades);
         this.startMine(0);
     };
 
@@ -110,12 +144,14 @@
         this.allTntAnnounced = false;
         this.medals = 0;
         this.escape = 0;
+        this.cogsFound = 0;
         this._spentStack.length = 0;
         this.bombs.length = 0;
 
         this.roomIndex = this.mine.spawnRoom;
         this.checkpoint = { room: this.mine.spawnRoom, x: this.mine.spawnX, y: this.mine.spawnY };
         this.player.reset(this.mine.spawnX, this.mine.spawnY, false);
+        if (this.mods.startTank) this.player.hasOxygen = true;
         this.dog.placeAt(this.mine.spawnX, this.mine.spawnY, 1);
 
         this._setState('playing');
@@ -201,6 +237,8 @@
         this._updateBombs(dt);
 
         this._collectPickups();
+        this._checkSecrets();
+        this._checkLevers();
         this._checkHazards(dt);
         if (this.state !== 'playing') return;
 
@@ -248,7 +286,7 @@
         this._burnEscape(dt);
         if (this.state !== 'playing') return;
 
-        const rate = C.ENERGY_MAX / (C.FUSE_SECONDS * this.mine.fuseMul);
+        const rate = C.ENERGY_MAX / (C.FUSE_SECONDS * this.mine.fuseMul * this.mods.fuseMul);
         this.energy -= rate * dt;
 
         if (this.player.inWater && !this.player.hasOxygen) {
@@ -298,7 +336,13 @@
                     }
                     break;
                 case 'food':
-                    this.energy = Math.min(C.ENERGY_MAX, this.energy + C.FOOD_ENERGY);
+                    this.energy = Math.min(C.ENERGY_MAX, this.energy + C.FOOD_ENERGY * this.mods.foodMul);
+                    break;
+                case 'cog':
+                    this.cogs++;
+                    this.cogsFound++;
+                    this.dog.release();
+                    this.dog.yap();
                     break;
                 case 'heart':
                     this.lives = Math.min(C.LIVES_MAX, this.lives + 1);
@@ -338,6 +382,53 @@
         if (this.medals === this.mine.rooms.filter(function (r) { return r.oreCount > 0; }).length) {
             this.score += C.SCORE_ALL_MEDALS;
             this.bus.emit(EV.ALL_MEDALS, { mine: this.mine });
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Secrets and levers
+     * ------------------------------------------------------------------ */
+
+    /**
+     * The dog's nose.
+     *
+     * Get within `C.SNIFF_R` of a hidden cog and the dog stops dead, points
+     * at it and barks, and the cog shows itself. It still has to be *reached*
+     * — cogs are hidden in the awkward corners of a room, up shafts and behind
+     * fissures — so the dog turns "is there anything here?" into "how do I get
+     * to it?", which is the better question.
+     *
+     * It lets go once the cog is taken or Tommy wanders well away from it.
+     */
+    Run.prototype._checkSecrets = function () {
+        const p = this.player;
+        const dog = this.dog;
+        for (const pk of this.ents().pickups) {
+            if (pk.kind !== 'cog' || pk.taken) continue;
+            const d = Math.hypot(pk.x - p.x, pk.y - p.centreY());
+            if (!pk.revealed && d < C.SNIFF_R) {
+                pk.revealed = true;
+                dog.pointAt(pk.x, pk.y);
+                this.bus.emit(EV.SECRET_FOUND, { x: pk.x, y: pk.y });
+            } else if (dog.state === 'point' && dog.pointX === pk.x && d > C.SNIFF_R * 1.6) {
+                dog.release();
+            }
+        }
+    };
+
+    /** Walk into a lever and it throws. See `Machines.Lever`. */
+    Run.prototype._checkLevers = function () {
+        const ents = this.ents();
+        if (!ents.levers.length) return;
+        const pb = this.player.box();
+        for (const lever of ents.levers) {
+            if (lever.thrown) continue;
+            const b = lever.box();
+            if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
+            if (ents.throwLever(lever)) {
+                this.bus.emit(EV.LEVER_THROWN, { x: lever.x, y: lever.y });
+                this.bus.emit(EV.SHAKE, { amount: 0.25, seconds: 0.3 });
+            }
         }
     };
 
@@ -400,10 +491,30 @@
             return;
         }
 
+        // Valves first, and whatever the invulnerability: a valve never hurts,
+        // so a stomp on one straight after taking a hit still has to count.
+        if (ents.boss && !ents.boss.defeated()) {
+            for (const v of ents.boss.valves) {
+                if (v.state === 'broken') continue;
+                const b = v.box();
+                if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
+                if (!(p.vy > C.STOMP_MIN_V && p.y <= b.y + b.h * C.STOMP_BAND)) continue;
+                p.vy = -(this._jumpHeld ? C.STOMP_BOUNCE_HELD : C.STOMP_BOUNCE);
+                p.rising = true;
+                p.onGround = false;
+                p.fallSpeed = 0;
+                if (ents.boss.hit(v, false)) {
+                    this._valveBroken(ents.boss);
+                } else {
+                    this.bus.emit(EV.ARMOUR_CLANG, { x: b.x, y: b.y });
+                }
+            }
+        }
+
         if (p.invuln > 0) return;
 
         if (this._touchesTile(room, T.SPIKE)) {
-            this._hurt(C.DMG_SPIKE, 'spike', -p.facing);
+            this._hurt(C.DMG_SPIKE * this.mods.spikeMul, 'spike', -p.facing);
             return;
         }
 
@@ -464,7 +575,7 @@
             if (!Util.overlaps(pb.x, pb.y, pb.w, pb.h, b.x, b.y, b.w, b.h)) continue;
             ents.shots.splice(i, 1);
             this.bus.emit(EV.SHOT_HIT, { x: s.x, y: s.y });
-            this._hurt(C.DMG_RIVET, 'rivet', s.vx > 0 ? 1 : -1);
+            this._hurt(s.kind === 'cinder' ? C.DMG_BOULDER : C.DMG_RIVET, s.kind, s.vx >= 0 ? 1 : -1);
             return;
         }
 
@@ -586,7 +697,9 @@
         const ents = this.entities[bomb.room];
 
         let broke = 0;
-        const r = Math.ceil(C.BLAST_RADIUS / C.TILE);
+        const radius = C.BLAST_RADIUS * this.mods.blastMul;
+        const killR = C.BLAST_KILL_R * this.mods.blastMul;
+        const r = Math.ceil(radius / C.TILE);
         const cx = Math.floor(bomb.x / C.TILE);
         const cy = Math.floor(bomb.y / C.TILE);
         for (let ty = cy - r; ty <= cy + r; ty++) {
@@ -594,14 +707,22 @@
                 if (room.get(tx, ty) !== T.CRACKED) continue;
                 const dx = (tx + 0.5) * C.TILE - bomb.x;
                 const dy = (ty + 0.5) * C.TILE - bomb.y;
-                if (Math.hypot(dx, dy) > C.BLAST_RADIUS) continue;
+                if (Math.hypot(dx, dy) > radius) continue;
                 room.set(tx, ty, T.EMPTY);
                 broke++;
             }
         }
 
-        const killed = ents.killNear(bomb.x, bomb.y, C.BLAST_KILL_R);
+        const killed = ents.killNear(bomb.x, bomb.y, killR);
         this.score += killed * C.SCORE_ENEMY;
+
+        // A stick beside one of the Governor's valves breaks it, open or shut.
+        if (ents.boss) {
+            for (const v of ents.boss.valves) {
+                if (Math.hypot(v.x - bomb.x, v.y - 6 - bomb.y) > killR) continue;
+                if (ents.boss.hit(v, true)) this._valveBroken(ents.boss);
+            }
+        }
 
         // The spent stick goes home.
         const source = this._spentStack.shift();
@@ -614,7 +735,7 @@
         // Standing in your own blast is a hit like any other.
         if (bomb.room === this.roomIndex && this.player.invuln <= 0) {
             const p = this.player;
-            if (Math.hypot(p.x - bomb.x, p.centreY() - bomb.y) < C.BLAST_KILL_R) {
+            if (Math.hypot(p.x - bomb.x, p.centreY() - bomb.y) < killR) {
                 this._hurt(C.DMG_ENEMY, 'blast', p.x < bomb.x ? -1 : 1);
             }
         }
@@ -639,11 +760,13 @@
             return;
         }
 
-        if (this.tntFound < this.mine.tntTotal) {
+        const governor = ents.boss && !ents.boss.defeated();
+        if (this.tntFound < this.mine.tntTotal || governor) {
             if (!this._detHinted) {
                 this._detHinted = true;
                 this.bus.emit(EV.DETONATOR_DENIED, {
-                    x: det.x, y: det.y, needed: this.mine.tntTotal - this.tntFound
+                    x: det.x, y: det.y, needed: this.mine.tntTotal - this.tntFound,
+                    governor: !!governor
                 });
             }
             return;
@@ -661,10 +784,55 @@
 
     Run.prototype._afterBoom = function () {
         if (this.mineIndex + 1 < this.mines.length) {
-            this.startMine(this.mineIndex + 1);
+            // Between mines: the workshop, where cogs become kit.
+            this.player.active = false;
+            this._setState('workshop');
         } else {
             this._finish('victory');
         }
+    };
+
+    /** A Governor lost a valve: pay out, and freeze the frame on it. */
+    Run.prototype._valveBroken = function (boss) {
+        this.score += C.SCORE_VALVE;
+        this.hitstop = Math.max(this.hitstop, C.HITSTOP_STOMP * 2);
+        this.bus.emit(EV.SHAKE, { amount: 0.8, seconds: 0.4 });
+        if (boss.defeated()) {
+            this.score += C.SCORE_GOVERNOR;
+            this.bus.emit(EV.SHAKE, { amount: 1.2, seconds: 1.2 });
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * The workshop
+     * ------------------------------------------------------------------ */
+
+    /** Can this item be bought right now? */
+    Run.prototype.canBuy = function (id) {
+        const item = Upgrades.item(id);
+        if (!item || this.state !== 'workshop') return false;
+        if (this.upgrades[id] >= item.max) return false;
+        if (id === 'helmet' && this.lives >= C.LIVES_MAX) return false;
+        return this.cogs >= item.cost;
+    };
+
+    /** Spend cogs on an item. Returns whether it was bought. */
+    Run.prototype.buy = function (id) {
+        if (!this.canBuy(id)) return false;
+        const item = Upgrades.item(id);
+        this.cogs -= item.cost;
+        this.upgrades[id]++;
+        this.mods = Upgrades.mods(this.upgrades);
+        if (id === 'helmet') this.lives = Math.min(C.LIVES_MAX, this.lives + 1);
+        this.bus.emit(EV.UPGRADE_BOUGHT, { id: id, level: this.upgrades[id] });
+        return true;
+    };
+
+    /** Out of the workshop and down the next mine. */
+    Run.prototype.leaveWorkshop = function () {
+        if (this.state !== 'workshop') return false;
+        this.startMine(this.mineIndex + 1);
+        return true;
     };
 
     /* ------------------------------------------------------------------ *

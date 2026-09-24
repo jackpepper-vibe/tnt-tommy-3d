@@ -14,13 +14,16 @@
     const SCREEN_FOR = {
         title: 'screen-title',
         gameover: 'screen-over',
-        victory: 'screen-win'
+        victory: 'screen-win',
+        workshop: 'screen-workshop'
     };
 
     function Screens(run, root) {
         this.run = run;
         this.root = root;
         this.current = null;
+        /** The selected card in the workshop; the last one is "go on". */
+        this.shopIndex = 0;
         this._listen();
         this.show('title');
     }
@@ -32,11 +35,94 @@
         });
 
         this.root.addEventListener('click', function (ev) {
+            const buy = ev.target.closest('[data-buy]');
+            if (buy) {
+                ev.preventDefault();
+                self._activate(Number(buy.dataset.index));
+                return;
+            }
             const btn = ev.target.closest('[data-confirm]');
             if (!btn) return;
             ev.preventDefault();
             self.run.confirm();
         });
+
+        this.run.bus.on(EV.UPGRADE_BOUGHT, function () {
+            if (self.current === 'workshop') self._renderShop();
+        });
+    };
+
+    /* ------------------------------------------------------------------ *
+     * The workshop
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Driven from the game's own input, not from focus and native buttons:
+     * the input layer swallows arrows, Enter and Space so they never scroll
+     * the page, which also stops them reaching a focused button. So the shop
+     * keeps its own selection and reads the same actions the game does.
+     */
+    Screens.prototype.workshopInput = function (input) {
+        if (this.current !== 'workshop') return;
+        const count = TNT.Upgrades.CATALOGUE.length + 1;
+        const before = this.shopIndex;
+        if (input.justPressed('left') || input.justPressed('up')) this.shopIndex = (this.shopIndex + count - 1) % count;
+        if (input.justPressed('right') || input.justPressed('down')) this.shopIndex = (this.shopIndex + 1) % count;
+        if (this.shopIndex !== before) this._renderShop();
+        if (input.justPressed('confirm')) this._activate(this.shopIndex);
+    };
+
+    Screens.prototype._activate = function (index) {
+        const items = TNT.Upgrades.CATALOGUE;
+        this.shopIndex = index;
+        if (index >= items.length) {
+            this.run.leaveWorkshop();
+            return;
+        }
+        if (this.run.buy(items[index].id)) {
+            const el = this.root.querySelector('[data-index="' + index + '"]');
+            if (el) el.classList.add('is-bought');
+        } else {
+            this._renderShop();
+        }
+    };
+
+    Screens.prototype._renderShop = function () {
+        const run = this.run;
+        const shop = document.getElementById('shop');
+        if (!shop) return;
+        set('shop-cogs', run.cogs);
+        set('shop-eyebrow', run.mine.name + ' is down');
+
+        const items = TNT.Upgrades.CATALOGUE;
+        shop.innerHTML = '';
+        for (let i = 0; i <= items.length; i++) {
+            const card = document.createElement('button');
+            card.className = 'shop__item';
+            card.dataset.buy = '1';
+            card.dataset.index = String(i);
+            card.setAttribute('role', 'listitem');
+            if (i === this.shopIndex) card.classList.add('is-selected');
+
+            if (i === items.length) {
+                const next = run.mines[run.mineIndex + 1];
+                card.classList.add('is-go');
+                card.innerHTML = '<span class="shop__name">Down the shaft ▸</span>' +
+                    '<span class="shop__blurb">' + (next ? next.name : '') + '</span>';
+            } else {
+                const item = items[i];
+                const level = run.upgrades[item.id];
+                const owned = level >= item.max;
+                if (owned) card.classList.add('is-owned');
+                else if (!run.canBuy(item.id)) card.classList.add('is-poor');
+                const pips = '<i class="cogs__icon"></i>'.repeat(item.cost);
+                const tail = owned ? 'OWNED' : (item.max > 1 ? level + ' / ' + item.max : '');
+                card.innerHTML = '<span class="shop__name">' + item.name + '</span>' +
+                    '<span class="shop__blurb">' + item.blurb + '</span>' +
+                    '<span class="shop__cost">' + (owned ? '' : pips) + ' ' + tail + '</span>';
+            }
+            shop.appendChild(card);
+        }
     };
 
     Screens.prototype.show = function (state) {
@@ -48,6 +134,15 @@
         this.current = state || null;
 
         if (state === 'gameover' || state === 'victory') this._fillSummary(state);
+        if (state === 'workshop') {
+            this.shopIndex = TNT.Upgrades.CATALOGUE.length;
+            // Start on the first thing you can actually buy, if there is one.
+            const items = TNT.Upgrades.CATALOGUE;
+            for (let i = 0; i < items.length; i++) {
+                if (this.run.canBuy(items[i].id)) { this.shopIndex = i; break; }
+            }
+            this._renderShop();
+        }
     };
 
     Screens.prototype._fillSummary = function (state) {

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description"
-        content="A mine platformer with no jump button. Twelve sticks of dynamite, three seams, one burning fuse — and every metre of height is a ladder, a rope or a cage.">
+        content="A flip-screen platformer in an underground works. Twelve sticks of dynamite, three seams, a Governor in every vault, one burning fuse — and a dog that finds what you missed.">
     <meta name="color-scheme" content="dark">
     <title>TNT Tommy</title>
     <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
@@ -48,6 +48,9 @@
                 <span class="medals" id="medals" title="Rooms stripped of every nugget">
                     <i class="medals__icon"></i><b id="medal-count">0</b><span class="medals__of">/</span><b id="medal-total">9</b>
                 </span>
+                <span class="cogs" id="cogs" title="Brass cogs found in this mine — the dog sniffs them out">
+                    <i class="cogs__icon"></i><b id="cog-count">0</b><span class="cogs__of">/</span><b id="cog-total">3</b>
+                </span>
                 <span class="kit" id="kit" title="Oxygen tank">O₂</span>
             </div>
         </div>
@@ -56,6 +59,12 @@
         <div class="escape" id="escape" aria-live="assertive">
             <span class="escape__label">SEAM COMING DOWN</span>
             <span class="escape__time" id="escape-time">0:00</span>
+        </div>
+
+        <!-- The Governor, while you are in its vault: one pip per valve. -->
+        <div class="governor" id="governor" aria-live="polite">
+            <span class="governor__label">THE GOVERNOR</span>
+            <span class="governor__valves" id="governor-valves"></span>
         </div>
 
         <!-- Which rooms are done, and where you are. -->
@@ -112,11 +121,11 @@
                     <div class="fuse-line"><div class="fuse-spark"></div></div>
                     <div id="tagline">BRING DOWN ALL THREE SEAMS</div>
 
-                    <p>Twelve sticks of dynamite are scattered through nine rooms of a
-                       working mine. Collect the lot, reach the vault, and drop the
-                       plunger — then run, because lifting the last stick starts the
-                       seam coming down. Food keeps your fuse alight; the faster you
-                       are, the more of it you keep.</p>
+                    <p>Twelve sticks of dynamite are hidden through nine rooms of each
+                       works. Find them, break the Governor that guards the vault, and
+                       drop the plunger — and mind the fuse, because lifting the last
+                       stick starts the seam coming down. The dog sniffs out brass cogs;
+                       spend them at the workshop between mines.</p>
 
                     <div class="ships-row">
                         <span class="ship-chip ship-1"><span class="ship-dot"></span>COPPERLODE</span>
@@ -129,6 +138,7 @@
                         <span><kbd>SPACE</kbd> <b>JUMP</b></span>
                         <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> <b>CLIMB</b></span>
                         <span><kbd>X</kbd> <b>BLAST</b></span>
+                        <span><kbd>&larr;</kbd><kbd>SPACE</kbd> <b>WALL KICK</b></span>
                         <span><kbd>K</kbd> <b>SCANLINES</b></span>
                         <span><kbd>M</kbd> <b>SOUND</b></span>
                     </div>
@@ -175,6 +185,20 @@
         </section>
 
         <!-- ============================================================ -->
+        <!-- The workshop, between mines                                  -->
+        <!-- ============================================================ -->
+        <section class="screen" id="screen-workshop" aria-label="The workshop">
+            <div class="card card--workshop">
+                <p class="card__eyebrow" id="shop-eyebrow">The seam is down</p>
+                <h2 class="card__title">The Workshop</h2>
+                <p class="card__tagline">Brass cogs buy kit that lasts the rest of the run.
+                    You have <b class="shop__bank" id="shop-cogs">0</b> to spend.</p>
+                <div class="shop" id="shop" role="list"></div>
+                <p class="card__keys">&larr; &rarr; choose &nbsp;·&nbsp; ENTER buy &nbsp;·&nbsp; pick the last card to go on</p>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
         <!-- Touch controls                                               -->
         <!-- ============================================================ -->
         <div class="pad" id="pad" aria-hidden="true">
@@ -212,9 +236,11 @@
     <script src="src/world/World.js"></script>
 
     <!-- Simulation -->
+    <script src="src/entities/Machines.js"></script>
     <script src="src/entities/Entities.js"></script>
     <script src="src/entities/Player.js"></script>
     <script src="src/entities/Companion.js"></script>
+    <script src="src/systems/Upgrades.js"></script>
     <script src="src/systems/Run.js"></script>
 
     <!-- ===== 3D PRESENTATION LAYER ===== -->
@@ -226,6 +252,7 @@
     <script src="src/r3d/Scene3D.js"></script>
 
     <!-- Shell -->
+    <script src="src/systems/Synth.js"></script>
     <script src="src/systems/Audio.js"></script>
     <script src="src/systems/Hud.js"></script>
     <script src="src/systems/Screens.js"></script>

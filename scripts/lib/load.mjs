@@ -30,9 +30,11 @@ export const SIM_FILES = [
     'src/world/Mine2.js',
     'src/world/Mine3.js',
     'src/world/World.js',
+    'src/entities/Machines.js',
     'src/entities/Entities.js',
     'src/entities/Player.js',
     'src/entities/Companion.js',
+    'src/systems/Upgrades.js',
     'src/systems/Run.js'
 ];
 

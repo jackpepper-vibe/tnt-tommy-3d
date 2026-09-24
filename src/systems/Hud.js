@@ -37,8 +37,16 @@
             medalTotal: root.querySelector('#medal-total'),
             escape: root.querySelector('#escape'),
             escapeTime: root.querySelector('#escape-time'),
-            minimap: root.querySelector('#minimap')
+            minimap: root.querySelector('#minimap'),
+            cogs: root.querySelector('#cogs'),
+            cogCount: root.querySelector('#cog-count'),
+            cogTotal: root.querySelector('#cog-total'),
+            governor: root.querySelector('#governor'),
+            valves: root.querySelector('#governor-valves')
         };
+        this._lastCogs = -1;
+        this._pips = [];
+        this._bossFor = null;
         this._roomShown = 0;
         this._toastT = 0;
         this._lastLives = -1;
@@ -81,6 +89,12 @@
         bus.on(EV.ROOM_CHANGED, function (e) {
             self.el.room.textContent = e.room.name;
             self._roomShown = 2.4;
+            // The first time into a vault, say what the fight is.
+            const set = self.run.ents();
+            if (set && set.boss && !set.boss.defeated() && !set._introduced) {
+                set._introduced = true;
+                self.toast('STOMP THE GOVERNOR\'S VALVES WHILE THEY VENT', 'bad');
+            }
         });
 
         bus.on(EV.MINE_STARTED, function (e) {
@@ -115,8 +129,33 @@
         });
 
         bus.on(EV.DETONATOR_DENIED, function (e) {
-            self.toast('NEED ' + e.needed + ' MORE STICK' + (e.needed === 1 ? '' : 'S'), 'bad');
+            if (e.needed > 0) {
+                self.toast('NEED ' + e.needed + ' MORE STICK' + (e.needed === 1 ? '' : 'S'), 'bad');
+            } else {
+                self.toast('THE GOVERNOR STILL RUNS — BREAK ITS VALVES', 'bad');
+            }
             self.float('NO', e.x, e.y - 20, 'bad');
+        });
+
+        bus.on(EV.SECRET_FOUND, function () {
+            self.toast('THE DOG HAS FOUND SOMETHING', 'good');
+        });
+
+        bus.on(EV.LEVER_THROWN, function () {
+            self.toast('A GATE WINDS OPEN', 'good');
+        });
+
+        bus.on(EV.VALVE_OPENED, function (e) {
+            self.float('NOW!', e.x, e.y - 26, 'gold');
+        });
+
+        bus.on(EV.BOSS_HURT, function (e) {
+            self.float('+' + C.SCORE_VALVE, e.x, e.y - 14, 'gold');
+            if (e.left > 0) self.toast('VALVE BROKEN — ' + e.left + ' TO GO', 'good');
+        });
+
+        bus.on(EV.BOSS_DEFEATED, function () {
+            self.toast('THE GOVERNOR IS DOWN — THE PLUNGER IS LIVE', 'good');
         });
 
         bus.on(EV.PLAYER_HURT, function (e) {
@@ -180,6 +219,40 @@
         }
 
         this.el.kit.classList.toggle('is-on', run.player.hasOxygen);
+
+        if (run.cogsFound !== this._lastCogs) {
+            if (this._lastCogs >= 0 && run.cogsFound > this._lastCogs) {
+                const el = this.el.cogs;
+                el.classList.remove('is-bumped');
+                void el.offsetWidth;                 // restart the animation
+                el.classList.add('is-bumped');
+            }
+            this._lastCogs = run.cogsFound;
+            this.el.cogCount.textContent = run.cogsFound;
+            this.el.cogTotal.textContent = C.COGS_PER_MINE;
+        }
+
+        // The Governor's valves, while you are in its vault.
+        const set = run.entities[run.roomIndex];
+        const boss = set && set.boss;
+        const showBoss = !!boss && run.state !== 'title' && boss.state !== 'dead';
+        this.el.governor.classList.toggle('is-shown', showBoss);
+        if (boss && boss !== this._bossFor) {
+            this._bossFor = boss;
+            this.el.valves.innerHTML = '';
+            this._pips = boss.valves.map(function () {
+                const pip = document.createElement('i');
+                return pip;
+            });
+            for (const pip of this._pips) this.el.valves.appendChild(pip);
+        }
+        if (boss) {
+            for (let i = 0; i < this._pips.length; i++) {
+                const v = boss.valves[i];
+                this._pips[i].classList.toggle('is-broken', v.state === 'broken');
+                this._pips[i].classList.toggle('is-open', v.state === 'open');
+            }
+        }
 
         if (run.medals !== this._lastMedals) {
             this._lastMedals = run.medals;

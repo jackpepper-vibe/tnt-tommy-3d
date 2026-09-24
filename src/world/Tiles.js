@@ -47,7 +47,8 @@
         'W': T.WATER,
         'G': T.DETONATOR,
         'T': T.TRAMPOLINE,
-        'Q': T.TELEPORT
+        'Q': T.TELEPORT,
+        'I': T.GATE
     };
 
     /**
@@ -81,7 +82,10 @@
         'K': 'crusher',     // ceiling piston; slams C.CRUSH_TILES down
         'P': 'boulder',     // ceiling dropper
         'h': 'liftH',       // horizontal lift; a pair marks the ends of its run
-        'v': 'liftV'        // vertical lift; likewise
+        'v': 'liftV',       // vertical lift; likewise
+        'Y': 'cog',         // a brass cog, hidden until the dog finds it
+        'l': 'lever',       // throws every gate in the room open
+        'U': 'valve'        // one of the Governor's three weak points
     };
 
     Tiles.TERRAIN_CHARS = TERRAIN;
@@ -92,7 +96,7 @@
      * ------------------------------------------------------------------ */
 
     Tiles.isSolid = function (t) {
-        return t === T.ROCK || t === T.CRACKED;
+        return t === T.ROCK || t === T.CRACKED || t === T.GATE;
     };
 
     /** Stand on it from above, pass through it from below. */

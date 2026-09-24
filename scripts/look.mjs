@@ -64,6 +64,49 @@ const POSES = {
             'TNT.game.step(128)'
         ]
     },
+    /* The Governor mid-volley, a valve venting. */
+    boss: {
+        eval: [
+            'bare', 'TNT.game.room("vault")',
+            `(function () {
+                const run = TNT.game.run;
+                run.energy = 1e6;
+                const b = run.ents().boss;
+                b.valves[1].state = 'open'; b.valves[1].timer = 9;
+                b.valves[0].state = 'broken';
+                b.state = 'volley'; b._burst = 3; b._burstT = 0.2;
+            })()`,
+            'TNT.game.step(40)'
+        ]
+    },
+    /* The workshop between mines, with cogs to spend. */
+    workshop: {
+        wait: 1200,
+        eval: [
+            'bare',
+            `(function () {
+                const run = TNT.game.run;
+                const idx = run.entities.findIndex(e => e.detonator);
+                run.roomIndex = idx;
+                run.entities[idx].boss.defeat();
+                run.tntFound = run.mine.tntTotal;
+                const d = run.entities[idx].detonator;
+                run.player.reset(d.x, d.y, true);
+                run.player.active = true;
+                run.cogs = 4;
+            })()`,
+            'TNT.game.step(260)'
+        ]
+    },
+    bossNoWorks: {
+        eval: [
+            'bare', 'TNT.game.room("vault")',
+            'TNT.game.step(40)',
+            'TNT.game.scene.roomView.group.children[0].visible = false'
+        ]
+    },
+    /* The Powder Store's shuttered door and the lever that opens it. */
+    gate: { eval: ['bare', 'TNT.game.room("powderStore")', 'TNT.game.put(30, 22)', 'TNT.game.step(60)'] },
     blast: {
         eval: [
             'bare', 'TNT.game.room("lampRoom")', 'TNT.game.put(7, 22)',

@@ -87,6 +87,14 @@
         ENEMY_FIRED: 'enemy-fired',       // {x, y, kind}
         SHOT_HIT: 'shot-hit',             // {x, y}
         ARMOUR_CLANG: 'armour-clang',     // {x, y}
+        SECRET_FOUND: 'secret-found',     // {x, y}
+        LEVER_THROWN: 'lever-thrown',     // {x, y}
+        BOSS_TELL: 'boss-tell',           // {x, y, move}
+        BOSS_BURST: 'boss-burst',         // {x, y}
+        BOSS_HURT: 'boss-hurt',           // {x, y, left}
+        BOSS_DEFEATED: 'boss-defeated',   // {x, y}
+        VALVE_OPENED: 'valve-opened',     // {x, y}
+        UPGRADE_BOUGHT: 'upgrade-bought', // {id, level}
         SHAKE: 'shake',                   // {amount, seconds}
         FLOAT_TEXT: 'float-text',         // {text, x, y, colour, seconds}
         STATE_CHANGED: 'state-changed'    // {from, to}

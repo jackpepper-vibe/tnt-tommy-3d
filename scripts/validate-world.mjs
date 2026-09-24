@@ -72,12 +72,43 @@ let warnings = 0;
  */
 let withBlast = false;
 
+/**
+ * Rooms whose lever has been reached, so their gates count as open.
+ *
+ * Gates make reachability a fixed point rather than a single search: explore
+ * with every gate shut, open the gates of every room whose lever was reached,
+ * and explore again — until a pass opens nothing new. A gate whose lever is
+ * only reachable from behind the gate stays shut for ever, which is exactly
+ * the bug this is here to catch.
+ */
+let openGates = new Set();
+
 function open(room, tx, ty) {
     if (tx < 0 || tx >= C.COLS || ty < 0 || ty >= C.ROWS) return false;
     const t = room.get(tx, ty);
     if (t === T.LAVA) return false;
     if (t === T.CRACKED) return withBlast;
+    if (t === T.GATE) return openGates.has(room.index);
     return !Tiles.isSolid(t);
+}
+
+/** Explore to a fixed point over the levers. */
+function exploreWithGates(mine) {
+    openGates = new Set();
+    for (;;) {
+        const seen = explore(mine);
+        let grew = false;
+        for (const room of mine.rooms) {
+            if (openGates.has(room.index)) continue;
+            for (const s of room.spawns) {
+                if (s.kind === 'lever' && reached(seen, room.index, s.tx, s.ty)) {
+                    openGates.add(room.index);
+                    grew = true;
+                }
+            }
+        }
+        if (!grew) return seen;
+    }
 }
 
 /** Is there something to stand on directly under this cell? */
@@ -395,8 +426,13 @@ function reached(seen, roomIdx, tx, ty) {
     return false;
 }
 
-/** Things a run cannot be completed without. */
-const REQUIRED = new Set(['tnt', 'oxygen']);
+/** Things a run cannot be completed without — the Governor's valves included. */
+const REQUIRED = new Set(['tnt', 'oxygen', 'valve']);
+/**
+ * Secrets. Optional to collect, but a cog nobody can reach is a promise the
+ * dog makes and the game breaks, so an unreachable one fails the pass.
+ */
+const SECRET = new Set(['cog']);
 /** Things it is merely a shame to lose. */
 const OPTIONAL = new Set(['ore', 'food', 'heart']);
 
@@ -404,9 +440,9 @@ function validate(mine) {
     console.log('\n' + mine.name);
 
     withBlast = false;
-    const onFoot = explore(mine);
+    const onFoot = exploreWithGates(mine);
     withBlast = true;
-    const seen = explore(mine);
+    const seen = exploreWithGates(mine);
     withBlast = false;
 
     let required = 0, optional = 0, lostRequired = 0, lostOptional = 0;
@@ -417,7 +453,12 @@ function validate(mine) {
         const misses = [];
 
         for (const s of room.spawns) {
-            if (REQUIRED.has(s.kind)) {
+            if (SECRET.has(s.kind)) {
+                if (!reached(seen, room.index, s.tx, s.ty)) {
+                    lostRequired++;
+                    misses.push(`secret ${s.kind} at (${s.tx},${s.ty})`);
+                }
+            } else if (REQUIRED.has(s.kind)) {
                 required++;
                 if (!reached(seen, room.index, s.tx, s.ty)) {
                     lostRequired++;

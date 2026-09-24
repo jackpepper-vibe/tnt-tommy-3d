@@ -828,6 +828,8 @@ check('the plunger refuses to fire early and fires when fed', () => {
     assert(denied === 1, 'expected one refusal, got ' + denied);
     assert(run.state === 'playing', 'it fired on three sticks');
 
+    // The Governor is its own check; here it is only in the way.
+    run.entities[vaultIdx].boss.defeat();
     run.tntFound = run.mine.tntTotal;
     h.step(2);
     assert(run.state === 'boom', 'it would not fire on a full dozen (state ' + run.state + ')');
@@ -845,12 +847,166 @@ check('a full run rolls into the next mine and then to victory', () => {
         run.player.reset(det.x, det.y, true);
         run.player.active = true;
         run.tntFound = run.mine.tntTotal;
+        const governor = run.entities[vaultIdx].boss;
+        if (governor) governor.defeat();
         h.step(2);
         assert(run.state === 'boom', 'mine ' + before + ' would not blow');
         h.seconds(1.6, []);
+        if (m < 2) {
+            assert(run.state === 'workshop', 'mine ' + before + ' did not go to the workshop');
+            run.leaveWorkshop();
+        }
     }
     assert(run.state === 'victory', 'ended in state "' + run.state + '" instead of victory');
     return 'three mines blown, score ' + run.score;
+});
+
+console.log('\ngoals');
+
+check('every mine hides its cogs, and every vault has a Governor', () => {
+    const run = new Run();
+    const out = [];
+    for (const mine of run.mines) {
+        let cogs = 0;
+        for (const room of mine.rooms) cogs += room.spawns.filter(s => s.kind === 'cog').length;
+        assert(cogs === C.COGS_PER_MINE, mine.name + ' hides ' + cogs + ' cogs, not ' + C.COGS_PER_MINE);
+        const sets = TNT.Entities.forMine(mine);
+        const vault = sets.find(s => s.detonator);
+        assert(vault && vault.boss, mine.name + ': the plunger has no Governor guarding it');
+        assert(vault.boss.valves.length === 3, mine.name + ': the Governor has ' + vault.boss.valves.length + ' valves');
+        out.push(mine.name + ' ' + cogs);
+    }
+    return out.join(', ');
+});
+
+check('the dog points at a hidden cog and the cog shows itself', () => {
+    const h = harness();
+    const run = h.run;
+    let cog = null;
+    for (let i = 0; i < run.mine.rooms.length && !cog; i++) {
+        cog = run.entities[i].pickups.find(p => p.kind === 'cog');
+        if (cog) run.roomIndex = i;
+    }
+    assert(cog, 'no cog in mine 1');
+    assert(!cog.revealed, 'a cog starts out visible');
+    const p = run.player;
+    p.placeAt(cog.x + C.TILE * 3, cog.y);
+    p.invuln = 5;
+    h.step(1);
+    assert(cog.revealed, 'three tiles from a cog and it stayed hidden');
+    assert(run.dog.state === 'point', 'the dog did not point (state ' + run.dog.state + ')');
+    return 'revealed from ' + (C.SNIFF_R / C.TILE) + ' tiles';
+});
+
+check('a lever opens every gate in its room', () => {
+    const h = harness();
+    const run = h.run;
+    const idx = run.entities.findIndex(e => e.gates.length);
+    assert(idx >= 0, 'no gated room in mine 1');
+    run.roomIndex = idx;
+    const ents = run.ents();
+    const g0 = ents.gates[0];
+    assert(Tiles.isSolid(run.room().get(g0.tx, g0.ty)), 'a shut gate is not solid');
+    const lever = ents.levers[0];
+    run.player.placeAt(lever.x, lever.y);
+    run.player.invuln = 5;
+    h.step(1);
+    assert(lever.thrown, 'walked into the lever and it did not throw');
+    for (const g of ents.gates) {
+        assert(!Tiles.isSolid(run.room().get(g.tx, g.ty)), 'a gate stayed shut at (' + g.tx + ',' + g.ty + ')');
+    }
+    return ents.gates.length + ' gate tiles opened in ' + run.room().name;
+});
+
+check('the plunger will not fire while the Governor runs', () => {
+    const h = harness();
+    const run = h.run;
+    const idx = run.entities.findIndex(e => e.detonator);
+    run.roomIndex = idx;
+    const ents = run.ents();
+    run.tntFound = run.mine.tntTotal;
+    run.player.reset(ents.detonator.x, ents.detonator.y, true);
+    run.player.active = true;
+    run.player.invuln = 5;
+    h.step(2);
+    assert(run.state === 'playing', 'the plunger fired with the Governor still running');
+    ents.boss.defeat();
+    run._detHinted = false;
+    h.step(2);
+    assert(run.state === 'boom', 'the Governor is dead and the plunger still refused');
+    return 'refused, then fired';
+});
+
+check('an open valve breaks under a stomp; a shut one glances it off', () => {
+    const h = harness();
+    const run = h.run;
+    const idx = run.entities.findIndex(e => e.boss);
+    run.roomIndex = idx;
+    const boss = run.ents().boss;
+    const p = run.player;
+    const land = function (v) {
+        const b = v.box();
+        p.placeAt(b.x, b.y - b.h / 4);
+        p.mode = 'walk';
+        p.onGround = false;
+        p.invuln = 5;
+        p.vy = C.STOMP_MIN_V * 2;
+        run.hitstop = 0;
+        h.step(1);
+    };
+    const v = boss.valves[0];
+    v.state = 'shut';
+    land(v);
+    assert(v.state === 'shut', 'a shut valve broke under a stomp');
+    v.state = 'open';
+    v.timer = 2;
+    const before = run.score;
+    land(v);
+    assert(v.state === 'broken', 'an open valve survived a stomp');
+    assert(run.score >= before + C.SCORE_VALVE, 'breaking a valve scored nothing');
+    for (const w of boss.valves) { if (w.state !== 'broken') { w.state = 'open'; w.timer = 2; land(w); } }
+    assert(boss.defeated(), 'three valves broken and the Governor runs on');
+    return 'broke all three';
+});
+
+check('the workshop turns cogs into kit, and kit changes the rules', () => {
+    const h = harness();
+    const run = h.run;
+    const idx = run.entities.findIndex(e => e.detonator);
+    run.roomIndex = idx;
+    run.entities[idx].boss.defeat();
+    run.tntFound = run.mine.tntTotal;
+    const det = run.entities[idx].detonator;
+    run.player.reset(det.x, det.y, true);
+    run.player.active = true;
+    h.step(2);
+    h.seconds(1.6, []);
+    assert(run.state === 'workshop', 'a cleared mine did not open the workshop');
+
+    run.cogs = 2;
+    assert(!run.buy('tank'), 'bought a 3-cog tank with 2 cogs');
+    run.cogs = 5;
+    assert(run.buy('boots'), 'could not buy boots with 5 cogs');
+    assert(run.cogs === 3, 'boots cost ' + (5 - run.cogs) + ', not 2');
+    assert(!run.buy('boots'), 'bought boots twice');
+    assert(run.mods.spikeMul === 0.5, 'boots did not halve spikes');
+    assert(run.buy('tank'), 'could not buy the tank with 3 cogs');
+    run.leaveWorkshop();
+    assert(run.state === 'playing' && run.mineIndex === 1, 'did not go down the next mine');
+    assert(run.player.hasOxygen, 'bought the air tank and started without it');
+    return 'boots and tank bought, mine 2 started with the tank';
+});
+
+check('a heavy landing costs fuse, and never kills', () => {
+    const h = harness();
+    const run = h.run;
+    run.energy = 10;
+    run.bus.emit(TNT.EV.PLAYER_LANDED, { x: 0, y: 0, speed: C.MAX_FALL, hard: true });
+    assert(run.energy === 1, 'a heavy landing at 10 fuse left ' + run.energy);
+    run.energy = 50;
+    run.bus.emit(TNT.EV.PLAYER_LANDED, { x: 0, y: 0, speed: C.FALL_SAFE - 10, hard: false });
+    assert(run.energy === 50, 'a safe landing cost fuse');
+    return 'costs ' + C.FALL_DMG + ', floors at 1';
 });
 
 /* ------------------------------------------------------------------ *

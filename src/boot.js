@@ -49,6 +49,7 @@
         const host = {
             update: function (dt) {
                 run.update(dt, input);
+                screens.workshopInput(input);
 
                 // Shell keys are read here rather than inside `Run`, which has
                 // no business knowing the page has a scanline toggle on it.
@@ -122,7 +123,9 @@
                 run.player.reset(spawn.x, spawn.y, true);
                 run.player.active = true;
                 run.dog.placeAt(spawn.x, spawn.y, 1);
-                scene.setRoom(run.room(), null);
+                // Announced like any room change, so the HUD's banner and the
+                // Governor bar follow the room a harness jumps to.
+                run.bus.emit(TNT.EV.ROOM_CHANGED, { room: run.room(), dir: null });
                 return run.room().name;
             },
 

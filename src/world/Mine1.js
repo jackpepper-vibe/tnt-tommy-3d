@@ -136,6 +136,16 @@
 
                 // The only long climb: floor to the powder shelf.
                 g.ladder(12, 11, 16);
+
+                /*
+                 * The first gate in the game. The door on to the Deep Cut is
+                 * shuttered and the lever is on the roof deck at the far end,
+                 * so the room's lesson changes from "cross it" to "climb it" —
+                 * and the Deep Cut can still be reached from above by anyone
+                 * who would rather not.
+                 */
+                g.gate(40, 19, 4);
+                g.lever(34, 4);
             }
         },
 
@@ -355,6 +365,7 @@
              * collide, and arriving from above drops you into a moving platform.
              */
             build: function (g) {
+
                 // The headframe. The right cheek is cut away at each *standing*
                 // row — 19, 16, 13, 10, 7, 4 — and solid everywhere else, so
                 // the cage can be stepped off at a landing and the shaft is a
@@ -398,6 +409,9 @@
                 g.guardian(14, 6);
                 g.orb(18, 16);
 
+
+                // A cog at the top of the cage run, where only a rider reaches.
+                g.cog(5, 4);
             }
         },
 
@@ -418,6 +432,7 @@
              * this is the room that teaches you what the dynamite is for.
              */
             build: function (g) {
+
                 g.rock(1, 18, 6, 1);
                 g.cracked(5, 19, 2, 4);
                 g.heart(2, 22);
@@ -452,6 +467,9 @@
                 g.orb(31, 10);
 
                 g.ladder(35, 5, 22);
+
+                // A cog in the nook behind the fissure — the dog smells it through the rock.
+                g.cog(1, 22);
             }
         },
 
@@ -468,6 +486,7 @@
              * way onto the roof span, and the rope is the only way off it.
              */
             build: function (g) {
+
                 g.spikes(25, 22, 5);
                 g.tramp(15, 22, 2);
 
@@ -503,6 +522,9 @@
 
                 g.vine(6, 5, 7);
                 g.vine(28, 5, 7);
+
+                // A cog on the far roof deck, up the chain.
+                g.cog(33, 4);
             }
         },
 
@@ -513,6 +535,13 @@
             cell: [2, 0],
             exits: { left: true, down: true },
             /**
+             * The Governor is built into the roof over the middle of the room.
+             * Copperlode's is the gentlest — volleys and vents, no cinders —
+             * and its valves are spread one to a side and one low, so the
+             * fight is a climb round the room rather than a stand-off.
+             */
+            boss: { at: [21, 3] },
+            /**
              * The plunger, and a piston in front of it. Reachable two ways —
              * along the top band or straight up the cage — so a player who has
              * lost track of the map still has a route.
@@ -520,6 +549,9 @@
             build: function (g) {
                 g.detonator(34, 22);
                 g.crusher(30, 19);
+                g.valve(8, 13);
+                g.valve(36, 7);
+                g.valve(33, 16);
 
                 g.deck(20, [2, 8], [13, 8], [25, 8]);
                 g.deck(17, [5, 9], [17, 9], [29, 8]);
@@ -543,11 +575,9 @@
                 g.crumble(24, 11, 4);
                 g.boulder(29, 1);
                 g.bat(24, 12);
-                g.guardian(16, 9);
                 g.walker(18, 19);
                 g.spider(11, 1);
                 g.dog(13, 22);
-                g.orb(33, 10);
 
                 g.ladder(6, 8, 13);
             }

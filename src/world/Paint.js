@@ -220,6 +220,15 @@
         return this.set(x, y, 'G');
     };
 
+    /**
+     * A shutter gate, `h` tiles tall. Solid until the room's lever is thrown —
+     * so a gate is a question the room asks ("where is the lever?"), and the
+     * validator walks both sides of it.
+     */
+    Grid.prototype.gate = function (x, y, h) {
+        return this.fill(x, y, 1, h || 3, 'I');
+    };
+
     /* ------------------------------------------------------------------ *
      * Actors
      * ------------------------------------------------------------------ */
@@ -273,6 +282,13 @@
         }
         return this;
     };
+
+    /** A brass cog: hidden, and pointed out by the dog. Three to a mine. */
+    Grid.prototype.cog = function (x, y) { return this.put('Y', x, y); };
+    /** The lever that opens this room's gates. Walk into it. */
+    Grid.prototype.lever = function (x, y) { return this.put('l', x, y); };
+    /** One of the Governor's valves, standing on a deck. The vault has three. */
+    Grid.prototype.valve = function (x, y) { return this.put('U', x, y); };
 
     Grid.prototype.walker = function (x, y) { return this.put('B', x, y); };
     Grid.prototype.crawler = function (x, y) { return this.put('c', x, y); };
@@ -363,7 +379,7 @@
     };
 
     /** Characters that represent an actor rather than terrain. */
-    const ACTOR_CHARS = '@DCMHOBcdFSgoKPhv';
+    const ACTOR_CHARS = '@DCMHOBcdFSgoKPhvYlU';
 
     /**
      * The ladder that carries a vertical room link. Runs the full height of the

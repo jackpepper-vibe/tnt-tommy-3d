@@ -37,9 +37,11 @@ CHAR[C.Tile.WATER] = 'W';
 CHAR[C.Tile.DETONATOR] = 'G';
 CHAR[C.Tile.TRAMPOLINE] = 'T';
 CHAR[C.Tile.TELEPORT] = 'Q';
+CHAR[C.Tile.GATE] = 'I';
 
 const ACTOR = {
     spawn: '@', tnt: 'D', ore: 'C', food: 'M', heart: 'H', oxygen: 'O',
+    cog: 'Y', lever: 'l', valve: 'U',
     walker: 'B', crawler: 'c', dog: 'd', bat: 'F', spider: 'S',
     guardian: 'g', orb: 'o',
     crusher: 'K', boulder: 'P', liftH: 'h', liftV: 'v'

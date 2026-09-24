@@ -49,7 +49,8 @@
         ore:    { w: 9,  h: 9,  score: C.SCORE_ORE,   glow: true,  respawn: 0 },
         food:   { w: 11, h: 11, score: C.SCORE_FOOD,  glow: false, respawn: C.FOOD_RESPAWN },
         heart:  { w: 12, h: 11, score: C.SCORE_HEART, glow: true,  respawn: 0 },
-        oxygen: { w: 10, h: 14, score: 0,             glow: true,  respawn: 0 }
+        oxygen: { w: 10, h: 14, score: 0,             glow: true,  respawn: 0 },
+        cog:    { w: 14, h: 14, score: C.SCORE_COG,   glow: true,  respawn: 0 }
     };
 
     function Pickup(kind, tx, ty) {
@@ -68,6 +69,12 @@
         /** Offset from home while being drawn in by the magnet. */
         this.pullX = 0;
         this.pullY = 0;
+        /**
+         * Cogs start hidden: not drawn, until the dog smells one out. They can
+         * still be walked into and collected blind — a secret found by
+         * accident is still found.
+         */
+        this.revealed = kind !== 'cog';
     }
 
     Pickup.prototype.update = function (dt) {
@@ -651,12 +658,13 @@
      * any in its radius. It does not pass through decks either — a shot that
      * came up through the floor you are standing on would be unreadable.
      */
-    function Shot(kind, x, y, vx, vy) {
+    function Shot(kind, x, y, vx, vy, grav) {
         this.kind = kind;
         this.x = x;
         this.y = y;
         this.vx = vx;
         this.vy = vy;
+        this.grav = grav || 0;
         this.life = 4;
         this.dead = false;
         this.w = 7;
@@ -665,10 +673,14 @@
 
     Shot.prototype.update = function (dt, room) {
         this.life -= dt;
+        this.vy += this.grav * dt;
         this.x += this.vx * dt;
         this.y += this.vy * dt;
         const t = room.at(this.x, this.y);
-        if (this.life <= 0 || Tiles.isSolid(t) || this.x < 0 || this.x > C.ROOM_W) {
+        // A shot travelling level passes decks; one coming *down* stops on the
+        // first it meets, so a deck overhead is always cover.
+        const stopped = Tiles.isSolid(t) || (this.vy > 20 && Tiles.isOneWay(t));
+        if (this.life <= 0 || stopped || this.x < 0 || this.x > C.ROOM_W || this.y > C.ROOM_H) {
             this.dead = true;
             return true;
         }
@@ -1030,6 +1042,11 @@
         /** Shots in flight. Transient: cleared on every rewind. */
         this.shots = [];
         this.bus = null;
+        this.levers = [];
+        this.gates = [];
+        /** The Governor, in the vault only. */
+        this.boss = null;
+        const valveMarks = [];
         /** Set once every nugget in the room has been taken; the medal is once. */
         this.medal = false;
         /** Whether the player has ever been here. Drawn on the minimap. */
@@ -1075,6 +1092,15 @@
                 case 'liftV':
                     liftMarks.v.push(s);
                     break;
+                case 'cog':
+                    this.pickups.push(new Pickup('cog', s.tx, s.ty));
+                    break;
+                case 'lever':
+                    this.levers.push(new TNT.Machines.Lever(s.tx, s.ty));
+                    break;
+                case 'valve':
+                    valveMarks.push(s);
+                    break;
                 default:
                     throw new Error(room.id + ': no entity for spawn kind "' + s.kind + '"');
             }
@@ -1086,7 +1112,9 @@
         for (let ty = 0; ty < C.ROWS; ty++) {
             for (let tx = 0; tx < C.COLS; tx++) {
                 const t = room.get(tx, ty);
-                if (t === T.VENT) {
+                if (t === T.GATE) {
+                    this.gates.push(new TNT.Machines.Gate(tx, ty));
+                } else if (t === T.VENT) {
                     this.vents.push(new Vent(tx, ty));
                 } else if (t === T.TELEPORT) {
                     this.warps.push(new Warp(tx, ty));
@@ -1109,6 +1137,16 @@
 
         pairWarps(this, room);
         pairLifts(this, liftMarks, room);
+
+        if (valveMarks.length) {
+            if (!room.boss) throw new Error(room.id + ': valves with no Governor (set `boss` on the room)');
+            this.boss = new TNT.Machines.Governor(room, mine, valveMarks, room.boss);
+        } else if (room.boss) {
+            throw new Error(room.id + ': a Governor with no valves to break');
+        }
+        if (this.gates.length && !this.levers.length) {
+            throw new Error(room.id + ': gates and no lever — nothing could ever open them');
+        }
 
         // A room marked as flooding gets a rising surface over its lava bed.
         if (room.flooding && lavaLow >= 0) {
@@ -1180,6 +1218,9 @@
         this.bus = bus;
         for (const p of this.pickups) p.update(dt);
         for (const e of this.enemies) e.update(dt, player, this);
+        for (const l of this.levers) l.update(dt);
+        for (const g of this.gates) g.update(dt);
+        if (this.boss && player) this.boss.update(dt, player, this);
         for (let i = this.shots.length - 1; i >= 0; i--) {
             const s = this.shots[i];
             if (s.update(dt, this.room)) {
@@ -1264,6 +1305,7 @@
         this.crumbles.clear();
 
         this.shots.length = 0;
+        if (this.boss) this.boss.rewind();
         for (const p of this.pickups) { p.pullX = p.pullY = 0; }
         for (const e of this.enemies) {
             e.dead = false;
@@ -1290,9 +1332,23 @@
     };
 
     /** Put a shot in the air. Called by the patrols that shoot. */
-    RoomEntities.prototype.fire = function (kind, x, y, vx, vy) {
-        this.shots.push(new Shot(kind, x, y, vx, vy));
+    RoomEntities.prototype.fire = function (kind, x, y, vx, vy, grav) {
+        this.shots.push(new Shot(kind, x, y, vx, vy, grav));
         if (this.bus) this.bus.emit(TNT.EV.ENEMY_FIRED, { x: x, y: y, kind: kind });
+    };
+
+    /**
+     * Throw a lever: every gate in the room winds up, and the tiles open.
+     * Returns false if it was already thrown.
+     */
+    RoomEntities.prototype.throwLever = function (lever) {
+        if (lever.thrown) return false;
+        lever.thrown = true;
+        for (const g of this.gates) {
+            g.open = true;
+            this.room.set(g.tx, g.ty, T.EMPTY);
+        }
+        return true;
     };
 
     /** Enemies within a blast. Returns how many were destroyed. */
