@@ -108,13 +108,7 @@
             // Contact shadows: multiplied down onto whatever is behind them,
             // so they darken the wall rather than adding a grey rectangle to
             // it. Drawn after the solids and before the glow.
-            const mesh = new THREE.Mesh(shade.geometry(), new THREE.MeshBasicMaterial({
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.5,
-                blending: THREE.MultiplyBlending,
-                depthWrite: false
-            }));
+            const mesh = new THREE.Mesh(shade.geometry(), R3D.shadeMaterial());
             mesh.name = 'contact';
             mesh.renderOrder = 1;
             group.add(mesh);
@@ -123,12 +117,7 @@
         if (!liquid.isEmpty()) {
             // Ordinary alpha, not additive: water has to take light *out* of
             // what shows through it.
-            const mesh = new THREE.Mesh(liquid.geometry(), new THREE.MeshBasicMaterial({
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.62,
-                depthWrite: false
-            }));
+            const mesh = new THREE.Mesh(liquid.geometry(), R3D.liquidMaterial());
             mesh.name = 'water';
             mesh.renderOrder = 2;
             group.add(mesh);

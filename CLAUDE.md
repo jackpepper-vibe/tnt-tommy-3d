@@ -3,14 +3,41 @@
 Inherits the global guidelines in `../CLAUDE.md` (commercial-grade code, always
 commit and push after changes, bypass-permissions bash).
 
-Replaces two earlier games that were the same idea twice: `../dynamite-dan`
-(TypeScript, PixiJS, Rapier2D, Vite) and `../tnt-tommy-godot` (GDScript). This
-build takes the Godot version's presentation — dark worked-out mine, lamp-lit,
-crystals, both chiptune tracks — and Dynamite Dan's mechanical depth: the fuse,
-conveyors, crushers, droppers, crumbling planks, lava, the flooded sump, the
-oxygen tank, blastable rock, and a three-mine campaign.
+Replaces two earlier games that were the same idea twice: Dynamite Dan
+(TypeScript, PixiJS) and the Godot build (both still on GitHub; the local
+folders were deleted on 23 Sep 2026). It keeps the Godot version's chiptune
+tracks and Dynamite Dan's mechanical depth — the fuse, conveyors, crushers,
+droppers, crumbling floors, lava, the flooded sump, the oxygen tank, blastable
+rock, a three-mine campaign — and has since been rebuilt top to bottom.
 
-Neither original is a reference for *movement*, because this one has no jump.
+## The look: an underground works
+
+Not a cave. The brief after the first playable build was that the green moss
+and the daylit backdrop made it read as outdoors, and that it lacked depth, so
+every room is now a built interior sunk in rock: a masonry wall with
+iron-framed windows onto a machine hall (`src/r3d/Works.js`), girder columns,
+pipework, gauges, bulkhead and pendant lamps. Decks are riveted steel catwalks
+hung from the structure above; ladders are steel, hanging ropes are chain,
+lines are cable. **There is no green anywhere, deliberately.** Each mine has
+its own palette in `R3D.PALETTES` (brass and oxide, a teal gasworks, a
+foundry), and each room names a background set piece in its definition
+(`works: 'flywheel' | 'fans' | 'furnace' | 'tanks' | 'winding' | 'stores'`) so
+rooms are told apart by their landmark.
+
+Tommy is the boy from the title-card portrait (red hair, puffer jacket banded
+yellow/grey/charcoal, jeans, blue trainers) in a miner's helmet, drawn larger
+than his collision box so he reads at room scale. His Shih Tzu follows him on
+his own trail (`src/entities/Companion.js`) and points at hidden cogs.
+
+## Goals
+
+A mine asks three things: find the twelve sticks, break the **Governor** that
+guards the plunger (a boiler-engine in the vault roof; stomp its three valves
+while they vent, or blast them — `src/entities/Machines.js`), and get back to
+the plunger once the last stick starts the seam coming down. Alongside: three
+**brass cogs** per mine, hidden until the dog smells them, spent at the
+**workshop** between mines on kit (`src/systems/Upgrades.js`). **No upgrade may
+touch the jump** — they change how forgiving a mine is, never its reach.
 
 ## The one rule everything else follows
 
@@ -28,11 +55,18 @@ silently — rooms stay perfectly plausible in a screenshot while becoming trivi
 or impossible. `scripts/smoke.mjs` asserts the apex for that reason, and
 `scripts/validate-world.mjs` re-walks all 27 rooms under it.
 
-Three supporting rules:
+Supporting rules:
 
-- **Falling is cheap and never fatal.** Eight rows is free, terminal velocity
-  grazes the fuse for fourteen, nothing kills. Both originals were the same, and
-  it is what lets a dense climbing frame be fun to come back down.
+- **Falling is cheap and never fatal.** Six rows is free; past that a landing
+  costs `C.FALL_DMG` of fuse (it was documented from the start and never
+  applied until the rebuild), and it floors at one point — nothing kills.
+- **A wall-jump must alternate walls.** Off one wall and then the other climbs
+  a chimney; off the same wall twice would climb any wall and make every
+  four-row ladder optional. The side last kicked off is locked until Tommy
+  lands, climbs or ropes. `smoke.mjs` checks it.
+- **Nothing an enemy does may break the rule either.** A held jump through a
+  stomp bounces to `C.STOMP_BOUNCE_HELD`, deliberately short of a full jump:
+  from an enemy's head a full jump would clear four rows.
 - **The forgiveness mechanics are not polish.** Coyote time, jump buffering and
   variable height are all present, and a three-row grid over spike beds is
   miserable without them.
@@ -118,6 +152,18 @@ go through `R3D.col()`. Skipping it lifts the whole palette to pale putty, which
 this art direction cannot survive. Light colours are the exception — they are
 multipliers, and are set raw.
 
+**Lighting is per-pixel Phong, not Lambert.** Lambert in r128 lights per
+*vertex*, and a merged wall run is one quad forty tiles wide — lamps could only
+brighten its corners and never made a pool, and the helmet spot showed nothing.
+Every light also carries its own `z`: a lamp bolted to the wall has to be at
+the wall to pool on it.
+
+**Materials are cached for the life of the page** (`R3D.cached`). Disposing
+the last user of a shader program deletes the program, so a room rebuilt with
+fresh materials recompiled four programs on every flip and respawn — a 25 to
+160 ms stall exactly when the player is watching. Never `new` a material per
+room; get it from `R3D`. `node scripts/perf.mjs` catches a regression.
+
 **Point-light decay is 1, not 2.** A world unit is a tile, so a room is
 forty-two units across, and inverse-square falloff leaves a lamp at a twentieth
 of its strength four tiles out. Every room came out black with a halo round
@@ -154,11 +200,13 @@ gets slower and then dies, a long way from the cause.
 Three passes, and none of them is optional before pushing.
 
 ```
-node scripts/smoke.mjs           19 checks on the rules, headless, no browser
-node scripts/validate-world.mjs  reachability across all 27 rooms
+node scripts/smoke.mjs           39 checks on the rules, headless, no browser
+node scripts/validate-world.mjs  reachability: sticks, valves, cogs, gates
 node scripts/check-rooms.mjs     build every room, report all faults at once
-node scripts/room-stats.mjs      density, against ../dynamite-dan
-node scripts/shot.mjs            16 screenshots
+node scripts/look.mjs [pose…]    captures on the REAL GPU — judge art from these
+node scripts/perf.mjs            frame rate and worst frame, real GPU
+node scripts/room-stats.mjs      density (needs ../dynamite-dan cloned alongside)
+node scripts/shot.mjs            software-GL captures, for "does it draw at all"
 node scripts/dump-rooms.mjs 2    print a mine as ASCII
 ```
 

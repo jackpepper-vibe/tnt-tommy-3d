@@ -503,13 +503,15 @@
             _beamGeo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
             _beamGeo.userData.shared = true;
         }
-        const mat = new THREE.MeshBasicMaterial({
-            color: R3D.mixCol(pal.lamp, '#000000', 0.82),
-            vertexColors: true,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            side: THREE.DoubleSide
+        const mat = R3D.cached('beam:' + pal.lamp, function () {
+            return new THREE.MeshBasicMaterial({
+                color: R3D.mixCol(pal.lamp, '#000000', 0.82),
+                vertexColors: true,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
         });
         const mesh = new THREE.Mesh(_beamGeo, mat);
         const len = Math.max(2, beam.len);
@@ -857,9 +859,8 @@
         const spread = (Math.abs(DARK_Z) + 19) / 19;
         const w = (C.COLS + 10) * spread, h = (C.ROWS + 8) * spread;
         const geo = new THREE.PlaneGeometry(w, h);
-        const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-            map: darkTexture(pal),
-            depthWrite: false
+        const mesh = new THREE.Mesh(geo, R3D.cached('dark:' + pal.deep + pal.deepGlow, function () {
+            return new THREE.MeshBasicMaterial({ map: darkTexture(pal), depthWrite: false });
         }));
         mesh.position.set(C.COLS / 2, C.ROWS / 2 - 2, DARK_Z);
         mesh.renderOrder = -6;

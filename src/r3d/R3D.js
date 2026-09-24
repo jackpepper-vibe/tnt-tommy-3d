@@ -909,12 +909,60 @@
      * and every material — the texture only supplies the *detail*.
      */
     R3D.solidMaterial = function (textureName) {
-        return new THREE.MeshPhongMaterial({
-            vertexColors: true,
-            side: THREE.FrontSide,
-            map: textureName ? R3D.texture(textureName) : null,
-            specular: new THREE.Color(0x1a1612),
-            shininess: 14
+        return R3D.cached('solid:' + (textureName || ''), function () {
+            return new THREE.MeshPhongMaterial({
+                vertexColors: true,
+                side: THREE.FrontSide,
+                map: textureName ? R3D.texture(textureName) : null,
+                specular: new THREE.Color(0x1a1612),
+                shininess: 14
+            });
+        });
+    };
+
+    /**
+     * One material per distinct look, for the life of the page.
+     *
+     * A room is torn down and rebuilt on every flip, and it used to take its
+     * materials with it. Disposing the last user of a shader program deletes
+     * the program, so the next room compiled the same four programs again —
+     * a stall of 25 to 160 ms on every room change and every respawn, which is
+     * exactly when the player is watching. Materials made here are flagged
+     * shared, `R3D.dispose` leaves them alone, and the programs stay compiled.
+     */
+    const _materials = new Map();
+    R3D.cached = function (key, make) {
+        let m = _materials.get(key);
+        if (!m) {
+            m = make();
+            m.userData.shared = true;
+            _materials.set(key, m);
+        }
+        return m;
+    };
+
+    /** Contact shadows: multiplied down onto whatever is behind. */
+    R3D.shadeMaterial = function () {
+        return R3D.cached('shade', function () {
+            return new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.5,
+                blending: THREE.MultiplyBlending,
+                depthWrite: false
+            });
+        });
+    };
+
+    /** Water: ordinary alpha, so it takes light out of what shows through. */
+    R3D.liquidMaterial = function () {
+        return R3D.cached('liquid', function () {
+            return new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.62,
+                depthWrite: false
+            });
         });
     };
 
@@ -960,12 +1008,15 @@
 
     /** Everything that emits: crystals, glows, the fuse, the blast. */
     R3D.glowMaterial = function (opacity) {
-        return new THREE.MeshBasicMaterial({
-            vertexColors: true,
-            transparent: true,
-            opacity: opacity === undefined ? 1 : opacity,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
+        const o = opacity === undefined ? 1 : opacity;
+        return R3D.cached('glow:' + o.toFixed(2), function () {
+            return new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: o,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
         });
     };
 
@@ -1069,16 +1120,17 @@
 
     /** An additive plate carrying the heat falloff, tinted by `colour`. */
     R3D.hazeMaterial = function (colour, opacity) {
-        const m = new THREE.MeshBasicMaterial({
-            color: colour,
-            map: R3D.hazeTexture(),
-            transparent: true,
-            opacity: opacity === undefined ? 1 : opacity,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
+        const o = opacity === undefined ? 1 : opacity;
+        return R3D.cached('haze:' + colour.getHexString() + ':' + o.toFixed(2), function () {
+            return new THREE.MeshBasicMaterial({
+                color: colour,
+                map: R3D.hazeTexture(),
+                transparent: true,
+                opacity: o,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
         });
-        m.userData.shared = true;
-        return m;
     };
 
     /** An additive sprite material carrying the soft dot, tinted by `colour`. */
