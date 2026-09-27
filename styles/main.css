@@ -573,7 +573,7 @@ body[data-screen="victory"] .minimap {
     flex-direction: row;
     align-items: stretch;
     gap: 26px;
-    max-width: 900px;
+    max-width: 1180px;
     padding: 22px 26px;
     background: rgba(12, 8, 6, 0.86);
     border: 1px solid var(--edge);
@@ -969,6 +969,189 @@ kbd {
     font-weight: 700;
     color: var(--gold);
     font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Leaderboard
+
+   The world top ten, on the title card and under both end cards, and the
+   name field that goes with it. Tabular figures so the scores line up.
+   ========================================================================== */
+
+.miner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+}
+
+.miner__label {
+    font-size: 0.66rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+}
+
+.miner__field {
+    width: 13.5rem;
+    max-width: 60vw;
+    padding: 0.45rem 0.7rem;
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--edge);
+    border-radius: 5px;
+    outline: none;
+}
+
+.miner__field::placeholder {
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: rgba(168, 152, 128, 0.7);
+}
+
+.miner__field:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold);
+}
+
+.miner__post {
+    padding: 0.45rem 1rem;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #241505;
+    background: linear-gradient(180deg, var(--gold), #e2892b);
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.miner--post {
+    justify-content: center;
+    margin: 0 0 1.2rem;
+}
+
+.miner[hidden] { display: none; }
+
+.post {
+    margin: -0.8rem 0 1rem;
+    font-size: 0.9rem;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+}
+
+.board {
+    text-align: left;
+    padding: 12px 14px 10px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+}
+
+.board--title {
+    flex: 0 0 290px;
+    max-width: 290px;
+    align-self: stretch;
+}
+
+.board--end {
+    margin: 0 auto 1.6rem;
+    max-width: 460px;
+}
+
+.board__title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin: 0 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ember);
+}
+
+.board__status {
+    font-size: 0.62rem;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: var(--ink-dim);
+}
+
+.board__status[hidden] { display: none; }
+
+.board__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.board__table th {
+    padding: 0 4px 5px;
+    font-size: 0.58rem;
+    font-weight: normal;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--ink-dim);
+    border-bottom: 1px solid var(--edge);
+}
+
+.board__table th:last-child,
+.board__score { text-align: right; }
+
+.board__table td {
+    padding: 4px;
+    white-space: nowrap;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.board__rank { width: 1.6em; color: var(--ink-dim); }
+.board__name { font-weight: 700; letter-spacing: 0.06em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; max-width: 8.5em; }
+.board__mine { font-size: 0.66rem; letter-spacing: 0.1em; color: var(--ink-dim); }
+.board__score { font-weight: 700; color: var(--gold); }
+
+/* The top three, in the colours of the medals they would be. */
+.board__table tbody tr:nth-child(1) .board__rank { color: #ffd66b; }
+.board__table tbody tr:nth-child(2) .board__rank { color: #d8dce4; }
+.board__table tbody tr:nth-child(3) .board__rank { color: #d99257; }
+
+.board__table tr.is-won .board__mine { color: var(--good); }
+
+.board__table tr.is-me td { background: rgba(255, 200, 87, 0.12); }
+.board__table tr.is-me .board__name { color: var(--gold); }
+
+/*
+ * Too narrow for portrait, copy and board side by side: the board drops below
+ * the other two, full width. After the base rules so it wins over them.
+ */
+@media (max-width: 1180px) {
+    #title-card { flex-wrap: wrap; max-width: 900px; }
+    .board--title { flex: 1 1 100%; max-width: none; }
+}
+
+@media (max-width: 760px) {
+    .board--title { flex: none; align-self: stretch; }
+}
+
+.board__empty td {
+    padding: 14px 4px;
+    font-size: 0.78rem;
+    white-space: normal;
+    text-align: center;
+    color: var(--ink-dim);
 }
 
 /* ==========================================================================

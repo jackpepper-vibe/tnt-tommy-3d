@@ -203,6 +203,7 @@ Three passes, and none of them is optional before pushing.
 node scripts/smoke.mjs           42 checks on the rules, headless, no browser
 node scripts/validate-world.mjs  reachability: sticks, valves, cogs, gates
 node scripts/check-rooms.mjs     build every room, report all faults at once
+node scripts/leaderboard.mjs     the board's contract, and the client against a fake server
 node scripts/look.mjs [pose…]    captures on the REAL GPU — judge art from these
 node scripts/perf.mjs            frame rate and worst frame, real GPU
 node scripts/room-stats.mjs      density (needs ../dynamite-dan cloned alongside)
@@ -238,6 +239,30 @@ node C:/Claude/Tools/shot/shot.mjs ./index.html --viewport 1280x760 --wait 2600 
 composite pass is the one part of the pipeline that fails invisibly, and a
 broken shader there looks exactly like a broken camera, a broken palette or an
 empty scene.
+
+## Leaderboard
+
+A world top ten, the same design as CarRacer's: `api/scores.js` is a Vercel
+function over the account's shared Neon store (`neon-beige-queen`, connected
+27 Sep 2026), in its own `tnt_tommy_scores` and `tnt_tommy_rate` tables, created
+on first cold start. One row per name per season, replaced only by a better run.
+
+- `shared/leaderboard.js` is the contract — name cleaning, the plausibility
+  ceiling, board parsing — and is loaded by **both** the page (as a classic
+  script) and the function (as a side-effect `import`, which leaves
+  `TNT.ScoreRules` on `globalThis`). Change the rules there and nowhere else.
+- `src/systems/Leaderboard.js` is the client: caches the last board, queues a
+  run it could not send and drains the queue on the next fetch, and holds a run
+  finished with no name so the end card can ask for one. `ScoreboardView.js`
+  draws it into every `[data-board]` on the page.
+- The ceiling (`PER_MINE`, `PER_SECOND`) is generous on purpose. If scoring
+  changes, `node scripts/leaderboard.mjs` rebuilds a perfect run from the
+  constants and fails if the board would refuse it. **Raise `SEASON`** when a
+  scoring change makes old runs incomparable.
+- `Input` ignores keys aimed at a text field, or every space, WASD and M in a
+  name would be eaten by the game.
+- From `file://` the fetch fails and the board shows as offline, with runs
+  queued. That is expected, not a bug.
 
 ## Assets
 

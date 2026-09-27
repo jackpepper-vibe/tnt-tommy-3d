@@ -74,6 +74,9 @@
     };
 
     Input.prototype._onKeyDown = function (e) {
+        // Keys typed into a text field — the leaderboard name — are the
+        // field's. Taking them would eat every space, WASD and the M in a name.
+        if (isTyping(e.target)) return;
         const actions = this._codeToActions.get(e.code);
         if (!actions) return;
         // Arrows and space scroll the page otherwise, which drags the canvas
@@ -146,6 +149,14 @@
         this._onBlur();
         this.endStep();
     };
+
+    /** Is this key event aimed at somewhere the player is typing? */
+    function isTyping(target) {
+        if (!target || typeof target !== 'object') return false;
+        if (target.isContentEditable) return true;
+        const tag = target.tagName;
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    }
 
     Input.BINDINGS = BINDINGS;
     TNT.Input = Input;

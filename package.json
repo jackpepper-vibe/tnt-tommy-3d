@@ -9,7 +9,8 @@
     "smoke": "node scripts/smoke.mjs",
     "rooms": "node scripts/dump-rooms.mjs",
     "validate": "node scripts/validate-world.mjs",
-    "test": "node scripts/smoke.mjs && node scripts/validate-world.mjs"
+    "leaderboard": "node scripts/leaderboard.mjs",
+    "test": "node scripts/smoke.mjs && node scripts/validate-world.mjs && node scripts/leaderboard.mjs"
   },
   "repository": {
     "type": "git",
@@ -22,6 +23,9 @@
     "url": "https://github.com/jackpepper-vibe/tnt-tommy/issues"
   },
   "homepage": "https://github.com/jackpepper-vibe/tnt-tommy#readme",
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0"
+  },
   "devDependencies": {
     "playwright": "^1.61.1"
   }

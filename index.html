@@ -147,8 +147,22 @@
                         <span><kbd>M</kbd> <b>SOUND</b></span>
                     </div>
 
+                    <form class="miner" id="miner-form" autocomplete="off">
+                        <label class="miner__label" for="miner-name">Miner</label>
+                        <input class="miner__field" id="miner-name" name="miner" type="text" maxlength="12"
+                               spellcheck="false" placeholder="Your name for the board">
+                    </form>
+
                     <button class="btn" data-confirm id="start-btn">&#9656; DOWN THE SHAFT</button>
                 </div>
+
+                <section class="board board--title" data-board aria-label="World leaderboard">
+                    <h3 class="board__title">World top ten <span class="board__status" data-board-status hidden></span></h3>
+                    <table class="board__table">
+                        <thead><tr><th>#</th><th>Miner</th><th>Reached</th><th>Score</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </section>
             </div>
         </section>
 
@@ -166,6 +180,20 @@
                     <div><dt>Sticks</dt><dd id="over-tnt">0 / 12</dd></div>
                     <div><dt>Time</dt><dd id="over-time">0:00</dd></div>
                 </dl>
+                <p class="post" data-post aria-live="polite" hidden></p>
+                <form class="miner miner--post" data-post-form autocomplete="off" hidden>
+                    <label class="miner__label" for="over-name">Miner</label>
+                    <input class="miner__field" id="over-name" type="text" maxlength="12"
+                           spellcheck="false" placeholder="Your name">
+                    <button class="miner__post" type="submit">Post</button>
+                </form>
+                <section class="board board--end" data-board aria-label="World leaderboard">
+                    <h3 class="board__title">World top ten <span class="board__status" data-board-status hidden></span></h3>
+                    <table class="board__table">
+                        <thead><tr><th>#</th><th>Miner</th><th>Reached</th><th>Score</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </section>
                 <button class="btn" data-confirm>Go back down</button>
             </div>
         </section>
@@ -184,6 +212,20 @@
                     <div><dt>Sticks</dt><dd id="win-tnt">12 / 12</dd></div>
                     <div><dt>Time</dt><dd id="win-time">0:00</dd></div>
                 </dl>
+                <p class="post" data-post aria-live="polite" hidden></p>
+                <form class="miner miner--post" data-post-form autocomplete="off" hidden>
+                    <label class="miner__label" for="win-name">Miner</label>
+                    <input class="miner__field" id="win-name" type="text" maxlength="12"
+                           spellcheck="false" placeholder="Your name">
+                    <button class="miner__post" type="submit">Post</button>
+                </form>
+                <section class="board board--end" data-board aria-label="World leaderboard">
+                    <h3 class="board__title">World top ten <span class="board__status" data-board-status hidden></span></h3>
+                    <table class="board__table">
+                        <thead><tr><th>#</th><th>Miner</th><th>Reached</th><th>Score</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </section>
                 <button class="btn" data-confirm>Run it again</button>
             </div>
         </section>
@@ -261,6 +303,11 @@
     <script src="src/systems/Audio.js"></script>
     <script src="src/systems/Hud.js"></script>
     <script src="src/systems/Screens.js"></script>
+
+    <!-- Leaderboard: the contract the server also loads, then the client -->
+    <script src="shared/leaderboard.js"></script>
+    <script src="src/systems/Leaderboard.js"></script>
+    <script src="src/systems/ScoreboardView.js"></script>
 
     <script src="src/boot.js"></script>
 </body>

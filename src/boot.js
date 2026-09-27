@@ -13,7 +13,7 @@
 (function (TNT) {
     'use strict';
 
-    const { C, Run, Input, Loop, Scene3D, Hud, Screens, Audio } = TNT;
+    const { C, Run, Input, Loop, Scene3D, Hud, Screens, Audio, Leaderboard, ScoreboardView } = TNT;
 
     function boot() {
         const canvas = document.getElementById('world');
@@ -43,6 +43,8 @@
         const hud = new Hud(run, shell);
         const screens = new Screens(run, shell);
         const audio = new Audio(run);
+        const leaderboard = new Leaderboard(run);
+        const scoreboard = new ScoreboardView(run, leaderboard, shell);
 
         input.attach(window);
 
@@ -82,6 +84,9 @@
 
         loop.start();
 
+        // In the background: the title shows the cached board until this lands.
+        leaderboard.refresh(true);
+
         /**
          * The test hook. Deliberately small: everything a harness needs to reach
          * an arbitrary state, and nothing that would let it fake one.
@@ -94,6 +99,8 @@
             hud: hud,
             screens: screens,
             audio: audio,
+            leaderboard: leaderboard,
+            scoreboard: scoreboard,
 
             /**
              * Freeze the simulation. Always call this first from a harness.

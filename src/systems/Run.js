@@ -1012,11 +1012,13 @@
 
     Run.prototype._finish = function (state) {
         this.player.active = false;
-        this._setState(state);
+        // Best first: the end card is filled on the state change, and a run
+        // that sets a new best must show it there, not the one it just beat.
         if (this.score > this.best) {
             this.best = this.score;
             saveBest(this.best);
         }
+        this._setState(state);
     };
 
     /* ------------------------------------------------------------------ *
